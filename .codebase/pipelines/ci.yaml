@@ -1,0 +1,54 @@
+name: PR test suite
+trigger:
+  change:
+    types: [submit, create, push]
+    branches: [main, ve-main]
+    paths:
+    - "!.github/**"
+    - "!.vscode/**"
+    - "!benchmarking/**"
+    - "!ci/**"
+    - "!docs/**"
+    - "!tools/**"
+    - "!tutorials/**"
+    - "!**/*.md"
+    - "!*.md"
+    - "!*.rst"
+    - "!.gitignore"
+    - "!LICENSE"
+
+jobs:
+  daft_on_native: &daft
+    name: Unit Test
+    image: none
+    working-directory: "/data00/codebase/daft/${{random_string(5)}}"
+    envs:
+      DAFT_ANALYTICS_ENABLED: '0'
+      RUST_BACKTRACE: 1
+      DAFT_RUNNER: native
+    runs-on:
+      cluster: "gpu"
+      linux: {}
+    steps:
+    - uses: actions/setup-proxy
+
+    - name: Check pre-commit
+      commands:
+      - pre-commit run --files .pre-commit-config.yaml
+
+    - name: Build library and Test with pytest (Linux)
+      commands:
+      - make ve-test
+
+    - name: clean resources
+      if: "${{always()}}"
+      commands:
+      - rm -rf $PWD
+
+  daft_on_ray:
+    <<: *daft
+    envs:
+      DAFT_ANALYTICS_ENABLED: '0'
+      RUST_BACKTRACE: 1
+      DAFT_RUNNER: ray
+      DAFT_FLOTILLA: 1

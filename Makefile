@@ -70,6 +70,23 @@ test: .venv build  ## Run tests
 	# make test EXTRA_ARGS="-v tests/dataframe/test_select.py::test_select_dataframe" # Run a single test method
 	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) $(VENV_BIN)/pytest --hypothesis-seed=$(HYPOTHESIS_SEED) --ignore tests/integration $(EXTRA_ARGS)
 
+.PHONY: ve-test
+ve-test: .venv build  ## Run tests
+	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) $(VENV_BIN)/pytest \
+	--hypothesis-seed=$(HYPOTHESIS_SEED) \
+	--tb=short \
+	--maxfail=1 \
+	-l \
+	--ignore tests/integration \
+	--ignore tests/catalog/test_glue.py \
+	--ignore tests/catalog/test_s3tables.py \
+	--ignore tests/connect \
+	--ignore tests/io/delta_lake \
+	--ignore tests/io/hudi \
+	--ignore tests/io/test_url_upload_local.py \
+	--ignore tests/recordbatch/numeric/test_numeric.py \
+	--ignore tests/io/test_s3_credentials_refresh.py
+
 .PHONY: doctests
 doctests: .venv
 	DAFT_BOLD_TABLE_HEADERS=0 DAFT_PROGRESS_BAR=0 $(VENV_BIN)/pytest --doctest-modules --continue-on-collection-errors --ignore=daft/functions/llm.py --ignore=daft/functions/ai/__init__.py daft/dataframe/dataframe.py daft/expressions/expressions.py daft/convert.py daft/udf/__init__.py daft/functions/ daft/datatype.py
