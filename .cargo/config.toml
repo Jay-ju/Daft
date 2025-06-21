@@ -1,2 +1,10 @@
 [env]
-PYO3_PYTHON = "./.venv/bin/python"
+PYO3_PYTHON = ".venv/bin/python"
+PYO3_PYTHON_PYLIB ="/usr/lib/x86_64-linux-gnu/libpython3.11.so.1"
+
+[build]
+rustflags = [
+    "-C", "link-arg=-Wl,-rpath,${PYO3_PYTHON_PYLIB%/*}",
+    "-C", "link-arg=-L${PYO3_PYTHON_PYLIB%/*}",
+    "-C", "link-arg=-lpython3.11"
+]
