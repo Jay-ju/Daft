@@ -47,3 +47,24 @@ def test_lancedb_read_limit(lance_dataset_path):
     df = df.limit(1)
     df = df.select("vector")
     assert df.to_pydict() == {"vector": data["vector"][:1]}
+
+
+def test_lancedb_read_limit_explain(lance_dataset_path, capsys):
+    df = daft.read_lance(lance_dataset_path)
+    df = df.limit(1)
+    df = df.select("vector")
+
+    df.explain(show_all=True)
+    captured = capsys.readouterr()
+    assert "Pushdowns" in captured.out
+
+    assert df.to_pydict() == {"vector": data["vector"][:1]}
+
+
+def test_lancedb_read_explain_pushdowns(lance_dataset_path, capsys):
+    df = daft.read_lance(lance_dataset_path)
+    df = df.where(df["lat"] > 45).limit(1)
+    df.explain(show_all=True)
+    captured = capsys.readouterr()
+    assert "Filter: col(lat) > lit(45)" in captured.out
+    assert "Limit: 1" in captured.out
