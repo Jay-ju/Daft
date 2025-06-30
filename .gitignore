@@ -1,6 +1,9 @@
 # Added by jetbrains IDE
 .idea/
 
+# vscode
+.vscode/
+
 .coverage
 .env
 venv

@@ -28,7 +28,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir):
 def test_audio_size(tos_test_data_dir, local_test_data_dir):
     input_df, expected_df = generate_test_data(tos_test_data_dir, local_test_data_dir)
 
-    ds = daft.DataFrame._from_pandas(input_df)
+    ds = daft.from_pandas(input_df)
     ds = ds.with_column("size_result", las_udf(AudioSize)(col("audio_path")))
     assert_dataframe_result(ds.to_pandas(), expected_df)
 
