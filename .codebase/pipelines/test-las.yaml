@@ -1,23 +1,10 @@
-name: PR test suite
+name: Las Operator Test
 trigger:
   change:
     types: [submit, create, push]
     branches: [main, ve-main]
     paths:
-    - "!.github/**"
-    - "!.vscode/**"
-    - "!benchmarking/**"
-    - "!ci/**"
-    - "!docs/**"
-    - "!tools/**"
-    - "!tutorials/**"
-    - "!**/*.md"
-    - "!*.md"
-    - "!*.rst"
-    - "!.gitignore"
-    - "!LICENSE"
-    - "!**/las/**"
-    - "!Makefile"
+    - "**/las/**"
 
 jobs:
   daft_on_native: &daft
@@ -40,7 +27,10 @@ jobs:
 
     - name: Build library and Test with pytest (Linux)
       commands:
-      - make ve-test
+      - export TOS_ENDPOINT=${{TOS_ENDPOINT}}
+      - export TOS_ACCESS_KEY=${{TOS_ACCESS_KEY}}
+      - export TOS_SECRET_KEY=${{TOS_SECRET_KEY}}
+      - make test-las
 
     - name: clean resources
       if: "${{always()}}"

@@ -78,14 +78,16 @@ ve-test: .venv build  ## Run tests
 	--maxfail=1 \
 	-l \
 	--ignore tests/integration \
-	--ignore tests/catalog/test_glue.py \
-	--ignore tests/catalog/test_s3tables.py \
+	--ignore tests/catalog \
 	--ignore tests/connect \
 	--ignore tests/io/delta_lake \
 	--ignore tests/io/hudi \
-	--ignore tests/io/test_url_upload_local.py \
-	--ignore tests/recordbatch/numeric/test_numeric.py \
+    --ignore tests/las \
 	--ignore tests/io/test_s3_credentials_refresh.py
+
+.PHONY: test-las
+test-las: .venv build
+	$(VENV_BIN)/pytest tests/las
 
 .PHONY: doctests
 doctests: .venv
