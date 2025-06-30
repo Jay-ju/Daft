@@ -10,153 +10,120 @@ from urllib.parse import urlparse
 
 
 class LasIO(ABC):
-    """The abstract base class for io client."""
+    """Abstract base class for I/O clients.
+
+    This class defines the common interface for all I/O client implementations.
+    """
 
     @abstractmethod
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize io client."""
+        """Initialize the I/O client.
+
+        Subclasses should override this method to implement their initialization logic.
+        """
 
     @classmethod
     def scheme(cls) -> str:
-        """Return the scheme of implementation IO.
+        """Return the scheme identifier for this I/O implementation.
+
+        Returns:
+            str: The scheme identifier (e.g., "s3", "gs", "file").
 
         Raises:
-        ------
-        NotImplementedError
-            if the IO client doesn't support this method.
+            NotImplementedError: If the subclass does not implement this method.
         """
         raise NotImplementedError
 
     def mkdirs(self, path: str) -> None:
-        """Create a new directory and create its ancestors recursively.
+        """Recursively create a directory and its ancestors.
 
-        Parameters:
-        ----------
-        path : str
-            The dir path need to be created.
+        Args:
+            path: Directory path to create
 
         Raises:
-        ------
-        FileExistsError
-            if there is a file exists with same path.
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            FileExistsError: If a file already exists at the specified path
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"mkdirs is not supported by {self.__class__.__name__}")
 
     def rm(self, path: str) -> None:
-        """Remove a file or dir recursively for the given path.
+        """Remove a file or directory recursively.
 
-        Allow the path is not exist.
+        If the path does not exist, the operation will be ignored.
 
-        Parameters:
-        ----------
-        path : str
-            The dir path or file path need to be removed.
+        Args:
+            path: Path to remove (file or directory)
 
         Raises:
-        ------
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"rm is not supported by {self.__class__.__name__}")
 
     def exists(self, path: str) -> bool:
-        """Check whether this path exists.
+        """Check if a path exists.
 
-        Parameters:
-        ----------
-        path : str
-            The path need to check.
+        Args:
+            path: Path to check
+
+        Returns:
+            bool: True if path exists, False otherwise
 
         Raises:
-        ------
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"exists is not supported by {self.__class__.__name__}")
 
     def file_size(self, path: str) -> int:
-        """Return the file size with the given path.
+        """Get the size of a file or directory.
 
-        If the path is a dir, the return value is according to the dir size of target
-        source, e.g. 4k for local fs, 0 for object store.
+        For directories, behavior is implementation-defined (e.g., 4096 for local FS,
+        0 for object storage).
 
-        Parameters:
-        ----------
-        path : str
-            The path need to fetch size.
+        Args:
+            path: Path to check size
+
+        Returns:
+            int: Size in bytes
 
         Raises:
-        ------
-        FileNotFoundError
-            if the path is not exist.
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            FileNotFoundError: If path does not exist
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"file_size is not supported by {self.__class__.__name__}")
 
     def download_file(self, remote: str, local: str, overwrite: bool = True) -> None:
-        """Downloading file from remote datasource to local.
+        """Download a file from remote storage to local filesystem.
 
-        Parameters:
-        ----------
-        remote : str
-            The source file to download.
-            Raise error if source file is not found.
-        local : str
-            The local file path, trailing `/` in local filename will be ignored.
-        overwrite : bool
-            If the flag is true, will overwrite the existing file or dir,
-            but be careful it's not an atomic operation.
-            Raise error if the flag is false and the local file or dir exists.
+        Args:
+            remote: Source file path in remote storage
+            local: Destination file path in local filesystem (trailing '/' is ignored)
+            overwrite: Whether to overwrite existing files (default: True)
 
         Raises:
-        ------
-        FileNotFoundError
-            if the remote file is not exist.
-        FileExistsError
-            if overwrite is False and the local path exists.
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            FileNotFoundError: If remote file does not exist
+            FileExistsError: If local file exists and overwrite=False
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"download_file is not supported by {self.__class__.__name__}")
 
     def upload_file(self, local: str, remote: str, overwrite: bool = True) -> None:
-        """Uploading local file to remote.
+        """Upload a file from local filesystem to remote storage.
 
-        Parameters:
-        ----------
-        local : str
-            The local file need to be uploaded.
-            Raise error if local file is not found.
-        remote : str
-            The remote destination file
-        overwrite : bool
-            If the flag is true, will overwrite the existing file or dir,
-            but be careful it's not an atomic operation.
-            Raise error if the flag is false and the remote file or dir exist.
+        Args:
+            local: Source file path in local filesystem
+            remote: Destination file path in remote storage
+            overwrite: Whether to overwrite existing files (default: True)
 
         Raises:
-        ------
-        FileNotFoundError
-            if the local file is not exist.
-        FileExistsError
-            if overwrite is False and the remote path exists.
-        NotImplementedError
-            if the IO client doesn't support this method.
-        OtherError
-            if any other IO error occurs.
+            FileNotFoundError: If local file does not exist
+            FileExistsError: If remote file exists and overwrite=False
+            NotImplementedError: If the subclass does not implement this method
+            OtherError: For other I/O related errors
         """
         raise NotImplementedError(f"upload_file is not supported by {self.__class__.__name__}")
 
@@ -233,19 +200,13 @@ def register_io_client(scheme: str) -> Callable[[type[LasIO]], type[LasIO]]:
 def mkdirs(uri: str, **kwargs: Any) -> None:
     """Create a new directory and create its ancestors recursively.
 
-    Parameters:
-    ----------
-    uri : str
-        The dir path need to be created.
+    Args:
+        uri: The dir path need to be created.
 
     Raises:
-    ------
-    FileExistsError
-        if there is a file exists with same path.
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        FileExistsError: if there is a file exists with same path.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     LasIOFactory.get().get_client(uri, **kwargs).mkdirs(uri)
 
@@ -255,17 +216,12 @@ def rm(uri: str, **kwargs: Any) -> None:
 
     Allow the path is not exist.
 
-    Parameters:
-    ----------
-    uri : str
-        The dir path or file path need to be removed.
+    Args:
+        uri: The dir path or file path need to be removed.
 
     Raises:
-    ------
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     LasIOFactory.get().get_client(uri, **kwargs).rm(uri)
 
@@ -273,28 +229,18 @@ def rm(uri: str, **kwargs: Any) -> None:
 def download_file(uri: str, local: str, overwrite: bool = True, **kwargs: Any) -> None:
     """Downloading file from remote datasource to local.
 
-    Parameters:
-    ----------
-    uri : str
-        The source file to download.
-        Raise error if source file is not found.
-    local : str
-        The local file path, trailing `/` in local filename will be ignored.
-    overwrite : bool
-        If the flag is true, will overwrite the existing file or dir,
-        but be careful it's not an atomic operation.
-        Raise error if the flag is false and the local file or dir exists.
+    Args:
+        uri: The source file to download. Raise error if source file is not found.
+        local: The local file path, trailing `/` in local filename will be ignored.
+        overwrite: If the flag is true, will overwrite the existing file or dir,
+            but be careful it's not an atomic operation. Raise error if the flag
+            is false and the local file or dir exists.
 
     Raises:
-    ------
-    FileNotFoundError
-        if the remote file is not exist.
-    FileExistsError
-        if overwrite is False and the local path exists.
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        FileNotFoundError: if the remote file is not exist.
+        FileExistsError: if overwrite is False and the local path exists.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     LasIOFactory.get().get_client(uri, **kwargs).download_file(uri, local, overwrite)
 
@@ -302,28 +248,18 @@ def download_file(uri: str, local: str, overwrite: bool = True, **kwargs: Any) -
 def upload_file(local: str, uri: str, overwrite: bool = True, **kwargs: Any) -> None:
     """Uploading local file to remote.
 
-    Parameters:
-    ----------
-    local : str
-        The local file need to be uploaded.
-        Raise error if local file is not found.
-    uri : str
-        The remote destination file
-    overwrite : bool
-        If the flag is true, will overwrite the existing file or dir,
-        but be careful it's not an atomic operation.
-        Raise error if the flag is false and the remote file or dir exist.
+    Args:
+        local: The local file need to be uploaded. Raise error if local file is not found.
+        uri: The remote destination file
+        overwrite: If the flag is true, will overwrite the existing file or dir,
+            but be careful it's not an atomic operation.
+            Raise error if the flag is false and the remote file or dir exist.
 
     Raises:
-    ------
-    FileNotFoundError
-        if the local file is not exist.
-    FileExistsError
-        if overwrite is False and the remote path exists.
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        FileNotFoundError: if the local file is not exist.
+        FileExistsError: if overwrite is False and the remote path exists.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     LasIOFactory.get().get_client(uri, **kwargs).upload_file(local, uri, overwrite)
 
@@ -334,19 +270,13 @@ def file_size(uri: str, **kwargs: Any) -> int:
     If the path is a dir, the return value is according to the dir size of target
     source, e.g. 4k for local fs, 0 for object store.
 
-    Parameters:
-    ----------
-    uri : str
-        The path need to fetch size.
+    Args:
+        uri: The path need to fetch size.
 
     Raises:
-    ------
-    FileNotFoundError
-        if the path is not exist.
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        FileNotFoundError: if the path is not exist.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     return LasIOFactory.get().get_client(uri, **kwargs).file_size(uri)
 
@@ -354,16 +284,11 @@ def file_size(uri: str, **kwargs: Any) -> int:
 def exists(uri: str, **kwargs: Any) -> bool:
     """Check whether this path exists.
 
-    Parameters:
-    ----------
-    uri : str
-        The path need to check.
+    Args:
+        uri: The path need to check.
 
     Raises:
-    ------
-    NotImplementedError
-        if the IO client doesn't support this method.
-    OtherError
-        if any other IO error occurs.
+        NotImplementedError: if the IO client doesn't support this method.
+        OtherError: if any other IO error occurs.
     """
     return LasIOFactory.get().get_client(uri, **kwargs).exists(uri)

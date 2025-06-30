@@ -11,42 +11,40 @@ def normalize_local_path(path: str) -> Path:
 
 
 def generate_temp_file(path: str, suffix: str | None = None) -> str:
-    """Generate a temporary file path with given path and suffix.
+    """Generate a temporary file path with the given path and suffix.
 
-    The trailing `/` in path will be ignored.
+    This function creates a temporary file path by modifying the original path:
+    1. Removes any trailing slash
+    2. Prefixes the filename with a dot (.)
+    3. Adds the string ".temp" before the suffix
+    4. Appends the custom suffix or a timestamp if no suffix is provided
 
-    Parameters:
-    ----------
-    path : str
-        The raw path.
-    suffix : str, optional
-        The given suffix will be as a suffix in the temp filename.
-        The current timestamp will be used as part suffix in the temp filename if suffix is not set.
+    The resulting file is in the same directory as the original path.
+
+    Args:
+        path: The original file path (trailing slashes are ignored)
+        suffix: Custom suffix to append to the filename. If not provided,
+                a timestamp in the format YYYYMMDDHHMMSS will be used.
 
     Returns:
-    -------
-        The temp file path, the temp file is under the same parent dir with the given path.
+        The generated temporary file path.
 
     Examples:
-    --------
-    >>> temp_file = generate_temp_file("/a/b/c")
-    >>> assert temp_file == f'/a/b/.c.temp-{datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")}'
-    >>>
-    >>> temp_file = generate_temp_file("/a/b/c", suffix="custom-suffix")
-    >>> assert temp_file == "/a/b/.c.temp-custom-suffix"
-    >>>
-    >>> temp_file = generate_temp_file("a/b/c", suffix="custom-suffix")
-    >>> assert temp_file == "a/b/.c.temp-custom-suffix"
-    >>>
-    >>> temp_file = generate_temp_file("file:///a/b//c", suffix="custom-suffix")
-    >>> assert temp_file == "file:///a/b/.c.temp-custom-suffix"
-    >>>
-    >>> temp_file = generate_temp_file("/a/b/", suffix="custom-suffix")
-    >>> assert temp_file == "/a/.b.temp-custom-suffix"
-    >>>
-    >>> temp_file = generate_temp_file("s3://bucket/a/b/c", suffix="custom-suffix")
-    >>> assert temp_file == "s3://bucket/a/b/.c.temp-suffix"
+        >>> generate_temp_file("/a/b/c")
+        '/a/b/.c.temp-20230315124530'  # Actual timestamp will vary
 
+        >>> generate_temp_file("/a/b/c", "custom-suffix")
+        '/a/b/.c.temp-custom-suffix'
+
+        >>> generate_temp_file("/a/b/", "suffix")
+        '/a/.b.temp-suffix'
+
+        >>> generate_temp_file("s3://bucket/a/b/c", "suffix")
+        's3://bucket/a/b/.c.temp-suffix'
+
+    Implementation details:
+        - For files in root directories: /file → /.file.temp-{suffix}
+        - Handles all types of paths: local, s3, gs, etc.
     """
     path = path.rstrip("/")
     filename = path.rsplit("/", maxsplit=1)[-1]
