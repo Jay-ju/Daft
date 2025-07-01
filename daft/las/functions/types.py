@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import pyarrow as pa
 
-    from daft.datatype import DataTypeLike
-
 NUM_GPUS = "num_gpus"
 DEFAULT_NUM_GPUS = 1
 
@@ -35,4 +33,4 @@ class Operator(ABC):
 
     @staticmethod
     @abstractmethod
-    def __return_column_type__() -> DataTypeLike: ...
+    def __return_column_type__() -> pa.DataType: ...

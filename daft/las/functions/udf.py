@@ -27,7 +27,7 @@ def las_udf(
         init_args.update({"num_cpus": num_cpus})
 
     return daft.udf(
-        return_dtype=operator.__return_column_type__(),
+        return_dtype=daft.DataType.from_arrow_type(operator.__return_column_type__()),
         num_cpus=num_cpus,
         num_gpus=num_gpus,
         memory_bytes=memory_bytes,

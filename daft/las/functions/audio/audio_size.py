@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from daft import DataType
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.io import file_size
-
-if TYPE_CHECKING:
-    from daft.datatype import DataTypeLike
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +33,8 @@ class AudioSize(Operator):
         super().__init__(**kwargs)
 
     @staticmethod
-    def __return_column_type__() -> DataTypeLike:
-        return DataType.float32()
+    def __return_column_type__() -> pa.DataType:
+        return pa.float32()
 
     @staticmethod
     def _calculate_size(audio_path: str) -> float:
@@ -71,4 +67,6 @@ class AudioSize(Operator):
         Returns:
             存放音频大小的列.
         """
-        return pa.array([self._calculate_size(audio_path) for audio_path in audio_paths])
+        return pa.array(
+            [self._calculate_size(audio_path) for audio_path in audio_paths], type=self.__return_column_type__()
+        )
