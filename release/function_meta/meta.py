@@ -14,14 +14,24 @@ def get_version():
     if version is not None:
         return version
 
-    import tomllib
+    import subprocess
 
-    with (Path(__file__).parent.parent.parent / "pyproject.toml").open("rb") as f:
-        version = tomllib.load(f)["project"]["version"]
-        parts = version.split(".")
-        if len(parts) <= 3:
-            return version
-        return ".".join(parts[:3])
+    process_python = subprocess.Popen(
+        ["uv", "run", "python", "-m", "setuptools_scm"],
+        cwd=str(Path(__file__).parent.parent.parent),
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+
+    process_sed = subprocess.Popen(
+        ["sed", "s/\\.dev/-dev/g"],
+        stdin=process_python.stdout,
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+
+    output, _ = process_sed.communicate()
+    return output.split("-")[0]
 
 
 OP_BUCKET = os.getenv("OP_BUCKET", "las-ai-cn-beijing")
@@ -138,6 +148,8 @@ class DataItem:
 
 @dataclass
 class ExtraMetaModel:
+    """Extra meta passed to las."""
+
     Code: str
     CodeDescription: str
     BeforeData: list[DataItem]
@@ -150,9 +162,33 @@ class OpMetaModel:
     """The description of the operator."""
 
     Name: str
-    Clazz: str
+    Clazz: type
     Description: str
     Category: str
     SubCategory: str
     Tags: list[str] | None = None
-    Precondition: str | None = None
+
+
+@dataclass
+class ParameterModel:
+    """The parameters of the operator."""
+
+    Name: str
+    Type: str | None
+    Default: str | None
+    Description: str | None
+
+
+@dataclass
+class InputModel:
+    """Input args."""
+
+    Name: str
+    Description: str | None
+
+
+@dataclass
+class OutputModel:
+    """Output."""
+
+    Description: str | None
