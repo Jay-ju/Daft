@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import daft
+from daft.las.functions.types import NUM_CPUS, NUM_GPUS
 
 if TYPE_CHECKING:
     from daft.las.functions.types import Operator
@@ -22,9 +23,9 @@ def las_udf(
 ) -> UDF:
     init_args = construct_args or {}
     if num_gpus is not None:
-        init_args.update({"gpu_num": num_gpus})
+        init_args.update({NUM_GPUS: num_gpus})
     if num_cpus is not None:
-        init_args.update({"num_cpus": num_cpus})
+        init_args.update({NUM_CPUS: num_cpus})
 
     return daft.udf(
         return_dtype=daft.DataType.from_arrow_type(operator.__return_column_type__()),

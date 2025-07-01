@@ -67,6 +67,5 @@ class AudioSize(Operator):
         Returns:
             存放音频大小的列.
         """
-        return pa.array(
-            [self._calculate_size(audio_path) for audio_path in audio_paths], type=self.__return_column_type__()
-        )
+        result = [self._calculate_size(audio_path.as_py()) for audio_path in audio_paths]
+        return pa.array(result, type=self.__return_column_type__())
