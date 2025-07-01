@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from daft.las.functions.audio import AudioSize
 from function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
@@ -19,7 +20,7 @@ from function_meta.meta import (
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="音频文件大小计算",
-        Identifier="audio_size",
+        Clazz=AudioSize,
         Category=Category.AUDIO,
         SubCategory=SubCategory.AUDIO_PROCESSING,
         Tags=["元数据", "文件分析", "音频属性"],
@@ -29,8 +30,7 @@ def get_meta() -> OpMetaModel:
 def get_extra_meta() -> ExtraMetaModel:
     code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_size/audio_size.py"
     code_description = (
-        "下面的代码展示了如何使用 pandas（适用于单机）"
-        "和 ray（适用于分布式）运行算子计算音频文件大小。"
+        "下面的代码展示了如何使用 pandas（适用于单机）" "和 ray（适用于分布式）运行算子计算音频文件大小。"
     )
     before = [
         DataItem(

@@ -150,7 +150,7 @@ class OpMetaModel:
     """The description of the operator."""
 
     Name: str
-    Identifier: str
+    Clazz: str
     Description: str
     Category: str
     SubCategory: str
