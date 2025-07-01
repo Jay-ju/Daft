@@ -20,7 +20,7 @@ class Operator(ABC):
     """An operator that process the input data."""
 
     def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
         num_gpus = kwargs.get(NUM_GPUS, DEFAULT_NUM_GPUS)
         self.use_gpu = False
         if num_gpus > 0:
