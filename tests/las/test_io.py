@@ -69,6 +69,20 @@ def test_with_daft_s3_config(tmpdir, object_store_test_dir, monkeypatch):
     _test_basic_io(remote_path, str(tmpdir))
 
 
+def test_with_s3_uri(tmpdir, object_store_test_dir, monkeypatch):
+    tos_config = TOSConfig.from_env()
+
+    monkeypatch.delenv("TOS_ACCESS_KEY", raising=False)
+    monkeypatch.delenv("TOS_ACCESS_KEY_ID", raising=False)
+
+    io_config = IOConfig(s3=tos_config.to_s3_config())
+    daft.set_planning_config(default_io_config=io_config)
+
+    s3_dir = object_store_test_dir.replace("tos://", "s3://")
+    remote_path = f"{s3_dir}/test_basic_io.txt"
+    _test_basic_io(remote_path, str(tmpdir))
+
+
 def _test_basic_io(remote_path: str, work_dir: str):
     # Prepare data
     raw_file = normalize_local_path(f"{work_dir}/raw_file")

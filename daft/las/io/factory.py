@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import threading
-from abc import ABC, abstractmethod
+from abc import ABC
 from functools import lru_cache
-from typing import Any, Callable, ClassVar
+from typing import Any, ClassVar
 from urllib.parse import urlparse
 
 
@@ -14,13 +14,6 @@ class LasIO(ABC):
 
     This class defines the common interface for all I/O client implementations.
     """
-
-    @abstractmethod
-    def __init__(self, **kwargs: Any) -> None:
-        """Initialize the I/O client.
-
-        Subclasses should override this method to implement their initialization logic.
-        """
 
     @classmethod
     def scheme(cls) -> str:
@@ -189,7 +182,7 @@ class LasIOFactory:
             cls._registry[normalized_scheme] = io_cls
 
 
-def register_io_client(scheme: str) -> Callable[[type[LasIO]], type[LasIO]]:
+def register_io_client(scheme: str):  # type: ignore
     def decorator(cls: type[LasIO]) -> type[LasIO]:
         LasIOFactory.register(scheme, cls)
         return cls

@@ -1,3 +1,5 @@
+# Copyright (c) Beijing Volcano Engine Technology Ltd.
+
 from __future__ import annotations
 
 import pandas as pd
@@ -6,6 +8,7 @@ import daft
 from daft import col
 from daft.las.functions.audio.audio_size import AudioSize
 from daft.las.functions.udf import las_udf
+from tests.las.functions import assert_dataframe_result
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir):
@@ -31,19 +34,3 @@ def test_audio_size(tos_test_data_dir, local_test_data_dir):
     ds = daft.from_pandas(input_df)
     ds = ds.with_column("size_result", las_udf(AudioSize)(col("audio_path")))
     assert_dataframe_result(ds.to_pandas(), expected_df)
-
-
-def assert_dataframe_result(
-    actual_df: pd.DataFrame,
-    expect_df: pd.DataFrame | None = None,
-    expect_columns: list | None = None,
-    expect_row_num: int | None = None,
-) -> None:
-    if expect_df is not None:
-        pd.testing.assert_frame_equal(actual_df, expect_df, check_dtype=False)
-
-    if expect_columns:
-        assert sorted(actual_df.columns.tolist()) == sorted(expect_columns)
-
-    if expect_row_num:
-        assert actual_df.shape[0] == expect_row_num
