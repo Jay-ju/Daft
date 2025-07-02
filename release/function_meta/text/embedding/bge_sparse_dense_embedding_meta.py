@@ -29,10 +29,7 @@ def get_meta() -> OpMetaModel:
 
 def get_extra_meta() -> ExtraMetaModel:
     code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/bge_sparse_dense_embedding/bge_sparse_dense_embedding.py"
-    code_description = (
-        "下面的代码展示了如何使用 pandas（适用于单机）"
-        "和 ray（适用于分布式）运行算子基于bge-m3模型计算文本dense embedding、sparse embedding以及token embedding。"
-    )
+    code_description = "下面的代码展示了如何使 daft 运行算子基于bge-m3模型计算文本dense embedding、sparse embedding以及token embedding。"
     before = [
         DataItem(
             Type=ValueType.Text.name,
