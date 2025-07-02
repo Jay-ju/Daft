@@ -18,7 +18,8 @@ from tosfs.exceptions import TosfsError
 import daft.daft
 from daft.daft import S3Config, S3Credentials
 from daft.las.io.factory import LasIO, register_io_client
-from daft.las.io.util import generate_temp_file, normalize_local_path
+from daft.las.io.utils import generate_temp_file, normalize_local_path
+from daft.las.utils import get_ak_sk, is_static_credential, not_blank
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -99,15 +100,11 @@ class TOSConfig:
 
     def _check_credential_info(self) -> None:
         if (
-            not self.is_static_credential()
-            and not self._not_blank(self.credential_provider_url)
+            not is_static_credential(self.access_key, self.secret_key)
+            and not not_blank(self.credential_provider_url)
             and not self.credential_provider
         ):
             raise ValueError("Cannot found credentials or credential provider.")
-
-    @staticmethod
-    def _not_blank(string: str | None) -> bool:
-        return string is not None and not string.isspace()
 
     def _parse_endpoint(self, endpoint: str | None, region: str | None) -> tuple[str, str]:
         if endpoint is None:
@@ -120,9 +117,6 @@ class TOSConfig:
 
         return endpoint, region
 
-    def is_static_credential(self) -> bool:
-        return self._not_blank(self.access_key) and self._not_blank(self.secret_key)
-
     @classmethod
     def _extract_region_regex(cls, endpoint: str) -> str | None:
         match = re.search(r"tos-([a-z]+[-a-z0-9]*)\.(?:iv|v)olces\.com", endpoint)
@@ -130,11 +124,12 @@ class TOSConfig:
 
     @staticmethod
     def from_env() -> TOSConfig:
+        access_key, secret_key = get_ak_sk("tos")
         return TOSConfig(
             endpoint=os.getenv("TOS_ENDPOINT"),
             region=os.getenv("TOS_REGION"),
-            access_key=os.getenv("TOS_ACCESS_KEY", os.getenv("TOS_ACCESS_KEY_ID")),
-            secret_key=os.getenv("TOS_SECRET_KEY", os.getenv("TOS_SECRET_ACCESS_KEY")),
+            access_key=access_key,
+            secret_key=secret_key,
             session_token=os.getenv("TOS_SESSION_TOKEN"),
             credential_provider_url=os.getenv("TOS_CREDENTIAL_PROVIDER_URL"),
         )
@@ -201,7 +196,7 @@ class TosIO(LasIO):
         if config is None:
             raise ValueError("TOS config is not provided")
 
-        if config.is_static_credential():
+        if is_static_credential(config.access_key, config.secret_key):
             return TosFileSystem(
                 endpoint=config.endpoint,
                 region=config.region,

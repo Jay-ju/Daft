@@ -19,8 +19,6 @@ jobs:
       cluster: "gpu"
       linux: {}
     steps:
-    - uses: actions/setup-proxy
-
     - name: Check pre-commit
       commands:
       - pre-commit run --files .pre-commit-config.yaml
@@ -30,6 +28,9 @@ jobs:
       - export TOS_ENDPOINT=${{TOS_ENDPOINT}}
       - export TOS_ACCESS_KEY=${{TOS_ACCESS_KEY}}
       - export TOS_SECRET_KEY=${{TOS_SECRET_KEY}}
+      - export ARK_ACCESS_KEY=${{ARK_ACCESS_KEY}}
+      - export ARK_SECRET_KEY=${{ARK_SECRET_KEY}}
+      - export ARK_BASE_URL=${{ARK_BASE_URL}}
       - make test-las
 
     - name: clean resources

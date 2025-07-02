@@ -11,7 +11,7 @@ from daft.daft import IOConfig
 from daft.las.io import download_file, exists, file_size, upload_file
 from daft.las.io.factory import LasIOFactory
 from daft.las.io.tos import TOSConfig
-from daft.las.io.util import generate_temp_file, normalize_local_path
+from daft.las.io.utils import generate_temp_file, normalize_local_path
 
 
 def test_generate_temp_filename():

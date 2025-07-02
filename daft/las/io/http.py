@@ -9,7 +9,7 @@ from typing import Any
 from urllib.parse import quote
 
 from daft.las.io.factory import LasIO, register_io_client
-from daft.las.io.util import generate_temp_file, normalize_local_path
+from daft.las.io.utils import generate_temp_file, normalize_local_path
 
 
 @register_io_client(scheme="http")

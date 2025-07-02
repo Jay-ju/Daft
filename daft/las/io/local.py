@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from daft.las.io.factory import LasIO, register_io_client
-from daft.las.io.util import normalize_local_path
+from daft.las.io.utils import normalize_local_path
 
 
 @register_io_client(scheme="file")
