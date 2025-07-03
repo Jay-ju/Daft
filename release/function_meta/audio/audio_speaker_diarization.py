@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import os
 
-import pandas as pd
-
 import daft
 from daft import col
 from daft.las.functions.audio import AudioSpeakerDiarization
@@ -13,9 +11,7 @@ if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
     model_path = os.getenv("MODEL_PATH", "./models")
     samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_speaker_diarization/sample.wav"]}
-
-    input = pd.DataFrame(samples)
-    df = daft.from_pandas(input)
+    df = daft.from_pydict(samples)
     df = df.with_column(
         "audio_speak_diarize",
         las_udf(AudioSpeakerDiarization, construct_args={"model_path": model_path})(col("audio_path")),
