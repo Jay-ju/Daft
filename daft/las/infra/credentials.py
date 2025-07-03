@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from abc import abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -27,6 +28,10 @@ class Credentials:
 
 
 class CredentialsProvider:
+    def __call__(self) -> Credentials | None:
+        return self.get_credentials()
+
+    @abstractmethod
     def get_credentials(self) -> Credentials | None:
         raise NotImplementedError
 
