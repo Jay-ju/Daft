@@ -13,6 +13,9 @@ from daft.las.functions.audio.audio_speaker_diarization import AudioSpeakerDiari
 from daft.las.functions.udf import las_udf
 from tests.las.functions import assert_dataframe_result
 
+num_gpus = int(os.getenv("NUM_GPUS", 1))
+rank = random.randint(0, num_gpus - 1)
+
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     paths = [
@@ -61,14 +64,13 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
 
 def test_diarization_audio_speaker(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df, expected_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
-    rank = random.randint(0, max(int(os.getenv("NUM_GPUS", "1")) - 1, 0))
     ds = daft.from_pandas(input_df)
     ds = ds.with_column(
         "audio_speak_diarize",
         las_udf(
             AudioSpeakerDiarization,
             construct_args={"model_path": local_models_dir, "rank": rank},
-            num_gpus=1,
+            num_gpus=num_gpus,
         )(col("audio_path")),
     )
     actual = ds.to_pandas()
