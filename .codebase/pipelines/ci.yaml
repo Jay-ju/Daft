@@ -18,6 +18,7 @@ trigger:
     - "!LICENSE"
     - "!**/las/**"
     - "!Makefile"
+    - "!**/test-las.yaml"
 
 jobs:
   daft_on_native: &daft

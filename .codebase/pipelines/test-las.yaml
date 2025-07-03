@@ -5,6 +5,7 @@ trigger:
     branches: [main, ve-main]
     paths:
     - "**/las/**"
+    - "**/test-las.yaml"
 
 jobs:
   daft_on_native: &daft
@@ -32,6 +33,8 @@ jobs:
       - export ARK_SECRET_KEY=${{ARK_SECRET_KEY}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
       - export NUM_GPUS=${{NUM_GPUS}}
+      - echo $CUDA_VISIBLE_DEVICES
+      - env
       - make test-las
 
     - name: clean resources
@@ -45,4 +48,4 @@ jobs:
       DAFT_ANALYTICS_ENABLED: '0'
       RUST_BACKTRACE: 1
       DAFT_RUNNER: ray
-      DAFT_FLOTILLA: 1
+      DAFT_FLOTILLA: 0
