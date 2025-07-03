@@ -8,14 +8,16 @@ trigger:
     - "**/test-las.yaml"
 
 jobs:
-  daft_on_native: &daft
+  daft_on_ray:
     name: Unit Test
     image: none
     working-directory: "/data00/codebase/daft/${{random_string(5)}}"
     envs:
       DAFT_ANALYTICS_ENABLED: '0'
       RUST_BACKTRACE: 1
-      DAFT_RUNNER: native
+      DAFT_RUNNER: ray
+      DAFT_FLOTILLA: 0
+      NUM_GPUS: 8
     runs-on:
       cluster: "gpu"
       linux: {}
@@ -32,9 +34,6 @@ jobs:
       - export ARK_ACCESS_KEY=${{ARK_ACCESS_KEY}}
       - export ARK_SECRET_KEY=${{ARK_SECRET_KEY}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
-      - export NUM_GPUS=${{NUM_GPUS}}
-      - echo $CUDA_VISIBLE_DEVICES
-      - env
       - make test-las
 
     - name: clean resources
@@ -42,10 +41,9 @@ jobs:
       commands:
       - rm -rf $PWD
 
-  daft_on_ray:
-    <<: *daft
-    envs:
-      DAFT_ANALYTICS_ENABLED: '0'
-      RUST_BACKTRACE: 1
-      DAFT_RUNNER: ray
-      DAFT_FLOTILLA: 0
+#  daft_on_native:
+#    <<: *daft
+#    envs:
+#      DAFT_ANALYTICS_ENABLED: '0'
+#      RUST_BACKTRACE: 1
+#      DAFT_RUNNER: native

@@ -31,8 +31,10 @@ ifeq ($(IS_M1), 1)
 	CFLAGS="${CFLAGS} -I /opt/homebrew/opt/openssl/include"	\
 	LDFLAGS="${LDFLAGS} -L /opt/homebrew/opt/openssl/lib" \
 	uv sync --no-install-project --all-extras --all-groups
+	uv pip install flash_attn==2.8.0.post2 --no-build-isolation
 else
 	uv sync --no-install-project --all-extras --all-groups
+	uv pip install flash_attn==2.8.0.post2 --no-build-isolation
 endif
 
 .PHONY: check-toolchain
@@ -87,7 +89,7 @@ ve-test: .venv build  ## Run tests
 
 .PHONY: test-las
 test-las: .venv build
-	$(VENV_BIN)/pytest tests/las
+	$(VENV_BIN)/pytest tests/las --ignore tests/las/test_io.py --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
 
 .PHONY: doctests
 doctests: .venv

@@ -35,7 +35,7 @@ def test_bge_sparse_dense_embedding(local_models_dir):
                 "model_name": model_name,
                 "rank": rank,
             },
-            num_gpus=1,
+            num_gpus=0,
             batch_size=1,
         )(col("text")),
     )

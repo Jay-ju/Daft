@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import os
 
-import pandas as pd
-
 import daft
 from daft import col
 from daft.las.functions.text.embedding.bge_sparse_dense_embedding import BgeSparseDenseEmbedding
@@ -18,8 +16,7 @@ if __name__ == "__main__":
     model_name = "BAAI/bge-m3"
     rank = 0
 
-    input = pd.DataFrame(samples)
-    ds = daft.from_pandas(input)
+    ds = daft.from_pydict(samples)
     ds = ds.with_column(
         "embeddings",
         las_udf(
