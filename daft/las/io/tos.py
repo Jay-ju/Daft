@@ -170,6 +170,7 @@ class TOSConfig:
             access_key=self.secret_key,
             session_token=self.session_token,
             credentials_provider=provider if self.credential_provider else None,
+            force_virtual_addressing=True,
         )
 
 

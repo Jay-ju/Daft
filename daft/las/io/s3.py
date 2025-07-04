@@ -5,9 +5,9 @@ from __future__ import annotations
 import os
 from typing import TYPE_CHECKING
 
-import daft
 from daft.las.io.factory import LasIO, register_io_client
 from daft.las.io.tos import TOSConfig
+from daft.las.utils import not_blank
 
 if TYPE_CHECKING:
     from daft.daft import S3Config
@@ -18,14 +18,10 @@ class S3IO(LasIO):
     _io: LasIO
 
     def __init__(self, config: S3Config | None = None) -> None:
-        if config is None:
-            ctx = daft.daft.get_context()
-            self.s3_config = ctx._daft_planning_config.default_io_config.s3
-
-        if bool(os.getenv("CONVERT_S3_TO_TOS", True)) and self.s3_config:
-            self._io = S3OnTosIO(config=self.s3_config)
+        if bool(os.getenv("CONVERT_S3_TO_TOS", True)):
+            self._io = S3OnTosIO(config=config)
         else:
-            self._io = S3IO(config=self.s3_config)
+            self._io = S3LikeIO(config=config)
 
     @classmethod
     def scheme(cls) -> str:
@@ -56,10 +52,11 @@ class S3LikeIO(LasIO):
 
 
 class S3OnTosIO(LasIO):
-    def __init__(self, config: S3Config) -> None:
+    def __init__(self, config: S3Config | None = None) -> None:
         from daft.las.io import TosIO
 
-        self._io = TosIO(config=TOSConfig.from_s3_config(config))
+        tos_config = TOSConfig.from_s3_config(config) if config and not_blank(config.endpoint_url) else None
+        self._io = TosIO(config=tos_config)
 
     @staticmethod
     def _convert_path(path: str) -> str:
