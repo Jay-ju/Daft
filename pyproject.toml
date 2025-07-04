@@ -35,6 +35,7 @@ aws = ["boto3"]
 azure = []
 clickhouse = ["clickhouse_connect"]
 deltalake = ["deltalake"]
+flash-attn = ["flash-attn~=2.8.0.post2"]
 gcp = []
 hudi = ["pyarrow >= 8.0.0"]
 huggingface = ["huggingface-hub"]
@@ -43,6 +44,30 @@ huggingface = ["huggingface-hub"]
 # See https://github.com/Eventual-Inc/Daft/issues/4868.
 iceberg = ["pyiceberg >= 0.7.0, < 0.9.1"]
 lance = ["pylance"]
+las = [
+  "httpx[http2]==0.28.1",
+  "ray[data, client]==2.46.0",
+  "tosfs>=2025.6.0",
+  "volcengine>=1.0.153",
+  "volcengine-python-sdk[ark]>=1.0.102",
+  "torch==2.7.0",
+  "torchvision==0.22.0",
+  "torchaudio==2.7.0",
+  "torchcodec==0.4.0",
+  "librosa>=0.11.0",
+  "av>=14.0.1",
+  "soundfile==0.13.1",
+  "peft>=0.12.0",
+  "ffmpeg-python>=0.2.0",
+  "pyannote.audio==3.3.2",
+  "h2==4.2.0",
+  "flagembedding==1.3.5",
+  "qwen-vl-utils~=0.0.10",
+  "transformers==4.52.4",
+  "llama-index~=0.11.9",
+  "wheel",
+  "daft[iceberg, lance]"
+]
 numpy = ["numpy"]
 openai = ["openai"]
 pandas = ["pandas"]

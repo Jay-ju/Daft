@@ -93,7 +93,7 @@ uv pip install twine yq setuptools_scm
 
 # Patch package version with setuptools_scm
 echo "Patching package version..."
-VERSION=$(python -m setuptools_scm | sed 's/\.dev/-dev/g')
+VERSION=${CUSTOM_VERSION:-$(python -m setuptools_scm | sed 's/\.dev/-dev/g')}
 echo "Setting package version to: $VERSION"
 
 tomlq -i -t ".package.version = \"$VERSION\"" Cargo.toml
