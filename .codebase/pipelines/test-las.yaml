@@ -34,6 +34,8 @@ jobs:
       - export ARK_ACCESS_KEY=${{ARK_ACCESS_KEY}}
       - export ARK_SECRET_KEY=${{ARK_SECRET_KEY}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
+      - export VISUAL_SERVICE_ACCESS_KEY=${{VISUAL_SERVICE_ACCESS_KEY}}
+      - export VISUAL_SERVICE_SECRET_KEY=${{VISUAL_SERVICE_SECRET_KEY}}
       - make test-las
 
     - name: clean resources
