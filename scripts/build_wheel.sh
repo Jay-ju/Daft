@@ -25,6 +25,9 @@ DIR="$(cd "`dirname "$0"`"/..; pwd)"
 # Initialize Environment
 # ========================
 
+NAME="daft"
+VERSION=""
+
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -32,6 +35,8 @@ while [[ $# -gt 0 ]]; do
         --arch) ARCH="$2"; shift ;;
         --lts) LTS="$2"; shift ;;
         --build-type) BUILD_TYPE="$2"; shift ;;
+        -n|--name) NAME="$2"; shift ;;
+        -v|--version) VERSION="$2"; shift ;;
         *) echo "Unknown argument: $1"; exit 1 ;;
     esac
     shift
@@ -40,8 +45,14 @@ done
 # Validate required parameters
 if [[ -z ${OS:-} || -z ${ARCH:-} || -z ${LTS:-} || -z ${BUILD_TYPE:-} ]]; then
     echo "Missing required parameters!"
-    echo "Usage: $0 --os [ubuntu|macos|windows] --arch [x86_64|aarch64] --lts [true|false] --build-type [release|dev|nightly]"
+    echo "Usage: $0 --os [ubuntu|macos|windows] --arch [x86_64|aarch64] --lts [true|false] --build-type [release|dev|nightly] [--name NAME] [--version VERSION]"
+    echo "Defaults: --name daft"
     exit 1
+fi
+
+if ! [[ "$NAME" =~ ^("daft"|"ve-daft")$ ]]; then
+    echo "Error: --lts must be 'daft' or 've-daft'"
+    exit 2
 fi
 
 # Configure environment variables
@@ -58,6 +69,8 @@ echo "Operating System: $OS"
 echo "Architecture: $ARCH"
 echo "LTS Build: $LTS"
 echo "Build Type: $BUILD_TYPE"
+echo "Name: $NAME"
+echo "Version: $VERSION"
 echo "========================================"
 
 # =========================================
@@ -92,20 +105,21 @@ uv pip install twine yq setuptools_scm
 # =========================================
 
 # Patch package version with setuptools_scm
+VERSION=${VERSION:-$(python -m setuptools_scm | sed 's/\.dev/-dev/g')}
 echo "Patching package version..."
-VERSION=${CUSTOM_VERSION:-$(python -m setuptools_scm | sed 's/\.dev/-dev/g')}
 echo "Setting package version to: $VERSION"
 
 tomlq -i -t ".package.version = \"$VERSION\"" Cargo.toml
 tomlq -i -t ".workspace.package.version = \"$VERSION\"" Cargo.toml
 
-# Rest project name
-PROJECT_NAME=${CUSTOM_PROJECT_NAME:-"daft"}
 
 # Patch name for LTS builds
 if [[ "$LTS" == "true" ]]; then
-    echo "Patching project name to '$PROJECT_NAME-lts' for LTS build"
-    tomlq -i -t ".project.name = \"$PROJECT_NAME-lts\"" pyproject.toml
+    echo "Patching project name to '$NAME-lts' for LTS build"
+    tomlq -i -t ".project.name = \"$NAME-lts\"" pyproject.toml
+else
+    echo "Patching project name to '$NAME' for non-LTS build"
+    tomlq -i -t ".project.name = \"$NAME\"" pyproject.toml
 fi
 
 # =========================================
