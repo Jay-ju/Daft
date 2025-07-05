@@ -29,14 +29,10 @@ jobs:
 
     - name: Build library and Test with pytest (Linux)
       commands:
+      - export ACCESS_KEY_ID=${{ACCESS_KEY_ID}}
+      - export SECRET_ACCESS_KEY=${{SECRET_ACCESS_KEY}}
       - export TOS_ENDPOINT=${{TOS_ENDPOINT}}
-      - export TOS_ACCESS_KEY=${{TOS_ACCESS_KEY}}
-      - export TOS_SECRET_KEY=${{TOS_SECRET_KEY}}
-      - export ARK_ACCESS_KEY=${{ARK_ACCESS_KEY}}
-      - export ARK_SECRET_KEY=${{ARK_SECRET_KEY}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
-      - export VISUAL_SERVICE_ACCESS_KEY=${{VISUAL_SERVICE_ACCESS_KEY}}
-      - export VISUAL_SERVICE_SECRET_KEY=${{VISUAL_SERVICE_SECRET_KEY}}
       - make test-las
 
     - name: clean resources

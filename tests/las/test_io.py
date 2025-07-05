@@ -61,6 +61,8 @@ def test_with_daft_s3_config(tmpdir, object_store_test_dir, monkeypatch):
 
     monkeypatch.delenv("TOS_ACCESS_KEY", raising=False)
     monkeypatch.delenv("TOS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("ACCESS_KEY", raising=False)
+    monkeypatch.delenv("ACCESS_KEY_ID", raising=False)
 
     io_config = IOConfig(s3=tos_config.to_s3_config())
     daft.set_planning_config(default_io_config=io_config)
@@ -74,6 +76,8 @@ def test_with_s3_uri(tmpdir, object_store_test_dir, monkeypatch):
 
     monkeypatch.delenv("TOS_ACCESS_KEY", raising=False)
     monkeypatch.delenv("TOS_ACCESS_KEY_ID", raising=False)
+    monkeypatch.delenv("ACCESS_KEY", raising=False)
+    monkeypatch.delenv("ACCESS_KEY_ID", raising=False)
 
     io_config = IOConfig(s3=tos_config.to_s3_config())
     daft.set_planning_config(default_io_config=io_config)
