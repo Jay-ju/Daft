@@ -120,6 +120,7 @@ class SubCategory(Enum):
     IMAGE_TO_VIDEO = "图片转视频"
     VIDEO_TO_AUDIO = "视频转音频"
     VIDEO_TO_IMAGE = "视频转图片"
+    MULTI_MODAL_EMBEDDING = "多模态向量化"
 
 
 class ValueType(Enum):

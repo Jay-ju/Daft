@@ -229,10 +229,10 @@ class QwenVLImageUnderstanding(Operator):
             except RuntimeError:
                 logger.exception("Model inference failed (possibly OOM)!")
                 logger.info("Current batch size: %d, consider reducing batch_size", self.batch_size)
-                all_captions.extend([""] * len(current_batch))
+                all_captions.extend([""] * len(sub_images))
             except Exception:
                 logger.exception("Inference error!")
-                all_captions.extend([""] * len(current_batch))
+                all_captions.extend([""] * len(sub_images))
 
         processing_time = time.monotonic() - start_time
 

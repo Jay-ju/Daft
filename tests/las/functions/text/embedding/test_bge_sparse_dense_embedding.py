@@ -19,6 +19,7 @@ dtype = "float16"
 batch_size = 1
 model_name = "BAAI/bge-m3"
 rank = 0
+num_gpus = 0
 
 
 def test_bge_sparse_dense_embedding(local_models_dir):
@@ -35,7 +36,7 @@ def test_bge_sparse_dense_embedding(local_models_dir):
                 "model_name": model_name,
                 "rank": rank,
             },
-            num_gpus=0,
+            num_gpus=num_gpus,
             batch_size=1,
         )(col("text")),
     )

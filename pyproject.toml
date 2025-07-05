@@ -78,7 +78,8 @@ las = [
   "zhconv==1.4.3",
   "rapidfuzz==3.13.0",
   "datasets==2.19.0",
-  "pdfplumber>=0.11.5"
+  "pdfplumber>=0.11.5",
+  "simplejson==3.20.1"
 ]
 numpy = ["numpy"]
 openai = ["openai"]

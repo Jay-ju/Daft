@@ -244,6 +244,9 @@ class QwenVLVideoUnderstanding(Operator):
                             with tmp_file_name.open("wb") as f:
                                 f.write(video_binary)
 
+                        if not Path(tmp_file_name).exists():
+                            raise FileNotFoundError(tmp_file_name)
+
                         message = self._build_message_template(str(tmp_file_name))
                         batch_messages.append(message)
 
@@ -251,13 +254,16 @@ class QwenVLVideoUnderstanding(Operator):
                     generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_caption_length)
                     batch_captions = self._decode_generated_text(inputs, generated_ids)
                     all_captions.extend(batch_captions)
+            except FileNotFoundError:
+                logger.exception("File not Found!")
+                all_captions.extend([""] * len(sub_videos))
             except RuntimeError:
                 logger.exception("Model inference failed (possibly OOM)!")
                 logger.info("Current batch size: {self.batch_size}, consider reducing batch_size")
-                all_captions.extend([""] * len(batch_messages))
+                all_captions.extend([""] * len(sub_videos))
             except Exception:
                 logger.exception("Inference error!")
-                all_captions.extend([""] * len(batch_messages))
+                all_captions.extend([""] * len(sub_videos))
 
         processing_time = time.monotonic() - start_time
 
