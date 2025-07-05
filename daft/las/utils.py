@@ -5,12 +5,8 @@ from __future__ import annotations
 import os
 
 
-def none_or_blank(string: str | None) -> bool:
-    return string is None or len(string.strip()) == 0
-
-
 def not_blank(string: str | None) -> bool:
-    return string is not None and not string.isspace()
+    return string is not None and not len(string.strip()) == 0
 
 
 def is_static_credential(access_key: str | None, secret_key: str | None) -> bool:

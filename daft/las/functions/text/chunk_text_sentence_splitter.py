@@ -9,7 +9,7 @@ from typing import Any
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.text_utils import strip_markdown_images
-from daft.las.utils import none_or_blank
+from daft.las.utils import not_blank
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ class ChunkTextSentenceSplitter(Operator):
             try:
                 if self.content_type == "text":
                     text_sequence = (
-                        [""] if none_or_blank(raw_text) else [raw_text] if isinstance(raw_text, str) else raw_text
+                        [raw_text] if not_blank(raw_text) else [""] if isinstance(raw_text, str) else raw_text
                     )
                     documents = [Document(text=t) for t in text_sequence]
 
