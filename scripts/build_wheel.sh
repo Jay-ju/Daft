@@ -99,10 +99,13 @@ echo "Setting package version to: $VERSION"
 tomlq -i -t ".package.version = \"$VERSION\"" Cargo.toml
 tomlq -i -t ".workspace.package.version = \"$VERSION\"" Cargo.toml
 
+# Rest project name
+PROJECT_NAME=${CUSTOM_PROJECT_NAME:-"daft"}
+
 # Patch name for LTS builds
 if [[ "$LTS" == "true" ]]; then
-    echo "Patching project name to 'daft-lts' for LTS build"
-    tomlq -i -t ".project.name = \"daft-lts\"" pyproject.toml
+    echo "Patching project name to '$PROJECT_NAME-lts' for LTS build"
+    tomlq -i -t ".project.name = \"$PROJECT_NAME-lts\"" pyproject.toml
 fi
 
 # =========================================

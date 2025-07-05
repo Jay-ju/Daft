@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=las-ai-cn-beijing.cr.volces.com/las/las-base:cu12.9.1-py3.11-ubuntu24.04-20250704
+ARG BASE_IMAGE=las-ai-cn-beijing.cr.volces.com/las/las-base:cu12.9.1-py3.11-ubuntu24.04-20250705
 FROM ${BASE_IMAGE}
 
 ARG DAFT_WHEEL_URL
