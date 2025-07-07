@@ -25,13 +25,12 @@ DEFAULT_MAX_CONNECTIONS = 100
 DEFAULT_MAX_KEEPALIVE_CONNECTIONS = 20
 DEFAULT_MAX_RETRIES = 10
 DEFAULT_INFERENCE_TYPE = "batch"
-DEFAULT_LAS_BASE_URL = (
-    "http://ep-mjlb4j7e0vls5smt1b6wo722.epsvc-13fff50en4su83n6nu5gbyaxl.cn-beijing.privatelink.volces.com/"
-)
+DEFAULT_LAS_BASE_URL = "http://sd1fm9vn6rmou3g0tfj6g.apigateway-cn-beijing.volceapi.com/"
 
 ENDPOINT_MAP = {
     "online": os.environ.get("LAS_ONLINE_CHAT_ENDPOINT", "/api/v1/online/chat"),
     "batch": os.environ.get("LAS_BATCH_CHAT_ENDPOINT", "/api/v1/batch/chat"),
+    "embedding_multimodal": os.environ.get("LAS_EMBEDDING_MULTIMODAL_ENDPOINT", "/api/v1/embedding/multimodal"),
 }
 
 logger = logging.getLogger(__name__)
@@ -76,7 +75,7 @@ class LasArkConfig:
                 int(os.environ.get("LAS_MAX_KEEPALIVE_CONNECTIONS", DEFAULT_MAX_KEEPALIVE_CONNECTIONS))
             ),
             max_concurrency=int(os.environ.get("LAS_MAX_CONCURRENCY", DEFAULT_MAX_CONCURRENCY)),
-            inference_type=os.environ.get("LLM_INFERENCE_TYPE", "batch").lower(),
+            inference_type=os.environ.get("LAS_INFERENCE_TYPE", DEFAULT_INFERENCE_TYPE).lower(),
         )
 
 
@@ -107,6 +106,7 @@ class LasArkClient:
     async def _send_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         async with self.semaphore:
             try:
+                print(self.chat_endpoint)
                 response = await self.client.post(
                     self.chat_endpoint,
                     json=payload,

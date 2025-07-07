@@ -28,9 +28,13 @@ def base64_to_byte(base64_str: str) -> bytes:
     return base64.b64decode(base64_str)
 
 
+def byte_to_base64(byte_data: bytes) -> str:
+    return base64.b64encode(byte_data).decode("utf-8")
+
+
 def path_to_base64(path: str) -> str:
     with Path(path).open(mode="rb") as file:
-        return base64.b64encode(file.read()).decode("utf-8")
+        return byte_to_base64(file.read())
 
 
 def path_to_byte(path: str) -> bytes:

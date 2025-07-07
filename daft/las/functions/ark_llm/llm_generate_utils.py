@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import urlparse
+
+from daft.las.functions.utils.common_utils import (
+    byte_to_base64,
+    path_to_base64,
+    run_on_local_path,
+)
 
 
 def build_text_query(raw_query: str, prompt: str | None = None) -> str:
@@ -21,3 +28,27 @@ def gen_text_message(raw_query: str, prompt: str | None = None, system_content: 
         return [user_message]
 
     return [{"role": "system", "content": system_content}, user_message]
+
+
+def gen_media_data(data_type: str, media_info: Any, media_type: str, source_type: str = "url") -> str:
+    """Generates media data for the model based on the input row."""
+    source_type = source_type.lower() if source_type else "url"
+    assert source_type in ["url", "base64", "binary"]
+
+    if source_type == "base64":
+        return f"data:{data_type}/{media_type};base64,{media_info}"
+
+    if source_type == "binary":
+        if isinstance(media_info, str):
+            media_info = media_info.encode()
+        base64_data = byte_to_base64(media_info)
+        return f"data:{data_type}/{media_type};base64,{base64_data}"
+
+    # Now start to process url
+    scheme = urlparse(media_info).scheme
+    if scheme and scheme in ["http", "https"]:
+        # For http data, ark llm can support http/https url, so we don't need to convert it to base64
+        return media_info
+
+    base64_data = run_on_local_path(media_info, lambda path: path_to_base64(path))
+    return f"data:{data_type}/{media_type};base64,{base64_data}"

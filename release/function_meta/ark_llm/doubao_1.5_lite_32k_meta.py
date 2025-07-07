@@ -7,14 +7,29 @@ from function_meta.meta import (
     OP_ENVIRONMENT,
     OP_REGION,
     OP_VERSION,
+    Category,
     DataItem,
     ExtraMetaModel,
+    OpMetaModel,
+    SubCategory,
     ValueType,
 )
 
+from daft.las.functions.ark_llm.doubao_1_5_lite_32k import Doubao15Lite32k
+
+
+def get_meta() -> OpMetaModel:
+    return OpMetaModel(
+        Name="文本生成（doubao-1.5-lite-32k）",
+        Clazz=Doubao15Lite32k,
+        Category=Category.TEXT,
+        SubCategory=SubCategory.TEXT_GENERATION,
+        Tags=["文本生成"],
+    )
+
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao_1_5_pro_32k_offline/doubao_1_5_pro_32k_offline.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao_1_5_pro_32k/doubao_1_5_pro_32k.py"
     code_description = (
         "下面的代码展示了如何使用 daft"
         "访问火山方舟 Doubao-1.5-lite-32k 模型进行批量推理。"

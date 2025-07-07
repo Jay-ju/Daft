@@ -116,6 +116,7 @@ class SubCategory(Enum):
     IMAGE_TO_TEXT = "图片理解"
     AUDIO_TO_TEXT = "音频理解"
     VIDEO_TO_TEXT = "视频理解"
+    VISION_TO_TEXT = "视觉理解"
     IMAGE_TO_AUDIO = "图片转音频"
     IMAGE_TO_VIDEO = "图片转视频"
     VIDEO_TO_AUDIO = "视频转音频"

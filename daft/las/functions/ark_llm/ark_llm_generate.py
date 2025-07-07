@@ -145,7 +145,9 @@ class ArkLLMGenerate(Operator):
         该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
 
         Args:
-            messages: 包含待处理消息的PyArrow数组。类型为list[dict]
+            messages: 包含待处理消息的PyArrow数组。类型为list[dict].
+                该字段需要符合方舟大模型服务提供的chat API中messages字段的格式。
+                messages格式可以参考https://www.volcengine.com/docs/82379/1494384
 
         Returns:
             pyarrow.Array: 处理后的PyArrow数组。若过程中有数据处理失败，返回与正常返回类型一致的空数组。
