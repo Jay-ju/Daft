@@ -19,6 +19,11 @@ RUN pip config set global.index-url ${INDEX_URL} \
     && pip install "${DAFT_NAME}[las]@${DAFT_WHEEL_URL}" \
     && pip install "${DAFT_NAME}[flash-attn]@${DAFT_WHEEL_URL}"
 
+# Used for adding some post logic, e.g. replace ray via ve-ray.
+ARG VE_RAY_OFFLINE_FILE
+COPY post_hook.sh /tmp/post_hook.sh
+RUN chmod +x /tmp/post_hook.sh && /tmp/post_hook.sh
+
 ENV FORCE_QWENVL_VIDEO_READER=torchvision
 
 WORKDIR /opt/

@@ -89,7 +89,7 @@ ve-test: .venv build  ## Run tests
 
 .PHONY: test-las
 test-las: .venv build
-	$(VENV_BIN)/pytest tests/las -m "not ark_llm" --ignore tests/las/test_io.py --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
+	$(VENV_BIN)/pytest tests/las -m "not ark_llm" --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
 
 .PHONY: doctests
 doctests: .venv
