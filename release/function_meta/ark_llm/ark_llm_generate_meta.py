@@ -24,7 +24,7 @@ def get_meta() -> OpMetaModel:
         Clazz=ArkLLMGenerate,
         Description="提供通用的文本或视觉理解能力，输入字段格式需满足:[{'role': 'user', 'content': query}]类似的格式，"
         "详细格式请参考方舟大模型服务平台要求的messages格式（https://www.volcengine.com/docs/82379/1494384）",
-        Category=Category.MULTI_MODAL,
+        Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.VISION_TO_TEXT,
         Tags=["多模态"],
     )

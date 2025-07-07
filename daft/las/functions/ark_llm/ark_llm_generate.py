@@ -23,6 +23,17 @@ DEFAULT_LAS_LLM_FINISH_REASON_CHECK = os.getenv("LAS_LLM_FINISH_REASON_CHECK", "
 
 
 class ArkLLMGenerate(Operator):
+    """使用豆包/DeepSeek大模型进行批量文本生成或视频理解.
+
+    该类封装了与方舟LAS平台的大模型服务交互的逻辑，支持以下功能：
+    - 批量异步推理
+    - 多种模型参数配置（temperature, top_p等）
+    - 请求超时和并发控制
+
+    Attributes:
+        _finish_reason_check (bool): 是否检查模型终止原因的标志位
+    """
+
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK
 
     def __init__(
@@ -46,7 +57,7 @@ class ArkLLMGenerate(Operator):
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
         **kwargs: dict[str, Any],
     ) -> None:
-        """使用豆包/DeepSeek模式做LLM推理.
+        """使用豆包/DeepSeek大模型进行批量文本生成.
 
         Args:
             model: 模型名称

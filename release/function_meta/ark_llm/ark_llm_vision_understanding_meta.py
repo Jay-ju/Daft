@@ -22,7 +22,7 @@ def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="视觉内容理解（豆包/DeepSeek 系列模型）",
         Clazz=ArkLLMVisionUnderstanding,
-        Category=Category.MULTI_MODAL,
+        Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.VISION_TO_TEXT,
         Tags=["图片理解", "视频理解", "多模态理解"],
     )
@@ -36,7 +36,7 @@ def get_extra_meta() -> ExtraMetaModel:
     before = [
         DataItem(
             Type=ValueType.Video.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_keyframes/sample.mp4",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/ark_llm_vision_understanding/sample.mp4",
             Description="",
         ),
     ]

@@ -22,17 +22,17 @@ def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="文本生成（doubao-1.5-lite-32k）",
         Clazz=Doubao15Lite32k,
-        Category=Category.TEXT,
+        Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.TEXT_GENERATION,
         Tags=["文本生成"],
     )
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao_1_5_pro_32k/doubao_1_5_pro_32k.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao_1_5_lite_32k/doubao_1_5_lite_32k.py"
     code_description = (
         "下面的代码展示了如何使用 daft"
-        "访问火山方舟 Doubao-1.5-lite-32k 模型进行批量推理。"
+        "访问火山方舟 Doubao-1.5-lite-32k 模型进行批量理解。"
         "请注意每次大模型推理结果可能不同。"
     )
     before = [

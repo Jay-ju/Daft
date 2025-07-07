@@ -106,7 +106,6 @@ class LasArkClient:
     async def _send_request(self, payload: dict[str, Any]) -> dict[str, Any]:
         async with self.semaphore:
             try:
-                print(self.chat_endpoint)
                 response = await self.client.post(
                     self.chat_endpoint,
                     json=payload,

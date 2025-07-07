@@ -6,9 +6,7 @@ from daft.las.functions.ark_llm.doubao_1_5_lite_32k import Doubao15Lite32k
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
-    # 配置模型的访问信息，包括ak和账号id，请根据实际情况修改
-    access_key_id = "you_access_key_id"
-    accound_id = "your_account_id"
+    # 需提前配置环境变量 LAS_ACCESS_KEY 和 LAS_ACCOUND_ID ： LAS_ACCESS_KEY 是账号的 AK ， LAS_ACCOUND_ID 是账号 id
     queries = {
         "query": [
             "中国的首都在哪里",
@@ -23,8 +21,6 @@ if __name__ == "__main__":
             Doubao15Lite32k,
             construct_args={
                 "version": "250115",
-                "access_key": access_key_id,
-                "account_id": accound_id,
             },
         )(col("query")),
     )
