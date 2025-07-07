@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
+from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
+from daft.las.functions.ark_llm.llm_generate_utils import gen_text_message
 from daft.las.infra.las_ark import (
     DEFAULT_INFERENCE_TYPE,
     DEFAULT_MAX_CONCURRENCY,
@@ -15,9 +16,10 @@ if TYPE_CHECKING:
     from daft.dependencies import pa
 
 
-class Doubao15Lite32k(ArkLLMTextGenerate):
+class ArkLLMTextGenerate(ArkLLMGenerate):
     def __init__(
         self,
+        model: str,
         version: str,
         access_key: str | None = None,
         account_id: str | None = None,
@@ -38,10 +40,9 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
         prompt: str | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
-        """Doubao-1.5-lite，全新一代轻量版模型，极致响应速度，效果与时延均达到全球一流水平.
+        """针对纯文本的数据，调用方舟模型进行文本进行理解和回复。示例文本翻译、内容总结等场景，传入文本信息，通过大模型对这些文本信息作相应理解和回复.
 
-        Doubao1.5-lite在轻量版语言模型中也处于全球一流水平，在综合（MMLU_pro）、推理（BBH）、数学（MATH）、
-        专业知识（GPQA）权威测评指标持平或超越GPT-4omini，Cluade 3.5 Haiku.
+        输入纯文本数据，将其按照方舟模型的输入格式进行组装message信息，格式为{role: user, content: <query语句>}。您只需要传入<query语句>即可.
 
         Args:
             model: 模型名称
@@ -98,7 +99,6 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
             max_concurrency: 并发数
                 每个进程的最大并发数
         """
-        model = "doubao-1.5-lite-32k"
         super().__init__(
             model=model,
             version=version,
@@ -117,18 +117,17 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
             llm_config=llm_config,
             request_timeout=request_timeout,
             max_concurrency=max_concurrency,
-            system_content=system_content,
-            prompt=prompt,
             **kwargs,
         )
 
-    def transform(self, raw_text: pa.Array) -> pa.Array:
-        """批量使用大模型进行文本数组推理.
+        self.system_content = system_content
+        self.prompt = prompt
 
-        该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
+    def transform(self, raw_text: pa.Array) -> pa.Array:
+        """批量使用大模型对文本内容进行理解和回复.
 
         Args:
-            raw_text: 包含待处理文本的PyArrow数组。类型为 str
+            raw_text: 包含待处理文本的PyArrow数组。类型为str
 
         Returns:
             pyarrow.Array: 处理后的PyArrow数组。若过程中有数据处理失败，返回与正常返回类型一致的空数组。
@@ -137,4 +136,5 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
                 - finish_reason: 模型输出结束原因
             当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
         """
-        return super().transform(raw_text)
+        messages = [gen_text_message(x.as_py(), self.prompt, self.system_content) for x in raw_text]
+        return super().process(messages)
