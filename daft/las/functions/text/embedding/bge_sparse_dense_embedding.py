@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class BgeSparseDenseEmbedding(Operator):
     """**基于 BGE-M3 的文本嵌入模型，支持稀疏/稠密/token 三级向量生成**
 
-    **核心功能**：
+    **核心功能**
     - **多粒度嵌入输出：**
         - 稀疏向量：词项权重表示，适合关键词检索
         - 稠密向量：1024维语义表示，适合语义相似度计算

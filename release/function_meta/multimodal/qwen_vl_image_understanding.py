@@ -43,6 +43,7 @@ if __name__ == "__main__":
             },
             num_gpus=1,
             batch_size=2,
+            concurrency=1,
         )(col("image_path")),
     )
 

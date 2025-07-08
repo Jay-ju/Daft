@@ -46,6 +46,7 @@ if __name__ == "__main__":
             },
             num_gpus=1,
             batch_size=1,
+            concurrency=1,
         )(col("audio_path")),
     )
     df.show()

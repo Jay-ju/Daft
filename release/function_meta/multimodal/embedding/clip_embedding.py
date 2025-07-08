@@ -33,6 +33,7 @@ if __name__ == "__main__":
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("text")),
     )
 

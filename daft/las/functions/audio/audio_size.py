@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 class AudioSize(Operator):
     """**音频文件元数据分析处理器，精确计算文件大小.**
 
-    **核心功能：**
+    **核心功能**
     - 精确计算音频文件字节大小
     - 支持本地文件与TOS存储
     - 轻量高效，适合批量处理
 
-    **格式支持：**
+    **格式支持**
     - MP3 (.mp3)
     - WAV (.wav)
     - FLAC (.flac)

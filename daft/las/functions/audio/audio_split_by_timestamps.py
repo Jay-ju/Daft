@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class AudioSplitByTimestamps(Operator):
     """**音频时间戳切分处理器，支持精准片段提取.**
 
-    **核心功能：**
+    **核心功能**
     - 基于时间戳精确切分音频
     - 支持多输入格式：
        - 本地文件路径
@@ -30,7 +30,7 @@ class AudioSplitByTimestamps(Operator):
        - 二进制数据流
     - 支持片段二进制输出或TOS存储
 
-    **格式支持：**
+    **格式支持**
     - MP3 (.mp3)
     - WAV (.wav)
     - FLAC (.flac)
