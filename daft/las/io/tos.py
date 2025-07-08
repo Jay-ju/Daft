@@ -19,7 +19,14 @@ import daft.daft
 from daft.daft import S3Config, S3Credentials
 from daft.las.io.factory import LasIO, register_io_client
 from daft.las.io.utils import generate_temp_file, normalize_local_path
-from daft.las.utils import get_ak_sk, is_static_credential, not_blank
+from daft.las.utils import (
+    get_ak_sk,
+    get_credentials_provider_url,
+    get_region,
+    get_session_token,
+    is_static_credential,
+    not_blank,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -76,8 +83,8 @@ class TOSConfig:
     endpoint: str | None
     access_key: str | None
     secret_key: str | None
-    credential_provider: Callable[[], TosCredentials] | None
-    credential_provider_url: str | None
+    credentials_provider: Callable[[], TosCredentials] | None
+    credentials_provider_url: str | None
 
     def __init__(
         self,
@@ -86,23 +93,23 @@ class TOSConfig:
         access_key: str | None = None,
         secret_key: str | None = None,
         session_token: str | None = None,
-        credential_provider: Callable[[], TosCredentials] | None = None,
-        credential_provider_url: str | None = None,
+        credentials_provider: Callable[[], TosCredentials] | None = None,
+        credentials_provider_url: str | None = None,
     ):
         self.endpoint, self.region = self._parse_endpoint(endpoint, region)
         self.access_key = access_key
         self.secret_key = secret_key
         self.session_token = session_token
-        self.credential_provider = credential_provider
-        self.credential_provider_url = credential_provider_url
+        self.credentials_provider = credentials_provider
+        self.credentials_provider_url = credentials_provider_url
 
         self._check_credential_info()
 
     def _check_credential_info(self) -> None:
         if (
             not is_static_credential(self.access_key, self.secret_key)
-            and not not_blank(self.credential_provider_url)
-            and not self.credential_provider
+            and not not_blank(self.credentials_provider_url)
+            and not self.credentials_provider
         ):
             raise ValueError("Cannot found credentials or credential provider.")
 
@@ -127,11 +134,11 @@ class TOSConfig:
         access_key, secret_key = get_ak_sk("tos")
         return TOSConfig(
             endpoint=os.getenv("TOS_ENDPOINT"),
-            region=os.getenv("TOS_REGION"),
+            region=get_region("tos"),
             access_key=access_key,
             secret_key=secret_key,
-            session_token=os.getenv("TOS_SESSION_TOKEN"),
-            credential_provider_url=os.getenv("TOS_CREDENTIAL_PROVIDER_URL"),
+            session_token=get_session_token("tos"),
+            credentials_provider_url=get_credentials_provider_url("tos"),
         )
 
     @staticmethod
@@ -150,9 +157,9 @@ class TOSConfig:
             session_token=s3_config.session_token,
         )
 
-        credential_provider = s3_config.credentials_provider
-        if credential_provider:
-            config.credential_provider = lambda: TosCredentials.from_s3_credentials(credential_provider())
+        credentials_provider = s3_config.credentials_provider
+        if credentials_provider:
+            config.credentials_provider = lambda: TosCredentials.from_s3_credentials(credentials_provider())
 
         return config
 
@@ -160,8 +167,8 @@ class TOSConfig:
         endpoint_url = self.endpoint.replace("tos-", "tos-s3-") if self.endpoint else None
 
         def provider() -> S3Credentials:
-            assert self.credential_provider is not None
-            return self.credential_provider().to_s3_credentials()
+            assert self.credentials_provider is not None
+            return self.credentials_provider().to_s3_credentials()
 
         return S3Config(
             endpoint_url=endpoint_url,
@@ -169,7 +176,7 @@ class TOSConfig:
             key_id=self.access_key,
             access_key=self.secret_key,
             session_token=self.session_token,
-            credentials_provider=provider if self.credential_provider else None,
+            credentials_provider=provider if self.credentials_provider else None,
             force_virtual_addressing=True,
         )
 
@@ -206,21 +213,21 @@ class TosIO(LasIO):
                 session_token=config.session_token,
             )
 
-        if config.credential_provider_url:
-            if config.credential_provider_url.isspace():
-                raise ValueError("credential_provider_url cannot be empty")
+        if config.credentials_provider_url:
+            if config.credentials_provider_url.isspace():
+                raise ValueError("credentials_provider_url cannot be empty")
 
             return TosFileSystem(
                 endpoint=config.endpoint,
                 region=config.region,
-                credentials_provider=NoLockUrlCredentialsProvider(config.credential_provider_url),
+                credentials_provider=NoLockUrlCredentialsProvider(config.credentials_provider_url),
             )
 
-        if config.credential_provider:
+        if config.credentials_provider:
             return TosFileSystem(
                 endpoint=config.endpoint,
                 region=config.region,
-                credentials_provider=lambda: config.credential_provider().to_tosfs_credentials(),
+                credentials_provider=lambda: config.credentials_provider().to_tosfs_credentials(),
             )
 
         raise ValueError("Cannot found credentials or credential provider.")

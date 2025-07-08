@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from volcenginesdkarkruntime import Ark, AsyncArk
 
-from daft.las.utils import get_ak_sk, is_static_credential, not_blank
+from daft.las.utils import get_ak_sk, get_region, is_static_credential, not_blank
 
 
 class ArkConfig:
@@ -69,7 +69,7 @@ class ArkConfig:
         access_key, secret_key = get_ak_sk("ark")
         return ArkConfig(
             base_url=os.getenv("ARK_BASE_URL"),
-            region=os.getenv("ARK_REGION"),
+            region=get_region("ark"),
             access_key=access_key,
             secret_key=secret_key,
             api_key=os.getenv("ARK_API_KEY"),

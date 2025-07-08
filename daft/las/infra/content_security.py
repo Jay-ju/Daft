@@ -8,7 +8,7 @@ from typing import Callable
 from volcengine.content_security.ContentSecurityService import ContentSecurityService
 
 from daft.las.infra.credentials import Credentials, UrlCredentialsProvider
-from daft.las.utils import get_ak_sk, is_static_credential, not_blank
+from daft.las.utils import get_ak_sk, get_credentials_provider_url, get_session_token, is_static_credential, not_blank
 
 
 class ContentSecurityConfig:
@@ -19,8 +19,8 @@ class ContentSecurityConfig:
         access_key: str | None = None,
         secret_key: str | None = None,
         session_token: str | None = None,
-        credential_provider: Callable[[], Credentials] | None = None,
-        credential_provider_url: str | None = None,
+        credentials_provider: Callable[[], Credentials] | None = None,
+        credentials_provider_url: str | None = None,
         host: str = "open.volcengineapi.com",
         scheme: str = "http",
         connect_timeout: int = 30,
@@ -29,8 +29,8 @@ class ContentSecurityConfig:
         self.access_key = access_key
         self.secret_key = secret_key
         self.session_token = session_token
-        self.credential_provider = credential_provider
-        self.credential_provider_url = credential_provider_url
+        self.credentials_provider = credentials_provider
+        self.credentials_provider_url = credentials_provider_url
         self.host = host
         self.scheme = scheme
         self.connect_timeout = connect_timeout
@@ -41,8 +41,8 @@ class ContentSecurityConfig:
     def _check_credential_info(self) -> None:
         if (
             not is_static_credential(self.access_key, self.secret_key)
-            and not not_blank(self.credential_provider_url)
-            and not self.credential_provider
+            and not not_blank(self.credentials_provider_url)
+            and not self.credentials_provider
         ):
             raise ValueError("Cannot found credentials or credential provider.")
 
@@ -52,8 +52,8 @@ class ContentSecurityConfig:
         return ContentSecurityConfig(
             access_key=access_key,
             secret_key=secret_key,
-            session_token=os.getenv("CONTENT_SECURITY_SESSION_TOKEN"),
-            credential_provider_url=os.getenv("CONTENT_SECURITY_CREDENTIAL_PROVIDER_URL"),
+            session_token=get_session_token("content_security"),
+            credentials_provider_url=get_credentials_provider_url("content_security"),
             host=os.getenv("CONTENT_SECURITY_HOST", "open.volcengineapi.com"),
             scheme=os.getenv("CONTENT_SECURITY_SCHEME", "http"),
             connect_timeout=int(os.getenv("CONTENT_SECURITY_CONNECT_TIMEOUT", 30)),
@@ -73,10 +73,10 @@ def get_content_security_service(config: ContentSecurityConfig) -> ContentSecuri
     if config.access_key and config.secret_key:
         ak = config.access_key
         sk = config.secret_key
-    elif config.credential_provider:
-        credentials = config.credential_provider()
-    elif config.credential_provider_url:
-        credentials = UrlCredentialsProvider(config.credential_provider_url).get_credentials()
+    elif config.credentials_provider:
+        credentials = config.credentials_provider()
+    elif config.credentials_provider_url:
+        credentials = UrlCredentialsProvider(config.credentials_provider_url).get_credentials()
     else:
         raise ValueError("Missing credentials.")
     if credentials is not None:

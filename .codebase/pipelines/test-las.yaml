@@ -31,6 +31,7 @@ jobs:
       commands:
       - export ACCESS_KEY_ID=${{ACCESS_KEY_ID}}
       - export SECRET_ACCESS_KEY=${{SECRET_ACCESS_KEY}}
+      - export REGION=${{REGION}}
       - export TOS_ENDPOINT=${{TOS_ENDPOINT}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
       - make test-las

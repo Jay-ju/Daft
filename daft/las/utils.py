@@ -44,3 +44,15 @@ def get_ak_sk(service: str) -> tuple[str | None, str | None]:
     )
 
     return access_key, secret_key
+
+
+def get_session_token(service: str) -> str | None:
+    return os.getenv(f"{service.upper()}_SESSION_TOKEN") or os.getenv("SESSION_TOKEN")
+
+
+def get_region(service: str) -> str | None:
+    return os.getenv(f"{service.upper()}_REGION") or os.getenv("REGION")
+
+
+def get_credentials_provider_url(service: str) -> str | None:
+    return os.getenv(f"{service.upper()}_CREDENTIALS_PROVIDER_URL") or os.getenv("CREDENTIALS_PROVIDER_URL")

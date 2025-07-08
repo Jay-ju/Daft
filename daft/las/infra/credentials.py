@@ -23,8 +23,8 @@ class Credentials:
 
     access_key: str
     secret_key: str
-    session_token: str
-    expire_time: datetime
+    session_token: str | None = None
+    expire_time: datetime | None = None
 
 
 class CredentialsProvider:
@@ -84,5 +84,6 @@ class UrlCredentialsProvider(CredentialsProvider):
     def _try_get_credentials(self) -> Credentials | None:
         if self.credentials is None:
             return None
+        assert self.credentials.expire_time is not None
         expire_threshold: datetime = self.credentials.expire_time - self.expire_duration
         return None if (datetime.now().timestamp() > expire_threshold.timestamp()) else self.credentials

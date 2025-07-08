@@ -1,12 +1,18 @@
 # Copyright (c) Beijing Volcano Engine Technology Ltd.
+
 from __future__ import annotations
 
 import pytest
+import requests
 
 from daft.las.infra.ark import ArkConfig, get_ark_client
+from daft.las.infra.top.volcauth import VolcAuth
 from daft.las.utils import get_ak_sk
 
-services = ["TOS", "CONTENT_SECURITY", "VISUAL_SERVICE"]
+VERSION = "2024-06-30"
+HOST = "open.volcengineapi.com"
+PATH = "/"
+SERVICES = ["TOS", "CONTENT_SECURITY", "VISUAL_SERVICE"]
 
 
 def test_ark_client():
@@ -36,7 +42,7 @@ def test_missing_credential(monkeypatch):
         get_ark_client(ArkConfig.from_env())
 
 
-@pytest.mark.parametrize("service", services)
+@pytest.mark.parametrize("service", SERVICES)
 def test_get_ak_sk(service, monkeypatch):
     test_las_service_access_key = "test_las_service_access_key"
     test_las_service_secret_key = "test_las_service_secret_key"
@@ -108,3 +114,24 @@ def test_get_ak_sk(service, monkeypatch):
     ak, sk = get_ak_sk(service)
     assert ak is None
     assert sk is None
+
+
+def test_openapi():
+    access_key, secret_key = get_ak_sk("las")
+
+    auth = VolcAuth(access_key, secret_key, "cn-beijing", "las_ai_qa")
+
+    url = f"https://{HOST}{PATH}"
+    params = {"Action": "ExistsDataset", "Version": VERSION}
+    headers = {
+        "ServiceName": "las_ai_qa",
+        "AccessKey": access_key,
+        "SecretKey": secret_key,
+        "Region": "cn-beijing",
+        "Content-Type": "application/json",
+    }
+    body = {"DatasetName": "non_exist_ds"}
+
+    response = requests.request(method="POST", url=url, headers=headers, params=params, auth=auth, json=body)
+
+    assert response.json()["Result"]["Exists"] is False

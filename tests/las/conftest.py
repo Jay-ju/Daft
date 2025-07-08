@@ -32,10 +32,15 @@ def local_models_dir():
 
 
 @pytest.fixture
-def object_store_test_dir(request):
+def uuid_short():
+    return str(uuid.uuid4()).split("-")[0]
+
+
+@pytest.fixture
+def object_store_test_dir(request, uuid_short):
     scheme = os.getenv("TEST_OBJECT_SCHEME", "tos")
     bucket = os.getenv("TEST_OBJECT_BUCKET", "las-ci")
-    temp_dir = f"{scheme}://{bucket}/object-store/test-{uuid.uuid4().hex!s}"
+    temp_dir = f"{scheme}://{bucket}/object-store/test-{uuid_short}"
 
     def clean_temp_data():
         if exists(temp_dir):

@@ -7,7 +7,7 @@ import os
 from volcengine.visual.VisualService import VisualService
 
 from daft.las.infra.credentials import Credentials, CredentialsProvider, UrlCredentialsProvider
-from daft.las.utils import get_ak_sk, is_static_credential, not_blank
+from daft.las.utils import get_ak_sk, get_credentials_provider_url, get_session_token, is_static_credential, not_blank
 
 
 class VisualServiceConfig:
@@ -51,8 +51,8 @@ class VisualServiceConfig:
         return VisualServiceConfig(
             access_key=access_key,
             secret_key=secret_key,
-            session_token=os.getenv("VISUAL_SERVICE_SESSION_TOKEN"),
-            credentials_provider_url=os.getenv("VISUAL_SERVICE_CREDENTIAL_PROVIDER_URL"),
+            session_token=get_session_token("visual_service"),
+            credentials_provider_url=get_credentials_provider_url("visual_service"),
             host=os.getenv("VISUAL_SERVICE_HOST", "visual.volcengineapi.com"),
             scheme=os.getenv("VISUAL_SERVICE_SCHEME", "http"),
             connect_timeout=int(os.getenv("VISUAL_SERVICE_CONNECT_TIMEOUT", 30)),
