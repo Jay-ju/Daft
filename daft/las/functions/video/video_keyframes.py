@@ -27,25 +27,25 @@ EXTRACT_KEYFRAMES_INTRA_METHOD = {"I_frame"}
 
 
 class VideoKeyframes(Operator):
-    """视频关键帧抽取处理器，支持多算法动态检测.
+    """**视频关键帧抽取处理器，支持多算法动态检测.**
 
-    核心功能：
+    **核心功能：**
     - 多算法支持：
-        • 像素差分法(difference)
-        • 光流法(optical_flow)
-        • 直方图法(histogram)
-        • I型关键帧标识(I_frame)
+        - 像素差分法(difference)
+        - 光流法(optical_flow)
+        - 直方图法(histogram)
+        - I型关键帧标识(I_frame)
     - 支持自定义阈值与数量控制
     - 提供时间戳定位功能
     - 支持多种输出格式与存储选项
 
-    格式支持：
-    • 输入：MP4, AVI, MOV 等常见视频格式
-    • 输出：JPG, PNG 图片格式
+    **格式支持：**
+    - 输入：MP4, AVI, MOV 等常见视频格式
+    - 输出：JPG, PNG 图片格式
 
-    性能建议：
-    • I_frame 方法效率最高，推荐优先使用
-    """
+    **性能建议：**
+    - I_frame 方法效率最高，推荐优先使用
+    """  # noqa: D415
 
     def __init__(
         self,

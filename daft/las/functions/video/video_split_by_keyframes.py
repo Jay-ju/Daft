@@ -20,23 +20,23 @@ logger = logging.getLogger(__name__)
 
 
 class VideoSplitByKeyframes(Operator):
-    """视频关键帧切分处理器，支持智能片段分割.
+    """**视频关键帧切分处理器，支持智能片段分割.**
 
-    核心功能：
+    **核心功能：**
     - 多算法关键帧检测：
-        • I_frame: 基于I帧检测(推荐)
-        • difference: 像素差异检测
-        • histogram: 直方图差异检测
+        - I_frame: 基于I帧检测(推荐)
+        - difference: 像素差异检测
+        - histogram: 直方图差异检测
     - 支持片段二进制输出或TOS存储
     - 提供时间戳定位功能
 
-    格式支持：
-    • MP4 (.mp4)
-    • AVI (.avi)
-    • MOV (.mov)
-    • MKV (.mkv)
-    • 其他常见视频格式
-    """
+    **格式支持：**
+    - MP4 (.mp4)
+    - AVI (.avi)
+    - MOV (.mov)
+    - MKV (.mkv)
+    - 其他常见视频格式
+    """  # noqa: D415
 
     def __init__(
         self,
