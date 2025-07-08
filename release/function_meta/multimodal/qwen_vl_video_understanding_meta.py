@@ -28,7 +28,7 @@ def get_meta() -> OpMetaModel:
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/qwen_vl_video_understanding/qwen_vl_image_understanding.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/qwen_vl_video_understanding/qwen_vl_video_understanding.py"
     code_description = "下面的代码展示了如何使用 daft 运行算子理解视频内容，并按照指令生成描述。"
     before = [
         DataItem(

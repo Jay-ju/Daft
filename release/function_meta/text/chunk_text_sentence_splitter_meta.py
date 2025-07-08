@@ -28,7 +28,7 @@ def get_meta() -> OpMetaModel:
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/chunk_text/chunk_text.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/chunk_text_sentence_splitter/chunk_text_sentence_splitter.py"
     code_description = "下面的代码展示了如何使用 daft 运行算子按照文本句子结构对其做切分。"
     before = [
         DataItem(
