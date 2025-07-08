@@ -84,8 +84,8 @@ class FileWriterBase(ABC):
         self.position = 0
 
     def resolve_path_and_fs(self, root_dir: str, io_config: IOConfig | None = None) -> tuple[str, pafs.FileSystem]:
-        [resolved_path], fs = _resolve_paths_and_filesystem(root_dir, io_config=io_config)
-        return resolved_path, fs
+        [resolved_path], fs_adapter = _resolve_paths_and_filesystem(root_dir, io_config=io_config)
+        return resolved_path, fs_adapter.fs
 
     @abstractmethod
     def write(self, table: MicroPartition) -> int:

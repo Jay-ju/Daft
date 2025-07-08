@@ -30,6 +30,7 @@ gcp = []
 hudi = ["pyarrow >= 8.0.0"]
 iceberg = ["pyiceberg >= 0.7.0", "packaging"]
 lance = ["pylance"]
+mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]
 pandas = ["pandas"]
 ray = [

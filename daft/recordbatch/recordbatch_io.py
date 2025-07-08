@@ -598,7 +598,8 @@ def write_empty_tabular(
 ) -> str:
     table = pa.Table.from_pylist([], schema=schema.to_pyarrow_schema())
 
-    [resolved_path], fs = _resolve_paths_and_filesystem(path, io_config=io_config)
+    [resolved_path], fs_adapter = _resolve_paths_and_filesystem(path, io_config=io_config)
+    fs = fs_adapter.fs
     is_local_fs = canonicalize_protocol(get_protocol_from_path(path if isinstance(path, str) else str(path))) == "file"
     if is_local_fs:
         fs.create_dir(resolved_path, recursive=True)

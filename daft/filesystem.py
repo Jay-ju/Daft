@@ -111,10 +111,39 @@ def canonicalize_protocol(protocol: str) -> str:
     return _CANONICAL_PROTOCOLS.get(protocol, protocol)
 
 
+class FileSystemAdapter:
+    def __init__(self, fs: pafs.FileSystem | fsspec.AbstractFileSystem, protocol: str):
+        self.fs = fs
+        self.protocol = protocol
+
+    def get_file_info(self, path: str) -> pafs.FileInfo:
+        if self.protocol == "tos":
+            info = self.fs.info(path)
+            return type(
+                "FileInfo",
+                (),
+                {
+                    "path": info["name"],
+                    "type": pafs.FileType.File if info["type"] == "file" else pafs.FileType.Directory,
+                    "size": info["size"],
+                },
+            )()
+        else:
+            return self.fs.get_file_info(path)
+
+    def list_dir(self, path: str, recursive: bool = False) -> list[pafs.FileInfo]:
+        if self.protocol == "tos":
+            entries = self.fs.ls(path, detail=True)
+            return [self.get_file_info(e["name"]) for e in entries]
+        else:
+            selector = pafs.FileSelector(path, recursive=recursive)
+            return self.fs.get_file_info(selector)
+
+
 def _resolve_paths_and_filesystem(
     paths: str | pathlib.Path | list[str],
     io_config: IOConfig | None = None,
-) -> tuple[list[str], pafs.FileSystem]:
+) -> tuple[list[str], FileSystemAdapter]:
     """Resolves and normalizes the provided path and infers it's filesystem.
 
     Also ensures that the inferred filesystem is compatible with the passed filesystem, if provided.
@@ -165,7 +194,9 @@ def _resolve_paths_and_filesystem(
 
     # filesystem should be a non-None pyarrow FileSystem at this point, either
     # user-provided, taken from the cache, or inferred from the first path.
-    assert resolved_filesystem is not None and isinstance(resolved_filesystem, pafs.FileSystem)
+    assert resolved_filesystem is not None and isinstance(
+        resolved_filesystem, (pafs.FileSystem, fsspec.AbstractFileSystem)
+    ), "Resolved filesystem must be a pyarrow or fsspec filesystem instance"
 
     # Resolve all other paths and validate with the user-provided/cached/inferred filesystem.
     resolved_paths = [resolved_path]
@@ -173,7 +204,7 @@ def _resolve_paths_and_filesystem(
         resolved_path = _validate_filesystem(path, resolved_filesystem, io_config)
         resolved_paths.append(resolved_path)
 
-    return resolved_paths, resolved_filesystem
+    return resolved_paths, FileSystemAdapter(resolved_filesystem, protocol)
 
 
 def _validate_filesystem(path: str, fs: pafs.FileSystem, io_config: IOConfig | None) -> str:
@@ -302,6 +333,22 @@ def _infer_filesystem(
         resolved_filesystem, resolved_path = pafs._resolve_filesystem_and_path(path, fsspec_fs)
         resolved_path = resolved_filesystem.normalize_path(_unwrap_protocol(resolved_path))
         return resolved_path, resolved_filesystem, None
+    elif protocol in {"tos"}:
+        from tosfs import TosFileSystem
+
+        if io_config is None or io_config.s3 is None:
+            raise ValueError(
+                "TOS protocol requires an IOConfig with S3Config to be provided, as TOS is a S3-compatible object store."
+            )
+        s3_config = io_config.s3
+        resolved_filesystem = TosFileSystem(
+            key=s3_config.key_id,
+            secret=s3_config.access_key,
+            endpoint_url=s3_config.endpoint_url,
+            region=s3_config.region_name,
+        )
+
+        return path, resolved_filesystem, None
 
     else:
         raise NotImplementedError(f"Cannot infer PyArrow filesystem for protocol {protocol}: please file an issue!")
@@ -367,38 +414,71 @@ def overwrite_files(
     io_config: IOConfig | None,
     overwrite_partitions: bool,
 ) -> None:
-    [resolved_path], fs = _resolve_paths_and_filesystem(root_dir, io_config=io_config)
+    [resolved_path], fs_adapter = _resolve_paths_and_filesystem(root_dir, io_config=io_config)
+    fs = fs_adapter.fs
 
-    all_file_paths = []
+    # get all files in root_dir
     if overwrite_partitions:
-        # Get all files in ONLY the directories that were written to.
-
-        written_dirs = set(str(pathlib.Path(path).parent) for path in written_file_paths)
-        for dir in written_dirs:
-            file_selector = pafs.FileSelector(dir, recursive=True)
-            try:
-                all_file_paths.extend(
-                    [info.path for info in fs.get_file_info(file_selector) if info.type == pafs.FileType.File]
-                )
-            except FileNotFoundError:
-                continue
+        # Get all files in the written directories
+        written_dirs = {str(pathlib.Path(path).parent) for path in written_file_paths}
+        all_file_paths = []
+        for dir_path in written_dirs:
+            all_file_paths.extend(list_files(dir_path, io_config))
     else:
         # Get all files in the root directory.
-
-        file_selector = pafs.FileSelector(resolved_path, recursive=True)
-        try:
-            all_file_paths.extend(
-                [info.path for info in fs.get_file_info(file_selector) if info.type == pafs.FileType.File]
-            )
-        except FileNotFoundError:
-            # The root directory does not exist, so there are no files to delete.
-            return
+        all_file_paths = list_files(resolved_path, io_config)
 
     all_file_paths_df = MicroPartition.from_pydict({"path": all_file_paths})
-
-    # Find the files that were not written to in this run and delete them.
     to_delete = all_file_paths_df.filter(ExpressionsProjection([~(col("path").is_in(written_file_paths))]))
 
-    # TODO: Look into parallelizing this
     for entry in to_delete.get_column_by_name("path"):
         fs.delete_file(entry)
+
+
+# tos https://github.com/fsspec/tosfs/blob/1e7c9872097b220bad8359d1dd38eb3a86764a19/tosfs/tests/test_tosfs.py#L38
+
+
+def tos_normalize_path(path: str) -> str:
+    return path if path.startswith("tos://") else f"tos://{path}"
+
+
+def list_files(
+    root_dir: str | pathlib.Path,
+    io_config: IOConfig | None,
+) -> list[str]:
+    """List all files in the given directory."""
+    [resolved_path], fs = _resolve_paths_and_filesystem(root_dir, io_config=io_config)
+    all_file_paths = []
+
+    from tosfs import TosFileSystem
+
+    try:
+        if isinstance(fs, TosFileSystem):
+            file_info = fs.info(resolved_path)
+            if file_info["type"] == "file":
+                return [resolved_path]
+        else:
+            file_info = fs.get_file_info(resolved_path)
+            if file_info.type == pafs.FileType.File:
+                return [resolved_path]
+
+    except FileNotFoundError:
+        return []
+
+    if isinstance(fs, TosFileSystem):
+
+        def _walk(path: str) -> None:
+            for entry in fs.ls(path, detail=True):
+                if entry["type"] == "directory":
+                    _walk(tos_normalize_path(entry["name"]))
+                else:
+                    all_file_paths.append(tos_normalize_path(entry["name"]))
+
+        _walk(resolved_path)
+    else:
+        file_selector = pafs.FileSelector(resolved_path, recursive=True)
+        all_file_paths.extend(
+            [info.path for info in fs.get_file_info(file_selector) if info.type == pafs.FileType.File]
+        )
+
+    return all_file_paths
