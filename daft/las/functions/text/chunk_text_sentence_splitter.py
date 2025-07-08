@@ -15,21 +15,25 @@ logger = logging.getLogger(__name__)
 
 
 class ChunkTextSentenceSplitter(Operator):
-    """多格式文本分块处理器，支持结构化解析与智能切分.
+    """**多格式文本分块处理器 - 结构化解析与智能切分解决方案**
 
-    核心功能：
-    - 三格式支持：
-        • 纯文本：基于段落/标点的语义分块
-        • Markdown：保留文档结构，过滤图片链接
-        • HTML：提取正文内容，保留章节结构
-    - 智能分块策略：结合语义与语法规则
-    - 重叠优化：保持上下文连贯性
+    **核心功能**
 
-    技术实现：
-    ▸ 解析引擎：BeautifulSoup（HTML）/llama-index（Markdown）
-    ▸ 分块算法：递归式语义分割（sentence splitter）
-    ▸ 文本归一化：冗余字符过滤与空白标准化
-    """
+    - **支持格式**
+      - `纯文本`：基于段落/标点的语义分块
+      - `Markdown`：保留文档结构，过滤图片链接
+      - `HTML`：提取正文内容，保留章节结构
+    - **智能分块策略**
+      - 结合语义与语法规则
+      - 重叠优化保持上下文连贯性
+
+    **技术实现**
+    - **解析引擎**
+      - HTML：`BeautifulSoup`
+      - Markdown：`llama-index`
+    - **分块算法**
+      - 递归式语义分割（sentence splitter）
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -87,7 +91,7 @@ class ChunkTextSentenceSplitter(Operator):
             texts: 待处理的文本数组，要求元素类型为字符串。
 
         Returns:
-            pyarrow.Array: List[str]类型字段，存储切分后的文本块
+            pyarrow.Array: 切分后的文本块，元素为List[str]类型。
 
         """
         from bs4 import BeautifulSoup

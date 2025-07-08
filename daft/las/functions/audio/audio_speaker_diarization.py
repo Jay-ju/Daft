@@ -50,7 +50,23 @@ def load_pipeline_from_pretrained(config_path: str | Path) -> Pipeline:
 
 
 class AudioSpeakerDiarization(Operator):
-    """使用pyannote-audio对输入的音频进行说话人分离处理."""
+    """**基于pyannote-audio的说话人分离处理器**
+
+    **核心功能**
+    - 多说话人语音分离与时间戳标注
+    - 输出带说话人标签的语音分段元数据
+
+    **输入/输出**：
+    - 输入：音频
+    - 输出：包含以下字段的结构化数据
+        - speaker: 说话人唯一标识
+        - start: 语音段开始时间（秒）
+        - end: 语音段结束时间（秒）
+
+    **技术特性**
+    - 使用`speaker-diarization-3.1`说话人分离模型
+    - 支持GPU加速推理（需配置CUDA环境）
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -73,11 +89,11 @@ class AudioSpeakerDiarization(Operator):
             rank = 0 if rank is None else rank
             # change cuda_device_count
             self.rank = rank % self.cuda_device_count
-            self.model.to(torch.device(f"cuda:{rank}"))
+            logger.info("Model will be loaded on device: %s", f"cuda:{self.rank}")
+            self.model.to(torch.device(f"cuda:{self.rank}"))
             self.device = "cuda"
         else:
             self.device = "cpu"
-
         logger.info("The model is loaded from %s.", model_config_file)
 
     @staticmethod
@@ -112,10 +128,10 @@ class AudioSpeakerDiarization(Operator):
         """对输入的音频数组进行批量说话人分离处理.
 
         Args:
-            audios (pa.Array): 包含多个音频数据的 Arrow 数组.
+            audios: 包含多个音频数据的数组.
 
         Returns:
-            pa.Array: 包含说话人分离结果的 Arrow 数组.
+            pa.Array: 包含说话人分离结果的数组.
         """
         result = [self._diarization(audio.as_py()) for audio in audios]
         return pa.array(result, type=self.__return_column_type__())

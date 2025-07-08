@@ -17,15 +17,21 @@ logger = logging.getLogger(__name__)
 
 
 class QwenVLVideoUnderstanding(Operator):
-    """基于 Qwen2.5-VL 的多模态视频理解模型，支持时序语义解析与自然语言描述生成.
+    """**Qwen2.5-VL 多模态视频理解模型 - 时序语义解析与自然语言描述生成**
 
-    核心功能：
-    - 多模态时序建模：支持 TOS URL/Base64编码/二进制流 三种视频格式
-    - 时空联合建模：捕捉视频时空特征与语义关联
-    - 对话式提示：通过提示词(prompt)引导生成方向
+    **核心功能**
+
+    - **多模态时序建模**
+      - 支持 `TOS URL`/`Base64编码`/`二进制流` 三种视频格式
+    - **时空联合建模**
+      - 捕捉视频时空特征与语义关联
+    - **对话式提示支持**
+      - 通过 `prompt` 参数引导生成方向
+
+    **优化特性**
     - 中英文混合场景优化：特别针对中文语义增强
     - 支持先将视频尺寸修正为一致，建议按照视频和GPU情况设置尺寸
-    """
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -111,6 +117,7 @@ class QwenVLVideoUnderstanding(Operator):
         else:
             self.model_device = f"cuda:{self.rank % self.cuda_device_count}" if use_gpu else "cpu"
             self.data_device = self.model_device
+        logger.info("Model will be loaded on device: %s", self.model_device)
 
         # Type conversion mapping
         dtype_mapping = {
@@ -192,10 +199,10 @@ class QwenVLVideoUnderstanding(Operator):
         """对输入的视频数组进行批量处理，生成包含视觉理解结果的文本描述.
 
         Args:
-            videos (pa.Array): 包含视频数据的PyArrow数组。 类型为 字符串 或者 二进制。
+            videos: 包含视频数据的数组，元素类型为 字符串 或者 二进制。
 
         Returns:
-            pa.Array: 处理后的PyArrow数组，元素为每个视频的视觉理解结果。
+            pa.Array: 处理后的数组，元素为每个视频的视觉理解结果。
 
         Raises:
             ValueError: 当输入数据格式不符合要求时抛出

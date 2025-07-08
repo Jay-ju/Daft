@@ -11,10 +11,16 @@ if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
     model_path = os.getenv("MODEL_PATH", "./models")
     samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_speaker_diarization/sample.wav"]}
+    rank = 0
     df = daft.from_pydict(samples)
     df = df.with_column(
         "audio_speak_diarize",
-        las_udf(AudioSpeakerDiarization, construct_args={"model_path": model_path})(col("audio_path")),
+        las_udf(
+            AudioSpeakerDiarization,
+            construct_args={"model_path": model_path, "rank": rank},
+            num_gpus=1,
+            batch_size=1,
+        )(col("audio_path")),
     )
 
     df.show()

@@ -15,24 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 class ClipEmbedding(Operator):
-    """CLIP（Contrastive Language-Image Pretraining）跨模态嵌入生成器.
+    """**CLIP（Contrastive Language-Image Pretraining）跨模态嵌入生成器，实现基于CLIP模型的图文联合嵌入空间映射**
 
-    实现基于 CLIP 模型的图文联合嵌入空间映射，支持：
-    - 文本编码：中英文文本 → 512/768/1024维语义向量
-    - 图像编码：图像 → 512/768/1024维视觉特征向量
+    **核心功能**
 
-    核心功能：
-    1. 多模态统一编码
-       ▸ 文本编码：使用 CLIP text encoder 提取语义特征
-       ▸ 图像编码：通过 CLIP vision encoder 提取视觉特征
-    2. 跨模态相似度计算
-       ▸ 支持余弦相似度/内积计算图文嵌入向量的关联度
+    - **多模态统一编码**
+      - **文本编码**：中文文本 → 512/768/1024维语义向量
+      - **图像编码**：图像 → 512/768/1024维视觉特征向量
 
-    典型应用场景：
-    ✅ 电商场景 - 商品图文互搜
-    ✅ 内容审核 - 图文一致性校验
-    ✅ 推荐系统 - 多模态特征融合
-    """
+    - **跨模态相似度计算**
+      - 支持余弦相似度/内积计算图文嵌入向量的关联度
+
+    **典型应用场景**
+    - ✅ 电商场景 - 商品图文互搜
+    - ✅ 内容审核 - 图文一致性校验
+    - ✅ 推荐系统 - 多模态特征融合
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -94,6 +92,7 @@ class ClipEmbedding(Operator):
             self.model_device = "cuda" if use_gpu else "cpu"
         else:
             self.model_device = f"cuda:{self.rank % self.cuda_device_count}" if use_gpu else "cpu"
+        logger.info("Model will be loaded on device: %s", self.model_device)
 
         from modelscope.pipelines import pipeline
         from modelscope.utils.constant import Tasks
@@ -116,12 +115,12 @@ class ClipEmbedding(Operator):
         """批量生成文本或图像的CLIP嵌入向量.
 
         Args:
-            content: 包含输入数据的PyArrow数组，支持以下类型：
+            content: 包含输入数据的数组，支持以下元素类型：
                 - 文本模式: UTF-8字符串
                 - 图像模式: Base64字符串/二进制数据/图像URL
 
         Returns:
-            pa.Array: 包含浮点数嵌入向量的PyArrow数组，每个元素为List[float]
+            pa.Array: 包含浮点数嵌入向量的数组，每个元素为List[float]。
 
         Raises:
             ValueError: 当输入数据类型与content_type不匹配时

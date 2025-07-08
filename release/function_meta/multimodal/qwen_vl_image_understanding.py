@@ -39,7 +39,7 @@ if __name__ == "__main__":
                 "resized_height": resized_height,
                 "resized_width": resized_width,
                 "batch_size": batch_size,
-                "rank": 0,
+                "rank": rank,
             },
             num_gpus=1,
             batch_size=2,

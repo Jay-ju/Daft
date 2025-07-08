@@ -19,18 +19,27 @@ logger = logging.getLogger(__name__)
 
 
 class AudioAsrWhisper(Operator):
-    """使用openai whisper 模型识别语音中的文字，支持多语言识别，英文、中文等；支持将目标语种翻译成英文.
+    """**语音识别模块 - 基于Whisper模型的多语言语音转文字解决方案**
 
-    比较建议使用在英文场景，以及提前将音频切分成30秒。
-    支持的模型有：
-    1. openai/whisper-large-v3-turbo
-    2. openai/whisper-large-v3
-    3. openai/whisper-medium（中文支持一般）
-    4. openai/whisper-small（中文输出繁体字）
-    模型详情请参考：https://huggingface.co/openai/whisper-large-v3
-    支持的语种请参考：
+    **核心功能**
+
+    - **多语言识别**：支持中英文等主流语言
+    - **语音翻译**：可将识别结果翻译为英文
+
+    **推荐实践**
+    - 优先处理30秒内的音频片段
+    - 英文场景识别准确率最高
+
+    **支持模型**
+    - `openai/whisper-large-v3-turbo`
+    - `openai/whisper-large-v3`
+    - `openai/whisper-medium`（中文支持一般）
+    - `openai/whisper-small`（中文输出繁体字）
+
+    **语种支持**
+    完整语种列表请参考：
     https://github.com/ggml-org/whisper.cpp/blob/d682e150908e10caa4c15883c633d7902d385237/src/whisper.cpp#L248
-    """
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -129,9 +138,10 @@ class AudioAsrWhisper(Operator):
         if self.use_gpu:
             rank = 0 if self.rank is None else self.rank
             self.rank = rank % self.cuda_device_count
-            self.device = f"cuda:{rank}"
+            self.device = f"cuda:{self.rank}"
         else:
             self.device = "cpu"
+        logger.info("ASR model will be loaded on device: %s", self.device)
 
         try:
             logger.debug("Loading ASR model from: %s", model_dir)
@@ -241,10 +251,10 @@ class AudioAsrWhisper(Operator):
         该方法使用预加载的嵌入模型对输入的文本数组进行批量编码，生成对应的稠密/稀疏嵌入向量。
 
         Args:
-            texts: 包含待处理文本的PyArrow数组。类型为str
+            texts: 包含待处理文本的数组，元素类型为str。
 
         Returns:
-            pyarrow.Array: 处理后的PyArrow数组，包含以下字段：
+            pyarrow.Array: 处理后的数组，元素包含以下字段：
                 - dense_embedding: 稠密嵌入向量
                 - sparse_embedding: 稀疏嵌入向量
                 - token_embedding: 可选的token级嵌向量

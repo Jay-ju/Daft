@@ -14,16 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class BgeSparseDenseEmbedding(Operator):
-    """基于 BGE-M3 的多模态文本嵌入组件，支持稀疏/稠密/token 三级向量生成.
+    """**基于 BGE-M3 的文本嵌入模型，支持稀疏/稠密/token 三级向量生成**
 
-    核心功能：
-    - 三模态嵌入输出：
-        • 稀疏向量：词项权重表示，适合关键词检索
-        • 稠密向量：1024维语义表示，适合语义相似度计算
-        • Token向量：细粒度上下文表征
-    - 多场景优化：文档模式与查询模式
-    - 硬件加速：支持 FP16 量化与 GPU 并行计算
-    """
+    **核心功能**：
+    - **多粒度嵌入输出：**
+        - 稀疏向量：词项权重表示，适合关键词检索
+        - 稠密向量：1024维语义表示，适合语义相似度计算
+        - Token向量：细粒度上下文表征
+    - **硬件加速**：支持 `FP16` 量化与 GPU 并行计算
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -32,7 +31,7 @@ class BgeSparseDenseEmbedding(Operator):
         batch_size: int = 512,
         model_path: str = "./models",
         model_name: str = "BAAI/bge-m3",
-        rank: int = 0,
+        rank: int | None = None,
         **kwargs: Any,
     ) -> None:
         """初始化BGE稀疏稠密嵌入模型.
@@ -61,9 +60,16 @@ class BgeSparseDenseEmbedding(Operator):
         self.model_name = model_name
         self.rank = rank
 
+        import torch
+
+        use_gpu = self.use_gpu and torch.cuda.is_available()
+
         model_dir = str(Path(self.model_path) / self.model_name)
         use_fp16 = self.dtype == "float16"
-        device = f"cuda:{self.rank}" if self.use_gpu else "cpu"
+        if self.rank is None:
+            device = "cuda" if use_gpu else "cpu"
+        else:
+            device = f"cuda:{self.rank % self.cuda_device_count}" if use_gpu else "cpu"
 
         logger.info(
             "Initializing BGE model with:\n"
@@ -107,10 +113,10 @@ class BgeSparseDenseEmbedding(Operator):
         该方法使用预加载的嵌入模型对输入的文本数组进行批量编码，生成对应的稠密/稀疏嵌入向量。
 
         Args:
-            texts: 包含待处理文本的PyArrow数组。类型为str
+            texts: 包含待处理文本的数组，元素类型为str。
 
         Returns:
-            pyarrow.Array: 处理后的PyArrow数组，包含以下字段：
+            pyarrow.Array: 处理后的数组，包含以下字段：
                 - dense_embedding: 稠密嵌入向量
                 - sparse_embedding: 稀疏嵌入向量
                 - token_embedding: 可选的token级嵌向量

@@ -16,15 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 class QwenVLImageUnderstanding(Operator):
-    """基于 Qwen2.5-VL 的多模态图像理解模型，支持视觉语义解析与自然语言描述生成.
+    """**Qwen2.5-VL 多模态图像理解模型 - 视觉语义解析与自然语言描述生成**
 
-    核心功能：
-    - 多模态输入处理：支持 URL/Base64编码/二进制流 三种图像格式
-    - 视觉-语言联合建模：实现图像内容到语义空间的映射
-    - 支持对话式提示：通过提示词(prompt)引导生成方向
+    **核心功能**
+
+    - **多模态输入处理**
+      - 支持 `URL`/`Base64编码`/`二进制流` 三种图像格式
+    - **视觉-语言联合建模**
+      - 实现图像内容到语义空间的精准映射
+    - **对话式提示支持**
+      - 通过 `prompt` 参数引导生成方向
+
+    **场景优化**
     - 中英文混合场景优化：特别针对中文语义增强
     - 支持先将图像尺寸修正为一致，建议按照图像和GPU情况设置图像尺寸
-    """
+    """  # noqa: D415
 
     def __init__(
         self,
@@ -106,6 +112,7 @@ class QwenVLImageUnderstanding(Operator):
         else:
             self.model_device = f"cuda:{self.rank % self.cuda_device_count}" if use_gpu else "cpu"
             self.data_device = self.model_device
+        logger.info("Model will be loaded on device: %s", self.model_device)
 
         # Type conversion mapping
         dtype_mapping = {
@@ -193,10 +200,10 @@ class QwenVLImageUnderstanding(Operator):
         """对输入的图像数组进行批量处理，生成包含视觉理解结果的文本描述.
 
         Args:
-            images (pa.Array): 包含图像数据的PyArrow数组。 类型为 字符串 或者 二进制。
+            images: 包含图像数据的数组，元素类型为 字符串 或者 二进制。
 
         Returns:
-            pa.Array: 处理后的PyArrow数组，元素为每个图片的视觉理解结果。
+            pa.Array: 处理后的数组，元素为每个图片的视觉理解结果。
 
         Raises:
             ValueError: 当输入数据格式不符合要求时抛出
