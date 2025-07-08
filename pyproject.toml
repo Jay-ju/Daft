@@ -34,8 +34,8 @@ all = ["daft[aws, azure, clickhouse, deltalake, gcp, hudi, huggingface, iceberg,
 aws = ["boto3"]
 azure = []
 clickhouse = ["clickhouse_connect"]
-deltalake = ["deltalake"]
-flash-attn = ["flash-attn~=2.8.0.post2"]
+deltalake = ["deltalake", "packaging"]
+flash-attn = ["wheel", "flash-attn~=2.8.0.post2"]
 gcp = []
 hudi = ["pyarrow >= 8.0.0"]
 huggingface = ["huggingface-hub"]
@@ -45,6 +45,9 @@ huggingface = ["huggingface-hub"]
 iceberg = ["pyiceberg >= 0.7.0, < 0.9.1"]
 lance = ["pylance"]
 las = [
+  "pyiceberg >= 0.7.0",
+  "packaging",
+  "pylance",
   "httpx[http2]==0.28.1",
   "ray[default, data, client]==2.46.0",
   "tosfs>=2025.6.0",
@@ -65,8 +68,6 @@ las = [
   "qwen-vl-utils~=0.0.10",
   "transformers==4.52.4",
   "llama-index~=0.11.9",
-  "wheel",
-  "daft[iceberg, lance]",
   "s3fs==2023.12.0",
   "opencv-python==4.10.0.84",
   "modelscope~=1.27.1",
