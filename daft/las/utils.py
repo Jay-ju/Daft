@@ -19,8 +19,8 @@ def get_ak_sk(service: str) -> tuple[str | None, str | None]:
     ACCESS_KEY/SECRET_KEY are short form of ACCESS_KEY_ID/SECRET_ACCESS_KEY.
 
     Priority (tos as an example):
-    TOS_ACCESS_KEY > TOS_ACCESS_KEY_ID > ACCESS_KEY > ACCESS_KEY_ID
-    TOS_SECRET_KEY > TOS_SECRET_ACCESS_KEY > SECRET_KEY > SECRET_ACCESS_KEY
+    LAS_TOS_ACCESS_KEY > TOS_ACCESS_KEY > TOS_ACCESS_KEY_ID > ACCESS_KEY > ACCESS_KEY_ID
+    LAS_TOS_SECRET_KEY > TOS_SECRET_KEY > TOS_SECRET_ACCESS_KEY > SECRET_KEY > SECRET_ACCESS_KEY
     """
     prefix = service.upper()
     service_ak_short = prefix + "_ACCESS_KEY"
@@ -29,13 +29,15 @@ def get_ak_sk(service: str) -> tuple[str | None, str | None]:
     service_sk_long = prefix + "_SECRET_ACCESS_KEY"
 
     access_key = (
-        os.getenv(service_ak_short)
+        os.getenv(f"LAS_{service_ak_short}")
+        or os.getenv(service_ak_short)
         or os.getenv(service_ak_long)
         or os.getenv("ACCESS_KEY")
         or os.getenv("ACCESS_KEY_ID")
     )
     secret_key = (
-        os.getenv(service_sk_short)
+        os.getenv(f"LAS_{service_sk_short}")
+        or os.getenv(service_sk_short)
         or os.getenv(service_sk_long)
         or os.getenv("SECRET_KEY")
         or os.getenv("SECRET_ACCESS_KEY")

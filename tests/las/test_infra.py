@@ -38,6 +38,8 @@ def test_missing_credential(monkeypatch):
 
 @pytest.mark.parametrize("service", services)
 def test_get_ak_sk(service, monkeypatch):
+    test_las_service_access_key = "test_las_service_access_key"
+    test_las_service_secret_key = "test_las_service_secret_key"
     test_service_access_key = "test_service_access_key"
     test_service_secret_key = "test_service_secret_key"
     test_service_access_key_id = "test_service_access_key_id"
@@ -47,7 +49,9 @@ def test_get_ak_sk(service, monkeypatch):
     test_access_key_id = "test_access_key_id"
     test_secret_access_key = "test_secret_access_key"
 
+    monkeypatch.delenv(f"LAS_{service}_ACCESS_KEY", raising=False)
     monkeypatch.delenv(f"{service}_ACCESS_KEY", raising=False)
+    monkeypatch.delenv(f"LAS_{service}_SECRET_KEY", raising=False)
     monkeypatch.delenv(f"{service}_SECRET_KEY", raising=False)
     monkeypatch.delenv(f"{service}_ACCESS_KEY_ID", raising=False)
     monkeypatch.delenv(f"{service}_SECRET_ACCESS_KEY", raising=False)
@@ -60,8 +64,10 @@ def test_get_ak_sk(service, monkeypatch):
     assert ak is None
     assert sk is None
 
+    monkeypatch.setenv(f"LAS_{service}_ACCESS_KEY", test_las_service_access_key)
     monkeypatch.setenv(f"{service}_ACCESS_KEY", test_service_access_key)
     monkeypatch.setenv(f"{service}_SECRET_KEY", test_service_secret_key)
+    monkeypatch.setenv(f"LAS_{service}_SECRET_KEY", test_las_service_secret_key)
     monkeypatch.setenv(f"{service}_ACCESS_KEY_ID", test_service_access_key_id)
     monkeypatch.setenv(f"{service}_SECRET_ACCESS_KEY", test_service_secret_access_key)
     monkeypatch.setenv("ACCESS_KEY", test_access_key)
@@ -69,6 +75,12 @@ def test_get_ak_sk(service, monkeypatch):
     monkeypatch.setenv("ACCESS_KEY_ID", test_access_key_id)
     monkeypatch.setenv("SECRET_ACCESS_KEY", test_secret_access_key)
 
+    ak, sk = get_ak_sk(service)
+    assert ak == test_las_service_access_key
+    assert sk == test_las_service_secret_key
+
+    monkeypatch.delenv(f"LAS_{service}_ACCESS_KEY")
+    monkeypatch.delenv(f"LAS_{service}_SECRET_KEY")
     ak, sk = get_ak_sk(service)
     assert ak == test_service_access_key
     assert sk == test_service_secret_key
