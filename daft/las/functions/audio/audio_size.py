@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class AudioSize(Operator):
-    """**音频文件元数据分析处理器，精确计算文件大小.**
+    """**音频文件元数据分析处理器，精确计算文件大小**
 
     **核心功能**
     - 精确计算音频文件字节大小
@@ -38,14 +38,14 @@ class AudioSize(Operator):
 
     @staticmethod
     def _calculate_size(audio_path: str) -> float:
-        """计算音频文件大小.
+        """计算音频文件大小
 
         Args:
-            audio_path: 音频文件路径(支持本地或TOS路径).
+            audio_path: 音频文件路径(支持本地或TOS路径)
 
         Returns:
-            文件大小(字节), 如果计算失败返回np.nan.
-        """
+            文件大小(字节), 如果计算失败返回np.nan
+        """  # noqa: D415
         try:
             size_bytes = float(file_size(audio_path))
         except FileNotFoundError:
@@ -59,13 +59,13 @@ class AudioSize(Operator):
             return size_bytes
 
     def transform(self, audio_paths: pa.Array) -> pa.Array:
-        """计算音频文件大小.
+        """计算音频文件大小
 
         Args:
-            audio_paths: 存放音频路径的列.
+            audio_paths: 存放音频路径的列
 
         Returns:
-            存放音频大小的列.
-        """
+            存放音频大小的列
+        """  # noqa: D415
         result = [self._calculate_size(audio_path.as_py()) for audio_path in audio_paths]
         return pa.array(result, type=self.__return_column_type__())

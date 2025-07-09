@@ -45,7 +45,7 @@ def get_extra_meta() -> ExtraMetaModel:
         ),
         DataItem(
             Type=ValueType.List.name,
-            Value=[("Hello", 0.31201171875), ("World", 0.317626953125), ("!", 0.2181396484375)],
+            Value=str([("Hello", 0.31201171875), ("World", 0.317626953125), ("!", 0.2181396484375)]),
             Description="sparse embedding",
         ),
         DataItem(

@@ -20,8 +20,8 @@ class ClipEmbedding(Operator):
     **核心功能**
 
     - **多模态统一编码**
-      - **文本编码**：中文文本 → 512/768/1024维语义向量
-      - **图像编码**：图像 → 512/768/1024维视觉特征向量
+      - 文本编码：中文文本 → 512/768/1024维语义向量
+      - 图像编码：图像 → 512/768/1024维视觉特征向量
 
     - **跨模态相似度计算**
       - 支持余弦相似度/内积计算图文嵌入向量的关联度
@@ -112,7 +112,7 @@ class ClipEmbedding(Operator):
         )
 
     def transform(self, content: pa.Array) -> pa.Array:
-        """批量生成文本或图像的CLIP嵌入向量.
+        """批量生成文本或图像的CLIP嵌入向量
 
         Args:
             content: 包含输入数据的数组，支持以下元素类型：
@@ -125,7 +125,7 @@ class ClipEmbedding(Operator):
         Raises:
             ValueError: 当输入数据类型与content_type不匹配时
             RuntimeError: 模型推理失败或硬件资源不足时
-        """
+        """  # noqa: D415
         start_time = time.monotonic()
         logger.info("Starting batch processing, input type: %s", self.content_type)
 

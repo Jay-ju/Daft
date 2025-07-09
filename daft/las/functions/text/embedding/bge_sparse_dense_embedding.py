@@ -29,7 +29,7 @@ class BgeSparseDenseEmbedding(Operator):
         is_output_token_vec: bool = False,
         dtype: str = "float32",
         batch_size: int = 512,
-        model_path: str = "./models",
+        model_path: str = "/opt/las/models",
         model_name: str = "BAAI/bge-m3",
         rank: int | None = None,
         **kwargs: Any,
@@ -45,12 +45,12 @@ class BgeSparseDenseEmbedding(Operator):
             batch_size: 模型推理时的批处理大小
                 默认值：512
             model_path: 模型文件所在的路径
-                默认值："./models"
+                默认值："/opt/las/models"
             model_name: 模型名称
                 可选值：["BAAI/bge-m3"]
                 默认值："BAAI/bge-m3"
             rank: GPU 编号
-                默认值：0
+                默认值：None
         """
         super().__init__(**kwargs)
         self.is_output_token_vec = is_output_token_vec

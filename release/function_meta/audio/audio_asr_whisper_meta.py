@@ -19,7 +19,7 @@ from function_meta.meta import (
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="语音转文字（whisper 系列模型，批式）",
+        Name="语音转文字（whisper 系列模型）",
         Clazz=AudioAsrWhisper,
         Category=Category.AUDIO,
         SubCategory=SubCategory.AUDIO_RECOGNITION,

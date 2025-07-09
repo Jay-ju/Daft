@@ -21,11 +21,11 @@ class QwenVLVideoUnderstanding(Operator):
 
     **核心功能**
 
-    - **多模态时序建模**
-      - 支持 `TOS URL`/`Base64编码`/`二进制流` 三种视频格式
-    - **时空联合建模**
+    - 多模态时序建模
+      - 支持 `URL`/`Base64编码`/`二进制流` 三种视频格式
+    - 时空联合建模
       - 捕捉视频时空特征与语义关联
-    - **对话式提示支持**
+    - 对话式提示支持
       - 通过 `prompt` 参数引导生成方向
 
     **优化特性**
@@ -84,7 +84,7 @@ class QwenVLVideoUnderstanding(Operator):
             fps: 视频帧率，不设置时，默认使用视频的原帧率。视频帧率越高，GPU显存占用越高。
                 默认值：None
             rank: 指定使用的GPU设备编号（多卡环境有效）。例如：0表示第一张GPU，1表示第二张GPU
-                默认值：0
+                默认值：None
         """
         super().__init__(**kwargs)
 
@@ -196,7 +196,7 @@ class QwenVLVideoUnderstanding(Operator):
         return self.processor.batch_decode(trimmed_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
     def transform(self, videos: pa.Array) -> pa.Array:
-        """对输入的视频数组进行批量处理，生成包含视觉理解结果的文本描述.
+        """对输入的视频数组进行批量处理，生成包含视觉理解结果的文本描述
 
         Args:
             videos: 包含视频数据的数组，元素类型为 字符串 或者 二进制。
@@ -207,7 +207,7 @@ class QwenVLVideoUnderstanding(Operator):
         Raises:
             ValueError: 当输入数据格式不符合要求时抛出
             RuntimeError: 模型推理过程中发生错误时抛出
-        """
+        """  # noqa: D415
         start_time = time.monotonic()
         logger.info("Starting batch processing, input type: %s", self.video_src_type)
 

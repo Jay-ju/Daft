@@ -20,11 +20,11 @@ class QwenVLImageUnderstanding(Operator):
 
     **核心功能**
 
-    - **多模态输入处理**
+    - 多模态输入处理
       - 支持 `URL`/`Base64编码`/`二进制流` 三种图像格式
-    - **视觉-语言联合建模**
+    - 视觉-语言联合建模
       - 实现图像内容到语义空间的精准映射
-    - **对话式提示支持**
+    - 对话式提示支持
       - 通过 `prompt` 参数引导生成方向
 
     **场景优化**
@@ -80,7 +80,7 @@ class QwenVLImageUnderstanding(Operator):
             resized_width: 预处理时统一缩放图像的宽度（像素单位），空值保留原始尺寸。建议与resized_height配合使用
                 默认值：None
             rank: 指定使用的GPU设备编号（多卡环境有效）。例如：0表示第一张GPU，1表示第二张GPU
-                默认值：0
+                默认值：None
         """
         super().__init__(**kwargs)
 
@@ -197,7 +197,7 @@ class QwenVLImageUnderstanding(Operator):
         return self.processor.batch_decode(trimmed_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
     def transform(self, images: pa.Array) -> pa.Array:
-        """对输入的图像数组进行批量处理，生成包含视觉理解结果的文本描述.
+        """对输入的图像数组进行批量处理，生成包含视觉理解结果的文本描述。
 
         Args:
             images: 包含图像数据的数组，元素类型为 字符串 或者 二进制。
@@ -208,7 +208,7 @@ class QwenVLImageUnderstanding(Operator):
         Raises:
             ValueError: 当输入数据格式不符合要求时抛出
             RuntimeError: 模型推理过程中发生错误时抛出
-        """
+        """  # noqa: D415
         start_time = time.monotonic()
         logger.info("Starting batch processing, input type: %s", self.image_src_type)
 

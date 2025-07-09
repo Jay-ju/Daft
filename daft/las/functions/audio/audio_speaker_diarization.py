@@ -77,9 +77,9 @@ class AudioSpeakerDiarization(Operator):
         """初始化 AudioSpeakerDiarization 类的实例.
 
         Args:
-            model_path: 模型文件所在的路径.
-            rank: 用于指定使用的 GPU 设备编号.
-            **kwargs: 传递给父类构造函数的其他关键字参数.
+            model_path: 模型文件所在的路径
+            rank: 用于指定使用的 GPU 设备编号
+            **kwargs: 传递给父类构造函数的其他关键字参数
         """
         super().__init__(**kwargs)
         model_config_file = Path(model_path).joinpath("speaker-diarization-3.1/models/pyannote_diarization_config.yaml")
@@ -125,13 +125,13 @@ class AudioSpeakerDiarization(Operator):
             return None
 
     def transform(self, audios: pa.Array) -> pa.Array:
-        """对输入的音频数组进行批量说话人分离处理.
+        """对输入的音频数组进行批量说话人分离处理
 
         Args:
-            audios: 包含多个音频数据的数组.
+            audios: 包含多个音频数据的数组
 
         Returns:
-            pa.Array: 包含说话人分离结果的数组.
-        """
+            pa.Array: 包含说话人分离结果的数组
+        """  # noqa: D415
         result = [self._diarization(audio.as_py()) for audio in audios]
         return pa.array(result, type=self.__return_column_type__())

@@ -23,8 +23,8 @@ class AudioAsrWhisper(Operator):
 
     **核心功能**
 
-    - **多语言识别**：支持中英文等主流语言
-    - **语音翻译**：可将识别结果翻译为英文
+    - 多语言识别：支持中英文等主流语言
+    - 语音翻译：可将识别结果翻译为英文
 
     **推荐实践**
     - 优先处理30秒内的音频片段
@@ -57,7 +57,7 @@ class AudioAsrWhisper(Operator):
         rank: int = 0,
         **kwargs: Any,
     ) -> None:
-        """初始化Whisper语音识别模型.
+        """初始化Whisper语音识别模型
 
         Args:
             audio_src_type: 音频格式类型
@@ -115,7 +115,7 @@ class AudioAsrWhisper(Operator):
             rank: GPU设备编号
                 指定使用的GPU设备ID（多卡环境生效）
                 默认使用首张显卡（ID=0）
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
 
         self.audio_src_type = audio_src_type
@@ -246,22 +246,27 @@ class AudioAsrWhisper(Operator):
         return timestamps_update
 
     def transform(self, audios: pa.Array) -> pa.Array:
-        """批量处理文本数组生成嵌入向量.
+        """批量处理音频数组生成语音识别结果。
 
-        该方法使用预加载的嵌入模型对输入的文本数组进行批量编码，生成对应的稠密/稀疏嵌入向量。
+        该方法使用预加载的Whisper模型对输入的音频数据进行批量ASR处理，生成包含识别文本、
+        时间戳和分段信息的结构化结果。
 
         Args:
-            texts: 包含待处理文本的数组，元素类型为str。
+            audios: 包含音频数据的数组，支持以下格式：
+                - audio_base64: base64编码的音频字符串；
+                - audio_url: 音频文件URL路径；
+                - audio_binary: 原始音频字节数据
 
         Returns:
-            pyarrow.Array: 处理后的数组，元素包含以下字段：
-                - dense_embedding: 稠密嵌入向量
-                - sparse_embedding: 稀疏嵌入向量
-                - token_embedding: 可选的token级嵌向量
+            pyarrow.Array: 处理后的结构化数组，每个元素包含以下字段：
+                - asr_result: 语音识别文本结果；
+                - timestamps: 时间戳对列表(开始/结束时间)；
+                - segments: 分段文本结果列表
 
         Raises:
-            ValueError: 当输入数据格式不符合要求时抛出
-        """
+            ValueError: 当音频格式不支持时抛出
+            Exception: 批处理过程中出现未捕获的异常时抛出
+        """  # noqa: D415
         logger.info("Processing audio source type: %s", self.audio_src_type)
         try:
             results, timestamps, segments = [], [], []
