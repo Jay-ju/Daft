@@ -10,10 +10,12 @@ import logging
 import re
 import sys
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Callable, get_type_hints
+from types import UnionType
+from typing import Any, Callable, Union, get_args, get_origin, get_type_hints
 
+import pyarrow as pa
 from docstring_parser import parse
 from function_meta.meta import (
     OP_BUCKET,
@@ -64,7 +66,9 @@ def _collect_all_metas(root_dir: str) -> dict[str, tuple[OpMetaModel, ExtraMetaM
         spec.loader.exec_module(module)
 
         if hasattr(module, "get_meta") and hasattr(module, "get_extra_meta"):
-            results[module_name] = (module.get_meta(), module.get_extra_meta())
+            op_meta = module.get_meta()
+            op_meta.Description = op_meta.Clazz.__doc__
+            results[module_name] = (op_meta, module.get_extra_meta())
 
     return results
 
@@ -93,15 +97,33 @@ def _extract_precondition(clazz: type) -> str | None:
     return None
 
 
+def _get_type_name(type_hint):
+    origin = get_origin(type_hint)
+    if origin is Union or isinstance(type_hint, UnionType):
+        args = get_args(type_hint)
+        union_type = " or ".join(_get_type_name(arg) for arg in args)
+        return _replace_with_alias(union_type)
+    if hasattr(type_hint, "__name__"):
+        return _replace_with_alias(type_hint.__name__)
+    return _replace_with_alias(str(type_hint))
+
+
+def _replace_with_alias(type_str: str):
+    return type_str.replace("NoneType", "None")
+
+
 def _extract_fn_info(fn: Callable) -> tuple[list[ParameterModel], OutputModel]:
     init_signature = inspect.signature(fn)
 
-    parameters = []
+    parameters: list[dict[str, str]] = []
     for name, param in init_signature.parameters.items():
-        if name == "self":
+        if name == "self" or name == "args" or name == "kwargs":
             continue
 
-        type_hint = get_type_hints(fn).get(name, None)
+        globalns = {"pa": pa}  # Ensure 'pa' is defined
+        globalns.update(fn.__globals__)
+        type_hint = get_type_hints(fn, globalns=globalns).get(name, None)
+        type_hint = _get_type_name(type_hint)
         default = param.default if param.default != inspect.Parameter.empty else None
 
         parameters.append(
@@ -126,7 +148,12 @@ def _extract_fn_info(fn: Callable) -> tuple[list[ParameterModel], OutputModel]:
     return_desc = parsed_doc.returns.description if parsed_doc.returns is not None else None
 
     return [
-        ParameterModel(Name=p["name"], Type=p["type"], Default=p["default"], Description=p["description"])
+        ParameterModel(
+            Name=p.get("name"),
+            Type=p.get("type", ""),
+            Default=p.get("default", ""),
+            Description=p.get("description", ""),
+        )
         for p in parameters
     ], OutputModel(Description=return_desc)
 
@@ -143,7 +170,7 @@ def _extract_input_output(cls: type) -> tuple[list[InputModel], OutputModel]:
     return inputs, output
 
 
-def _collect_ops() -> list[ComposedModel]:
+def _collect_ops() -> list[Any]:
     ops = _collect_all_metas(str(Path(__file__).parent / "function_meta"))
 
     result = []
@@ -154,12 +181,14 @@ def _collect_ops() -> list[ComposedModel]:
         parameters, _ = _extract_fn_info(op_meta.Clazz.__init__)
         input, output = _extract_input_output(op_meta.Clazz)
 
+        module = op_meta.Clazz.__module__
+        qualname = op_meta.Clazz.__qualname__
         op = ComposedModel(
             Name=op_meta.Name,
-            OperatorId=str(op_meta.Clazz),
+            OperatorId=f"{module}.{qualname}",
             Description=op_meta.Description,
-            FunctionCategory=op_meta.Category,
-            SubFunctionCategory=op_meta.SubCategory,
+            FunctionCategory=op_meta.Category.value,
+            SubFunctionCategory=op_meta.SubCategory.value,
             Tags=op_meta.Tags,
             Parameters=parameters,
             Input=input,
@@ -167,12 +196,15 @@ def _collect_ops() -> list[ComposedModel]:
             Precondition=precondition,
             ExtraMeta=extra_meta,
         )
-        result.append(op)
+        result.append(asdict(op))
     return result
 
 
-def _print_op_info():
-    json.dumps(_collect_ops())
+def _print_op_info(output_file: str = "ops.json"):
+    res = json.dumps(_collect_ops(), ensure_ascii=False)
+    with Path(output_file).open(mode="w", encoding="utf-8") as file:
+        json.dump(json.loads(res), file, ensure_ascii=False, indent=4)
+    print(res)
 
 
 def _upload_examples():

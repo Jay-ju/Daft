@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from daft.las.functions.text.pre_sign_url_for_tos import PreSignUrlForTos
 from function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
@@ -19,7 +20,7 @@ from function_meta.meta import (
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="生成TOS的普通预签名",
-        Clazz="PreSignUrlForTos",
+        Clazz=PreSignUrlForTos,
         Category=Category.TEXT,
         SubCategory=SubCategory.OTHER,
         Description="生成 TOS 文件路径签名 URL。当路径 schema 是 http 或 https 时，直接返回路径；若是 tos 或 s3，则对路径进行签名，其他情况返回 None。",

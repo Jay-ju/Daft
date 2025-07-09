@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from daft.las.functions.audio import AudioASRWhisper
+from daft.las.functions.audio import AudioAsrWhisper
 from function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
@@ -20,7 +20,7 @@ from function_meta.meta import (
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="语音转文字（whisper 系列模型，批式）",
-        Clazz=AudioASRWhisper,
+        Clazz=AudioAsrWhisper,
         Category=Category.AUDIO,
         SubCategory=SubCategory.AUDIO_RECOGNITION,
         Tags=["语音识别", "ASR", "多语种"],

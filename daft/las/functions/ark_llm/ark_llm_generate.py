@@ -23,16 +23,33 @@ DEFAULT_LAS_LLM_FINISH_REASON_CHECK = os.getenv("LAS_LLM_FINISH_REASON_CHECK", "
 
 
 class ArkLLMGenerate(Operator):
-    """使用豆包/DeepSeek大模型进行批量文本生成或视频理解.
+    """**大模型批量推理处理器（豆包/DeepSeek）**
 
-    该类封装了与方舟LAS平台的大模型服务交互的逻辑，支持以下功能：
-    - 批量异步推理
-    - 多种模型参数配置（temperature, top_p等）
-    - 请求超时和并发控制
+    **核心功能：**
+    - 支持豆包/DeepSeek大模型在线推理和批量推理，对输入的消息进行理解回复或推理
+    - 异步请求处理与并发控制
+    - 多维度生成参数配置（max_tokens/temperature/top_p/惩罚系数等）
+    - 多模态输入支持（文本/视频理解）
+    - 支持模型推理和批量推理功能，通过 inference_type 参数设置采用在线推理还是批量推理方式。请具体参考 https://www.volcengine.com/docs/82379/1399517 获取具体信息
 
-    Attributes:
-        _finish_reason_check (bool): 是否检查模型终止原因的标志位
-    """
+    **输入/输出**
+    - 输入格式：符合方舟大模型服务提供的对话(Chat) API中messages字段格式要求
+        - 结构要求：list[dict]类型数组，字段规范参考官方文档
+        - 文档链接：https://www.volcengine.com/docs/82379/1494384
+    - 输出结构：
+        - 默认模式：str类型生成结果
+        - 诊断模式（设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true）：  返回完整的生成结果（llm_result）和模型诊断信息（finish_reason），
+            struct(llm_result:str, finish_reason:str)
+
+    **支持模型示例：**
+    - 豆包系列：
+        - doubao-1.5-lite-32k（版本250115）
+        - doubao-1.5-pro-256k（版本250115）
+        - doubao-1.5-vision-pro-32k（版本250115）
+        - 等等
+    - DeepSeek系列：
+        - DeepSeek-V3（版本250324）
+    """  # noqa: D415
 
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK
 

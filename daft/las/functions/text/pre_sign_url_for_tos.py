@@ -17,10 +17,28 @@ logger = logging.getLogger(__name__)
 
 
 class PreSignUrlForTos(Operator):
-    """生成 TOS 文件路径签名.
+    """TOS 预签名 URL 生成处理器
 
-    通过该算子对 TOS 文件路径生成带签名的 URL，您可直接用该 URL 发起 HTTP 请求，也可以将该 URL 共享给第三方实现访问授权。
-    """
+    **核心功能：**
+    - 签名生成机制：基于火山引擎 TOS SDK 生成带时效性的预签名 URL
+    - URL schema 处理：
+        - 原生支持 tos/s3 协议路径的签名转换
+        - 自动跳过包含 http/https 协议的路径
+    - 安全控制：
+        - 可配置签名有效期（默认 3600 秒）
+
+    **输入输出规范：**
+    - 输入格式：
+        - TOS 路径：string 类型，支持以下格式：
+            - tos://{bucket}/{object}
+            - s3://{bucket}/{object}
+    - 输出格式：
+        - 有效签名 URL：https 协议字符串
+        - 异常情况：返回 None
+
+    **配置参数说明：**
+        - expires: 控制签名有效期（单位：秒），过短可能导致业务中断，过长存在安全风险
+    """  # noqa: D415
 
     def __init__(
         self,

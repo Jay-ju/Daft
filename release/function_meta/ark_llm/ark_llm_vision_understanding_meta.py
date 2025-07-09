@@ -36,14 +36,14 @@ def get_extra_meta() -> ExtraMetaModel:
     before = [
         DataItem(
             Type=ValueType.Video.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/ark_llm_vision_understanding/sample.mp4",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/ark_llm_vision_understanding/eating_56.mp4",
             Description="",
         ),
     ]
     after = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="""视频中呈现的是一位女性在户外演奏手风琴的场景...""",
+            Value="""视频中呈现了一个**多层卡通蛋糕**（表面有红色糖霜、顶部… │""",
             Description="",
         ),
     ]

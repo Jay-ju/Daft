@@ -17,6 +17,32 @@ if TYPE_CHECKING:
 
 
 class ArkLLMTextGenerate(ArkLLMGenerate):
+    """**大模型文本生成专用处理器（豆包/DeepSeek）**
+
+    **核心功能：**
+    - 纯文本场景优化：根据用户输入文本数据，自动构建符合模型规范的message结构
+    - 输入简化机制：原生支持str类型输入，自动封装为{role: user, content: text}格式
+    - 多任务支持：翻译/总结/问答等NLP场景开箱即用
+    - 双提示词系统：
+        - system_content：系统级行为指导（如翻译风格控制）
+        - prompt：用户级指令模板（支持{query}占位符替换）
+
+    **输入输出规范：**
+    - 输入格式：纯文本数组（pyarrow.StringArray）
+    - 输出继承：
+        - 默认模式：str类型生成结果
+        - 诊断模式（设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true）： 返回完整的生成结果（llm_result）和模型诊断信息（finish_reason），
+            struct(llm_result:str, finish_reason:str)
+
+    **支持模型示例：**
+    - 豆包文本模型系列：
+        - doubao-1.5-lite-32k（版本250115）
+        - doubao-1.5-pro-256k（版本250115）
+        - 等等
+    - DeepSeek系列：
+        - DeepSeek-V3（版本250324）
+    """  # noqa: D415
+
     def __init__(
         self,
         model: str,

@@ -20,6 +20,29 @@ if TYPE_CHECKING:
 
 
 class ArkLLMVisionUnderstanding(ArkLLMGenerate):
+    """**大模型多模态视频理解处理器**
+
+    **核心功能：**
+    - 多模态场景支持：支持图片/视频理解任务，自动构建符合多模态模型规范的message结构
+    - 输入简化机制：配置图片/视频的base64编码、URL等输入格式，便可以实现视觉理解功能
+
+    **输入输出规范：**
+    - 输入格式：
+        - 图片/视频数据：string类型，支持base64编码/url地址
+        - （可选配置）用户提示词：string类型，当用户需要为每条数据指定不同提示词时，传入用户提示词。若不传入，则使用prompt字段配置的统一提示词）
+    - 输出格式：
+        - 默认模式：str类型生成结果
+        - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
+            - llm_result：str类型，生成结果
+            - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
+
+    **支持模型示例：**
+    - 豆包多模态模型示例：
+        - doubao-1.5-vision-pro-32k（版本250115）
+        - doubao-1.5-vision-lite（版本250315）
+        - doubao-1.5-vision-pro（版本250328）
+    """  # noqa: D415
+
     def __init__(
         self,
         model: str,
@@ -31,7 +54,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         system_image_url: str | None = None,
         system_video_url: str | None = None,
         prompt: str | None = None,
-        prompt_col_name: str | None = None,
         multimodal_type: str = "image",
         image_format: str = "jpeg",
         image_url_detail: str | None = None,
@@ -74,10 +96,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 图文混排场景下，输入系统视频 URL，用于指导模型的行为
             prompt: 用户提示词，
                 用户提示词，用于指导模型的行为。配置该字段时，会和输入的文本拼接，以user角色方式输入给模型。同时，该字段也可以配置为{query}，此时，输入的文本会替换掉该字段.
-            prompt_col_name: 用户提示词所在列名
-                用户提示词所在列名，用于指导模型的行为。和prompt字段不同，prompt字段是一个固定的提示词，prompt_col_name是从数据某个字段中加载的。
-                multimodal_type为image或video时，prompt_col_name字段才生效。prompt字段和prompt_col_name字段同时配置时，以prompt_col_name字段为准。
-                针对多模态场景下，使用该字段定义user角色使用的text内容，和image数据一起组装成包含text内容和image/video内容的messages信息，传给大模型
             multimodal_type: 媒体内容类型
                 指定处理的是图像还是视频，默认是 image。可选值:
                 - image: 图片
@@ -143,7 +161,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         self.system_image_url = system_image_url
         self.system_video_url = system_video_url
         self.prompt = prompt
-        self.prompt_col_name = prompt_col_name
         self.image_url_detail = image_url_detail
         self.video_fps = video_fps
 

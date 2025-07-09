@@ -17,16 +17,26 @@ from daft.las.infra.las_ark import (
 
 
 class DoubaoEmbeddingVision(Operator):
-    """火山引擎方舟多模态向量生成服务操作类.
+    """**多模态向量生成处理器**
 
-    提供图像/视频与文本的联合向量化能力，支持以图搜图、跨模态检索等场景。
+    **核心功能：**
+    - 多模态向量化支持：支持图像/视频与文本的联合向量生成，实现跨模态检索能力，参考文档：https://www.volcengine.com/docs/82379/1523520
+    - 输入格式自适应：
+        - 原生支持图像/视频的base64编码、二进制数据、URL等输入格式
+        - 自动处理媒体格式转换（JPEG/PNG/MP4/AVI等）
+    - 模型名称：doubao-embedding-vision
 
-    功能特性：
-    - 支持图像（JPEG/PNG/WEBP等格式）和视频（MP4/AVI/MOV等格式）的向量化
-    - 支持文本与多模态数据的联合向量生成
+    **输入输出规范：**
+    - 输入格式：
+        - 图片/视频数据：string类型，支持base64编码/url地址
+        - 文本数据（可选）：string类型
+    - 输出格式：
+        - 默认模式：float数组类型的向量表示
 
-    参考文档：https://www.volcengine.com/docs/82379/1523520
-    """
+    **支持模型版本示例：**
+        - 250615
+        - 250328
+    """  # noqa: D415
 
     def __init__(
         self,

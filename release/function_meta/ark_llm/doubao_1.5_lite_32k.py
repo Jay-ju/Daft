@@ -21,6 +21,7 @@ if __name__ == "__main__":
             Doubao15Lite32k,
             construct_args={
                 "version": "250115",
+                "inference_type": "online",
             },
         )(col("query")),
     )

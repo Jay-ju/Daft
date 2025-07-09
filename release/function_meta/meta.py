@@ -165,9 +165,9 @@ class OpMetaModel:
 
     Name: str
     Clazz: type
-    Description: str
-    Category: str
-    SubCategory: str
+    Category: Category
+    SubCategory: SubCategory
+    Description: str | None = None
     Tags: list[str] | None = None
 
 

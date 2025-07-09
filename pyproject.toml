@@ -48,7 +48,7 @@ las = [
   "pyiceberg >= 0.7.0",
   "packaging",
   "pylance",
-  "httpx[http2]==0.28.1",
+  "httpx[http2] >= 0.27.2",
   "ray[default, data, client]==2.46.0",
   "tosfs>=2025.6.0",
   "volcengine>=1.0.153",

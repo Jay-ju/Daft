@@ -16,6 +16,30 @@ if TYPE_CHECKING:
 
 
 class Doubao15Lite32k(ArkLLMTextGenerate):
+    """豆包轻量版语言模型（doubao-1.5-lite-32k）专用文本生成处理器。
+
+    **模型特性：**
+    - 模型名称: doubao-1.5-lite-32k
+    - 适用场景: 高吞吐文本生成任务（翻译/总结/问答等）
+    - 核心优势:
+        - 响应速度优化：32k上下文窗口，支持长文本处理
+        - 测评指标：MMLU_pro/BBH/MATH/GPQA等基准测试表现优于GPT-4omini
+
+    **功能特性：**
+    - 自动消息构建：原生支持str类型输入，自动转换为`{role: user, content: text}`格式
+    - 双提示词系统：
+        - `system_content`: 系统级行为控制（如翻译风格/应答模板）
+        - `prompt`: 用户级指令模板（支持`{query}`占位符替换）
+    - 批量推理优化：支持方舟平台批量推理模式（默认）
+
+    **输入输出规范：**
+    - 输入格式: string，纯文本
+    - 输出模式:
+        - 默认模式: 直接返回生成文本（str）
+        - 诊断模式（设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true）：  返回完整的生成结果（llm_result）和模型诊断信息（finish_reason），
+            struct(llm_result:str, finish_reason:str)
+    """  # noqa: D415
+
     def __init__(
         self,
         version: str,

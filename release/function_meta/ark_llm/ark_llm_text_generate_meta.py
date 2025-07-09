@@ -20,10 +20,10 @@ from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="文本生成",
+        Name="文本生成（豆包/DeepSeek 系列模型）",
         Clazz=ArkLLMTextGenerate,
-        Category=Category.TEXT,
-        SubCategory=SubCategory.LLM_ONLINE_REASONING,
+        Category=Category.LLM_ONLINE_REASONING,
+        SubCategory=SubCategory.TEXT_GENERATION,
         Description="针对纯文本的数据，调用方舟模型进行文本进行理解和回复。示例文本翻译、内容总结等场景，传入文本信息，通过大模型对这些文本信息作相应理解和回复."
         "输入纯文本数据，将其按照方舟模型的输入格式进行组装message信息：{role: user, content: <query语句>}。您只需要传入<query语句>即可.",
         Tags=["文本生成"],

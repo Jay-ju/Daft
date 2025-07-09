@@ -20,7 +20,7 @@ from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="文本或视觉理解",
+        Name="文本或视觉理解（豆包/DeepSeek 系列模型）",
         Clazz=ArkLLMGenerate,
         Description="提供通用的文本或视觉理解能力，输入字段格式需满足:[{'role': 'user', 'content': query}]类似的格式，"
         "详细格式请参考方舟大模型服务平台要求的messages格式（https://www.volcengine.com/docs/82379/1494384）",

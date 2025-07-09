@@ -10,7 +10,7 @@ from daft.las.functions.udf import las_udf
 if __name__ == "__main__":
     # 需提前配置环境变量 LAS_ACCESS_KEY 和 LAS_ACCOUND_ID ： LAS_ACCESS_KEY 是账号的 AK ， LAS_ACCOUND_ID 是账号 id
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
-    samples = {"videos": [f"tos://{TOS_TEST_DIR}/ark_llm_vision_understanding/sample.mp4"]}
+    samples = {"videos": [f"tos://{TOS_TEST_DIR}/ark_llm_vision_understanding/eating_56.mp4"]}
 
     df = daft.from_pydict(samples)
     df = df.with_column(
@@ -29,12 +29,10 @@ if __name__ == "__main__":
     df.show()
 
     #  输出(每次大模型推理结果可能不同)
-    # ╭────────────────────────────────┬──────────────────────────────────────────────────╮
-    # │ videos                         ┆ llm_result                                       │
-    # │ ---                            ┆ ---                                              │
-    # │ Utf8                           ┆ Utf8                                             │
-    # ╞════════════════════════════════╪══════════════════════════════════════════════════╡
-    # │ https://las-ai-cn-beijing.tos… ┆ 视频中呈现的是一位女性在户外演奏手风琴的场景：           │
-    # │                                ┆                                                  │
-    # │                                ┆ - …                                              │
-    # ╰────────────────────────────────┴──────────────────────────────────────────────────╯
+    # ╭────────────────────────────────┬─────────────────────────────────────────────────────────╮
+    # │ videos                         ┆ llm_result                                              │
+    # │ ---                            ┆ ---                                                     │
+    # │ Utf8                           ┆ Utf8                                                    │
+    # ╞════════════════════════════════╪═════════════════════════════════════════════════════════╡
+    # │ https://las-ai-cn-beijing.tos… ┆ 视频中呈现了一个**多层卡通蛋糕**（表面有红色糖霜、顶部… │
+    # ╰────────────────────────────────┴─────────────────────────────────────────────────────────╯
