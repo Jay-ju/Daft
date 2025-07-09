@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 class PDFParse(Operator):
-    """**PDF 智能文档解析处理器，支持多维度内容提取与结构化输出.**
+    """**PDF 智能文档解析处理器，支持多维度内容提取与结构化输出。**
 
     **核心功能**
     - 高精度 PDF 文本提取
@@ -65,7 +65,7 @@ class PDFParse(Operator):
         max_retries: int = 3,
         **kwargs: Any,
     ) -> None:
-        """初始化 PDF 智能文档解析处理器.
+        """初始化 PDF 智能文档解析处理器。
 
         Args:
             input_type: 输入类型，支持 "url"（文件链接）或 "base64"（Base64 编码内容）。
@@ -104,7 +104,7 @@ class PDFParse(Operator):
             max_retries: 最大重试次数。
                 默认值：3
             **kwargs: 其他参数，透传给父类。
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
 
         if input_type not in ("url", "base64"):
@@ -340,11 +340,11 @@ class PDFParse(Operator):
         data_col: pa.Array,
         file_name_col: pa.Array | None = None,
     ) -> pa.Array:
-        """根据 input_type 从 URL 或 Base64 编码的列中异步解析 PDF 文件.
+        """根据 input_type 从 URL 或 Base64 编码的列中异步解析 PDF 文件。
 
         Args:
-            data_col: 包含 PDF 文件 URL 或 Base64 编码内容的 PyArrow 数组。
-            file_name_col: 包含文件名的 PyArrow 数组，用于在 TOS 中保存。
+            data_col: 包含 PDF 文件 URL 或 Base64 编码内容的数组
+            file_name_col: 包含文件名的数组，用于在 TOS 中保存
 
         Returns:
             pa.Array: 一个结构体数组，包含解析结果。
@@ -352,7 +352,7 @@ class PDFParse(Operator):
                 - parsed_plain_text: 移除图片链接后的纯文本。
                 - parsed_detail: JSON 格式的详细解析信息。
                 - parsed_file_path: 解析结果在 TOS 上的存储路径。
-        """
+        """  # noqa: D415
         if self.input_type == "url":
             urls = data_col.to_pylist()
             base64s = [None] * len(urls)

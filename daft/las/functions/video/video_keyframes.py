@@ -27,7 +27,7 @@ EXTRACT_KEYFRAMES_INTRA_METHOD = {"I_frame"}
 
 
 class VideoKeyframes(Operator):
-    """**视频关键帧抽取处理器，支持多算法动态检测.**
+    """**视频关键帧抽取处理器，支持多算法动态检测。**
 
     **核心功能：**
     - 多算法支持：
@@ -57,7 +57,7 @@ class VideoKeyframes(Operator):
         output_tos_dir: str = "",
         **kwargs: Any,
     ) -> None:
-        """初始化视频关键帧抽取算子.
+        """初始化视频关键帧抽取算子。
 
         Args:
             method: 抽取关键帧的方法，支持 "difference"（像素差分法）、"optical_flow"（光流法）、"histogram"（直方图法）、"I_frame"（I型关键帧标识）。
@@ -75,7 +75,7 @@ class VideoKeyframes(Operator):
             output_tos_dir: 保存关键帧图片到 TOS 的目标路径，若为空字符串则不上传。
                 默认值：""
             **kwargs: 其他参数，透传给父类。
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
         self.method = method
         self.img_type = img_type
@@ -294,29 +294,26 @@ class VideoKeyframes(Operator):
         video_binaries: pa.Array | None = None,
         video_formats: pa.Array | None = None,
     ) -> pa.Array:
-        """批量抽取视频关键帧，支持多种输入类型.
+        """批量抽取视频关键帧，支持多种输入类型。
 
         支持三种输入方式：视频路径、视频二进制、视频格式。输出结构包含关键帧 array、base64、时间戳、TOS 路径等。
         注意：`video_paths` 和 `video_binaries` 至少需要指定一个，否则返回空结果。
 
         Args:
-            video_paths: 输入视频路径列，类型为 pyarrow Array。
+            video_paths: 输入视频路径列，类型为数组。
                 默认值：None
-            video_binaries: 输入视频二进制数据列，类型为 pyarrow Array。
+            video_binaries: 输入视频二进制数据列，类型为数组。
                 默认值：None
-            video_formats: 输入视频格式列（如 'mp4'、'avi' 等），类型为 pyarrow Array。
+            video_formats: 输入视频格式列（如 'mp4'、'avi' 等），类型为数组。
                 默认值：None
 
         Returns:
-            pa.Array: 处理后的 pyarrow Array，结构体字段包括：
+            pa.Array: 处理后的数组，结构体字段包括：
                 - keyframes: list[list[list[list[int]]]]，关键帧图片的 array 格式
                 - base64: list[str]，关键帧图片的 base64 编码
                 - timestamps: list[float]，关键帧对应的时间戳（单位：秒）
                 - tos_paths: list[str]，关键帧在 TOS 上的存储路径
-
-        Raises:
-            无（内部异常已捕获并记录日志，异常时返回空结果）。
-        """
+        """  # noqa: D415
         n = 0
         if video_paths is not None:
             n = len(video_paths)

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class AudioSplitByTimestamps(Operator):
-    """**音频时间戳切分处理器，支持精准片段提取.**
+    """**音频时间戳切分处理器，支持精准片段提取。**
 
     **核心功能**
     - 基于时间戳精确切分音频
@@ -46,13 +46,13 @@ class AudioSplitByTimestamps(Operator):
         output_audio_format: bool = False,
         **kwargs: Any,
     ) -> None:
-        """初始化音频时间戳切分处理器参数.
+        """初始化音频时间戳切分处理器参数。
 
         Args:
             output_tos_dir: 切分后的音频片段保存到 TOS 的路径。
             output_segments_binary: 是否返回切分后音频片段的二进制数据。
             output_audio_format: 是否返回音频格式信息。
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
 
         self.output_tos_dir = output_tos_dir.strip("/") if output_tos_dir else ""
@@ -299,7 +299,7 @@ class AudioSplitByTimestamps(Operator):
         audio_binaries: pa.Array | None = None,
         audio_formats: pa.Array | None = None,
     ) -> pa.Array:
-        """根据给定的时间戳区间批量切分音频.
+        """根据给定的时间戳区间批量切分音频。
 
         注意：`audio_paths` 和 `audio_binaries` 至少需要指定一个，否则返回空结果。
 
@@ -314,7 +314,7 @@ class AudioSplitByTimestamps(Operator):
                 - segments: 片段路径列表
                 - binaries: 片段二进制数据列表（可选）
                 - formats: 片段格式列表（可选）
-        """
+        """  # noqa: D415
         # Convert to Python lists
         ranges_list = timestamp_ranges.to_pylist()
         paths_list = audio_paths.to_pylist() if audio_paths is not None else [None] * len(ranges_list)

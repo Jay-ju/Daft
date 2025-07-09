@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class VideoSplitByKeyframes(Operator):
-    """**视频关键帧切分处理器，支持智能片段分割.**
+    """**视频关键帧切分处理器，支持智能片段分割。**
 
     **核心功能：**
     - 多算法关键帧检测：
@@ -48,7 +48,7 @@ class VideoSplitByKeyframes(Operator):
         output_segments_binary: bool = False,
         **kwargs: Any,
     ) -> None:
-        """初始化视频按关键帧切分算子.
+        """初始化视频按关键帧切分算子。
 
         Args:
             method: 抽取关键帧的方法，支持 "difference"（像素差分法）、"histogram"（直方图法）、"I_frame"（I型关键帧标识）。
@@ -68,7 +68,7 @@ class VideoSplitByKeyframes(Operator):
             output_segments_binary: 是否输出视频片段的二进制数据。
                 默认值：False
             **kwargs: 其他参数，透传给父类。
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
         self.method = method
         self.threshold = threshold
@@ -268,24 +268,24 @@ class VideoSplitByKeyframes(Operator):
         video_binaries: pa.Array | None = None,
         video_formats: pa.Array | None = None,
     ) -> pa.Array:
-        """将视频按关键帧切分为片段.
+        """将视频按关键帧切分为片段
 
-        注意：`video_paths` 和 `video_binaries` 至少需要指定一个，否则返回空结果。
+        注意：`video_paths` 和 `video_binaries` 至少需要指定一个，否则返回空结果
 
         Args:
-            video_paths: 输入视频路径列，类型为 pyarrow Array。
+            video_paths: 包含输入视频路径的数组
                 默认值：None
-            video_binaries: 输入视频二进制数据列，类型为 pyarrow Array。
+            video_binaries: 包含视频二进制数据的数组
                 默认值：None
-            video_formats: 输入视频格式列（如 'mp4'、'avi' 等），类型为 pyarrow Array。
+            video_formats: 包含输入视频格式（如 'mp4'、'avi' 等）的数组，指定 video_binaries 时可以提供格式信息
                 默认值：None
 
         Returns:
-            pa.Array: 处理后的 pyarrow Array，结构体字段包括：
+            pa.Array: 处理后的结构体字段包括：
                 - segments: list[str]，切分后视频片段的路径列表
                 - segments_binary: list[bytes]，切分后视频片段的二进制数据列表
                 - video_format: list[str]，切分后视频片段的格式列表
-        """
+        """  # noqa: D415
         n = 0
         if video_paths is not None:
             n = len(video_paths)
