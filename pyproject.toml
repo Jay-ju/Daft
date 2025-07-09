@@ -80,8 +80,12 @@ las = [
   "rapidfuzz==3.13.0",
   "datasets==2.19.0",
   "pdfplumber>=0.11.5",
-  "simplejson==3.20.1"
+  "simplejson==3.20.1",
+  "mcap==1.3.0",
+  "mcap-ros2-support==0.5.5",
+  "mcap-protobuf-support==0.5.3"
 ]
+mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]
 openai = ["openai"]
 pandas = ["pandas"]

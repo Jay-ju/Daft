@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from daft.las.functions.video import VideoSplitByKeyframes
 from function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
@@ -14,8 +15,6 @@ from function_meta.meta import (
     SubCategory,
     ValueType,
 )
-
-from daft.las.functions.video import VideoSplitByKeyframes
 
 
 def get_meta() -> OpMetaModel:

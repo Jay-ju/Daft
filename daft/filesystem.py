@@ -363,6 +363,54 @@ def join_path(fs: pafs.FileSystem, base_path: str, *sub_paths: str) -> str:
         return f"{base_path.rstrip('/')}/{'/'.join(sub_paths)}"
 
 
+def normalize_storage_path(path: str, io_config: IOConfig | None = None) -> str:
+    """Normalize storage path: infer and add protocol prefix based on IO configuration.
+
+    1. Keep existing protocol paths unchanged
+    2. Add protocol prefix for protocol-less paths based on io_config
+    3. Preserve local paths as-is
+    """
+    protocol = get_protocol_from_path(path)
+    if protocol != "file":
+        return path
+
+    if io_config:
+        if io_config.s3:
+            return f"s3://{path.lstrip('/')}"
+        elif io_config.azure:
+            return f"abfs://{path.lstrip('/')}"
+        elif io_config.gcs:
+            return f"gs://{path.lstrip('/')}"
+
+    return path
+
+
+def list_files(fs: pafs.FileSystem, path: str) -> list[str]:
+    """Lists all files in the given path recursively.
+
+    If the path does not exist, returns an empty list.
+    If the path is a file, then returns list only contains the file.
+    Otherwise, lists and returns all files under the path recursively.
+    """
+    try:
+        file_info = fs.get_file_info(path)
+        if file_info.type == pafs.FileType.File:
+            return [path]
+    except FileNotFoundError:
+        return []
+
+    selector = pafs.FileSelector(path, recursive=True)
+
+    try:
+        file_infos: list[pafs.FileInfo] = fs.get_file_info(selector)
+    except NotADirectoryError:
+        return [path]
+    except FileNotFoundError:
+        return []
+
+    return [str(file_info.path) for file_info in file_infos if file_info.type == pafs.FileType.File]
+
+
 def overwrite_files(
     written_file_paths: list[str],
     root_dir: str | pathlib.Path,
@@ -377,23 +425,13 @@ def overwrite_files(
 
         written_dirs = set(str(pathlib.Path(path).parent) for path in written_file_paths)
         for dir in written_dirs:
-            file_selector = pafs.FileSelector(dir, recursive=True)
-            try:
-                all_file_paths.extend(
-                    [info.path for info in fs.get_file_info(file_selector) if info.type == pafs.FileType.File]
-                )
-            except FileNotFoundError:
-                continue
+            all_file_paths.extend(list_files(fs=fs, path=dir))
+
     else:
         # Get all files in the root directory.
-
-        file_selector = pafs.FileSelector(resolved_path, recursive=True)
-        try:
-            all_file_paths.extend(
-                [info.path for info in fs.get_file_info(file_selector) if info.type == pafs.FileType.File]
-            )
-        except FileNotFoundError:
-            # The root directory does not exist, so there are no files to delete.
+        all_file_paths = list_files(fs=fs, path=resolved_path)
+        if all_file_paths is None or len(all_file_paths) == 0:
+            # If the root directory does not exist, there are no files to delete.
             return
 
     all_file_paths_df = MicroPartition.from_pydict({"path": all_file_paths})
