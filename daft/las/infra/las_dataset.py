@@ -6,12 +6,21 @@ import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
-
-from dotenv import load_dotenv
+from typing import TYPE_CHECKING
 
 from daft.las.infra.credentials import UrlCredentialsProvider
 from daft.las.infra.open_api import OpenAPIClient
-from daft.las.utils import get_ak_sk, get_credentials_provider_url, get_region, get_session_token, not_blank
+from daft.las.utils import (
+    get_ak_sk,
+    get_credentials_provider_url,
+    get_region,
+    get_session_token,
+    is_static_credential,
+    not_blank,
+)
+
+if TYPE_CHECKING:
+    from daft.daft import IOConfig
 
 logger = logging.getLogger(__name__)
 
@@ -63,33 +72,38 @@ class LasDatasetConfig:
         session_token: str | None = None,
         credentials_provider_url: str | None = None,
     ):
-        assert region is not None
-        self.region = region
+        access_key_env, secret_key_env = get_ak_sk("las")
 
-        if not_blank(credentials_provider_url):
-            credentials_provider = UrlCredentialsProvider(credentials_provider_url)  # type: ignore[arg-type]
+        self.region = region if not_blank(region) else get_region("las")
+        self.access_key = access_key if not_blank(access_key) else access_key_env
+        self.secret_key = secret_key if not_blank(secret_key) else secret_key_env
+        self.session_token = session_token if not_blank(session_token) else get_session_token("las")
+        self.credentials_provider_url = (
+            credentials_provider_url if not_blank(credentials_provider_url) else get_credentials_provider_url("las")
+        )
+
+        if not_blank(self.credentials_provider_url):
+            credentials_provider = UrlCredentialsProvider(self.credentials_provider_url)  # type: ignore[arg-type]
             self.session_token = credentials_provider.get_credentials().session_token
             self.access_key = credentials_provider.get_credentials().access_key
             self.secret_key = credentials_provider.get_credentials().secret_key
-        else:
-            assert access_key is not None
-            assert secret_key is not None
-            self.access_key = access_key
-            self.secret_key = secret_key
-            self.session_token = session_token
+
+        if not not_blank(self.region):
+            raise ValueError("'region' is not configured")
+        if not is_static_credential(self.access_key, self.secret_key) and not not_blank(self.credentials_provider_url):
+            raise ValueError("Cannot found credentials or credential provider.")
 
     @staticmethod
-    def from_env() -> LasDatasetConfig:
-        load_dotenv()
-
-        region = get_region("las")
-        access_key, secret_key = get_ak_sk("las")
-        return LasDatasetConfig(
-            region=region,
-            access_key=access_key,
-            secret_key=secret_key,
-            session_token=get_session_token("las"),
-            credentials_provider_url=get_credentials_provider_url("las"),
+    def from_io_config(config: IOConfig | None) -> LasDatasetConfig:
+        return (
+            LasDatasetConfig()
+            if config is None
+            else LasDatasetConfig(
+                region=config.s3.region_name,
+                access_key=config.s3.key_id,
+                secret_key=config.s3.access_key,
+                session_token=config.s3.session_token,
+            )
         )
 
 
@@ -99,12 +113,11 @@ class LasDatasetClient:
     def __init__(self, config: LasDatasetConfig):
         # In debug mode, set LAS_SERVICE_NAME to las_ai_qa
         service = os.environ.get("LAS_SERVICE_NAME", "las")
-
         self.api_client = OpenAPIClient(
             service=service,
-            region=config.region,
-            access_key=config.access_key,
-            secret_key=config.secret_key,
+            region=config.region,  # type: ignore[arg-type]
+            access_key=config.access_key,  # type: ignore[arg-type]
+            secret_key=config.secret_key,  # type: ignore[arg-type]
             session_token=config.session_token,
         )
 

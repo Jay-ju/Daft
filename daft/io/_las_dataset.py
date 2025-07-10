@@ -12,7 +12,7 @@ from ._parquet import read_parquet
 
 if TYPE_CHECKING:
     from daft import DataFrame
-    from daft.daft import IOConfig, S3Config
+    from daft.daft import IOConfig
 
 
 @PublicAPI
@@ -27,17 +27,7 @@ def read_las_dataset(name: str, io_config: IOConfig | None, **kwargs: Any) -> Da
     Returns:
         DataFrame: a DataFrame with the schema converted from the dataset.
     """
-    if io_config is not None and io_config.s3 is not None:
-        s3_config: S3Config = io_config.s3
-        region = s3_config.region_name
-        access_key = s3_config.key_id
-        secret_key = s3_config.access_key
-        session_token = s3_config.session_token
-        config = LasDatasetConfig(
-            region=region, access_key=access_key, secret_key=secret_key, session_token=session_token
-        )
-    else:
-        config = LasDatasetConfig.from_env()
+    config = LasDatasetConfig.from_io_config(io_config)
     client = LasDatasetClient(config)
 
     if not (client.dataset_exist(name=name)):

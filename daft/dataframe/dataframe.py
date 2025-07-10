@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Callable, Concatenate, Literal, Optional,
 from daft.api_annotations import DataframePublicAPI
 from daft.context import get_context
 from daft.convert import InputListType
-from daft.daft import FileFormat, IOConfig, JoinStrategy, JoinType, S3Config, WriteMode
+from daft.daft import FileFormat, IOConfig, JoinStrategy, JoinType, WriteMode
 from daft.dataframe.display import MermaidOptions
 from daft.dataframe.preview import Preview, PreviewAlign, PreviewColumn, PreviewFormat, PreviewFormatter
 from daft.datatype import DataType
@@ -758,17 +758,18 @@ class DataFrame:
     def write_las_dataset(
         self,
         name: str,
-        format: str,
-        root_dir: Union[str, pathlib.Path],
-        io_config: Optional[IOConfig],
-        nick_name: Optional[str],
-        labels: Optional[list[str]],
+        format: Optional[str] = None,
+        root_dir: Union[str, pathlib.Path, None] = None,
+        io_config: Optional[IOConfig] = None,
+        nick_name: Optional[str] = None,
+        labels: Optional[list[str]] = None,
         privacy: str = "PRIVATE",
         description: str = "",
         **kwargs: Any,
     ) -> "DataFrame":
         """Writes the DataFrame to LAS dataset, returning a new DataFrame with paths to the files that were written.
 
+        The dataset will be created if it was not exist.
         Files may be written to `<root_dir>/*` with randomly generated UUIDs as the file names.
 
         Args:
@@ -813,14 +814,54 @@ class DataFrame:
         )
         from daft.las.io.factory import rm
 
-        root_dir = str(root_dir)
-        if not root_dir.startswith("tos://") and not root_dir.startswith("s3://"):
-            raise ValueError("Only tos or s3 path is supported")
-        data_path = root_dir
-        root_dir = root_dir.replace("tos://", "s3://")
+        # Check root_dir if it was set.
+        if root_dir is not None:
+            root_dir = str(root_dir)
+            if not root_dir.startswith("tos://") and not root_dir.startswith("s3://"):
+                raise ValueError("Only tos or s3 path is supported")
+            root_dir = root_dir.replace("s3://", "tos://")
+
+        # Create a las dataset client.
+        config = LasDatasetConfig.from_io_config(io_config)
+        client = LasDatasetClient(config)
+
+        # Check if the dataset exists.
+        dataset_exists = False
+        if client.dataset_exist(name=name):
+            dataset_exists = True
+
+            dataset_info = client.get_dataset(name=name)
+            format_from_las = dataset_info.format.name
+            root_dir_from_las = dataset_info.data_path
+
+            if format is None:
+                format = format_from_las
+            if root_dir is None:
+                root_dir = root_dir_from_las
+
+            if format != format_from_las:
+                raise ValueError(
+                    f"The dataset {name} already exists, but the data format it records: "
+                    f"{format_from_las} is not consistent with that you specified: {format}"
+                )
+            if root_dir != root_dir_from_las:
+                raise ValueError(
+                    f"The dataset {name} already exists, but the data path it records: "
+                    f"{root_dir_from_las} is not consistent with the 'root_dir' you specified: {root_dir}"
+                )
+
+            mode = kwargs.get("mode")
+            if mode == "create" and format.upper() == "LANCE":
+                raise ValueError("'create' mode is not allowed for existing dataset with lance format")
+        else:
+            if root_dir is None:
+                raise ValueError("You must specify the 'root_dir' to write the data to")
+            if format is None:
+                format = "lance"
 
         format = format.upper()
-        privacy = privacy.upper()
+        assert root_dir is not None
+        root_dir = root_dir.replace("tos://", "s3://")
 
         if format == LasDatasetFormat.CSV.name:
             result_df = self.write_csv(root_dir=root_dir, io_config=io_config, **kwargs)
@@ -835,27 +876,19 @@ class DataFrame:
         else:
             raise ValueError(f"Unsupported format: {format}")
 
-        if io_config is not None and io_config.s3 is not None:
-            s3_config: S3Config = io_config.s3
-            region = s3_config.region_name
-            access_key = s3_config.key_id
-            secret_key = s3_config.access_key
-            session_token = s3_config.session_token
-            config = LasDatasetConfig(
-                region=region, access_key=access_key, secret_key=secret_key, session_token=session_token
-            )
-        else:
-            config = LasDatasetConfig.from_env()
+        # If the dataset already exists, just return
+        if dataset_exists:
+            return result_df
 
-        client = LasDatasetClient(config)
+        # Create new las dataset
         dataset = LasDatasetInfo(
             name=name,
             format=LasDatasetFormat[format],
             nick_name=nick_name,
             storage=Storage.TOS,
-            data_path=data_path,
+            data_path=root_dir.replace("s3://", "tos://"),
             labels=labels,
-            privacy=Privacy[privacy],
+            privacy=Privacy[privacy.upper()],
             description=description,
         )
         try:
