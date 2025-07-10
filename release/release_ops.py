@@ -89,7 +89,7 @@ def _collect_all_examples(root_dir: str) -> dict[str, str]:
 
 def _extract_precondition(clazz: type) -> str | None:
     doc = clazz.__doc__
-    pattern = rf"{'Notes'}:\n(.*?)(?=\n\w+:|$)"
+    pattern = r"Notes\s*\n\s*-+\s*\n(.*?)(?=\n\s*\w+:|$)"
     match = re.search(pattern, doc, re.DOTALL)
     if match:
         # remove indent
