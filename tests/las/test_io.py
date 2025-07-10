@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 import daft
 from daft.daft import IOConfig
@@ -148,7 +147,6 @@ def test_io_cache_cache():
     assert LasIOFactory.get().get_client("/a/b/c") == client
 
 
-@pytest.mark.skip("todo fix the ci issue")
 def test_daft_io_config_consistency(object_store_test_dir):
     tos_config = TOSConfig.from_env()
     io_config = IOConfig(s3=tos_config.to_s3_config())
