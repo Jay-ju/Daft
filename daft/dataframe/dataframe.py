@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any, Callable, Concatenate, Literal, Optional,
 from daft.api_annotations import DataframePublicAPI
 from daft.context import get_context
 from daft.convert import InputListType
-from daft.daft import FileFormat, IOConfig, JoinStrategy, JoinType, WriteMode
+from daft.daft import FileFormat, IOConfig, JoinStrategy, JoinType, S3Config, WriteMode
 from daft.dataframe.display import MermaidOptions
 from daft.dataframe.preview import Preview, PreviewAlign, PreviewColumn, PreviewFormat, PreviewFormatter
 from daft.datatype import DataType
@@ -753,6 +753,118 @@ class DataFrame:
     ###
     # Write methods
     ###
+
+    @DataframePublicAPI
+    def write_las_dataset(
+        self,
+        name: str,
+        format: str,
+        root_dir: Union[str, pathlib.Path],
+        io_config: Optional[IOConfig],
+        nick_name: Optional[str],
+        labels: Optional[list[str]],
+        privacy: str = "PRIVATE",
+        description: str = "",
+        **kwargs: Any,
+    ) -> "DataFrame":
+        """Writes the DataFrame to LAS dataset, returning a new DataFrame with paths to the files that were written.
+
+        Files may be written to `<root_dir>/*` with randomly generated UUIDs as the file names.
+
+        Args:
+            name: Name of the dataset to be created.
+            format: Format of the dataset (CSV, PARQUET, LANCE, or ICEBERG, case-insensitive).
+            root_dir: Root directory where the dataset files will be written.
+            io_config: Optional IO configuration for writing the dataset.
+            nick_name: Optional nickname for the dataset.
+            labels: Optional labels/tags for the dataset.
+            privacy: Privacy level of the dataset (PUBLIC or PRIVATE. default: PRIVATE, case-insensitive).
+            description: Description of the dataset.
+            **kwargs: Additional format-specific arguments:
+                - For ICEBERG format: 'table' (required) - Name of the Iceberg table
+                - May accept additional writer options
+
+        Returns:
+            DataFrame: A new DataFrame containing paths to the written files.
+
+        Raises:
+            ValueError: If the format is unsupported or if required arguments are missing.
+            Exception: If dataset creation fails in the LAS service.
+
+        Examples:
+            >>> df.write_las_dataset(
+            ...     name="my_dataset",
+            ...     format="csv",
+            ...     root_dir="tos://my_bucket/path/to/output",
+            ...     description="Sample dataset",
+            ... )
+
+        Note:
+            For ICEBERG format, the 'table' parameter must be provided in kwargs.
+            The method automatically registers the dataset with the LAS service after writing files.
+        """
+        from daft.las.infra.las_dataset import (
+            LasDatasetClient,
+            LasDatasetConfig,
+            LasDatasetFormat,
+            LasDatasetInfo,
+            Privacy,
+            Storage,
+        )
+        from daft.las.io.factory import rm
+
+        root_dir = str(root_dir)
+        if not root_dir.startswith("tos://") and not root_dir.startswith("s3://"):
+            raise ValueError("Only tos or s3 path is supported")
+        data_path = root_dir
+        root_dir = root_dir.replace("tos://", "s3://")
+
+        format = format.upper()
+        privacy = privacy.upper()
+
+        if format == LasDatasetFormat.CSV.name:
+            result_df = self.write_csv(root_dir=root_dir, io_config=io_config, **kwargs)
+        elif format == LasDatasetFormat.PARQUET.name:
+            result_df = self.write_parquet(root_dir=root_dir, io_config=io_config, **kwargs)
+        elif format == LasDatasetFormat.LANCE.name:
+            result_df = self.write_lance(uri=root_dir, io_config=io_config, **kwargs)
+        elif format == LasDatasetFormat.ICEBERG.name:
+            if kwargs.get("table") is None:
+                raise ValueError("Missing iceberg table")
+            result_df = self.write_iceberg(io_config=io_config, **kwargs)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+        if io_config is not None and io_config.s3 is not None:
+            s3_config: S3Config = io_config.s3
+            region = s3_config.region_name
+            access_key = s3_config.key_id
+            secret_key = s3_config.access_key
+            session_token = s3_config.session_token
+            config = LasDatasetConfig(
+                region=region, access_key=access_key, secret_key=secret_key, session_token=session_token
+            )
+        else:
+            config = LasDatasetConfig.from_env()
+
+        client = LasDatasetClient(config)
+        dataset = LasDatasetInfo(
+            name=name,
+            format=LasDatasetFormat[format],
+            nick_name=nick_name,
+            storage=Storage.TOS,
+            data_path=data_path,
+            labels=labels,
+            privacy=Privacy[privacy],
+            description=description,
+        )
+        try:
+            client.create_dataset(dataset=dataset)
+        except Exception:
+            rm(root_dir)
+            raise
+
+        return result_df
 
     @DataframePublicAPI
     def write_parquet(

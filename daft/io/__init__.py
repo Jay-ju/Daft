@@ -17,6 +17,7 @@ from daft.io.hudi._hudi import read_hudi
 from daft.io.iceberg._iceberg import read_iceberg
 from daft.io.lance._lance import read_lance, merge_columns
 from daft.io._json import read_json
+from daft.io._las_dataset import read_las_dataset
 from daft.io._parquet import read_parquet
 from daft.io._sql import read_sql
 from daft.io._warc import read_warc
@@ -54,6 +55,7 @@ __all__ = [
     "read_iceberg",
     "read_json",
     "read_lance",
+    "read_las_dataset",
     "read_mcap",
     "read_parquet",
     "read_sql",

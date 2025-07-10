@@ -47,6 +47,7 @@ class LasDatasetInfo:
     labels: list[str] | None = None
     privacy: Privacy = Privacy.PUBLIC
     description: str | None = None
+    table: str | None = None
 
 
 class LasDatasetConfig:
@@ -143,6 +144,15 @@ class LasDatasetClient:
             body=body,
         )
         result = response.json()["Result"]
+
+        table: str | None = None
+        if result["Catalog"] is not None:
+            catalog = result["Catalog"]
+            catalog_name = catalog["CatalogName"]
+            schema_name = catalog["SchemaName"]
+            table_name = catalog_name["TableName"]
+            table = f"{catalog_name}.{schema_name}.{table_name}"
+
         return LasDatasetInfo(
             name=result["DatasetName"],
             nick_name=result["Nickname"],
@@ -152,4 +162,5 @@ class LasDatasetClient:
             format=LasDatasetFormat[result["Format"].upper()],
             storage=Storage[result["Storage"].upper()],
             data_path=result["DataPath"],
+            table=table,
         )

@@ -85,11 +85,12 @@ ve-test: .venv build  ## Run tests
 	--ignore tests/io/delta_lake \
 	--ignore tests/io/hudi \
     --ignore tests/las \
-	--ignore tests/io/test_s3_credentials_refresh.py
+	--ignore tests/io/test_s3_credentials_refresh.py \
+	--ignore tests/io/test_las_dataset.py
 
 .PHONY: test-las
 test-las: .venv build
-	$(VENV_BIN)/pytest tests/las -m "not ark_llm" --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
+	$(VENV_BIN)/pytest tests/las tests/io/test_las_dataset.py -m "not ark_llm" --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
 
 .PHONY: doctests
 doctests: .venv
