@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from dotenv import load_dotenv
 from tos.credential import Credentials
 from tosfs import TosFileSystem
 from tosfs.certification import NoLockUrlCredentialsProvider
@@ -131,6 +132,8 @@ class TOSConfig:
 
     @staticmethod
     def from_env() -> TOSConfig:
+        load_dotenv()
+
         access_key, secret_key = get_ak_sk("tos")
         return TOSConfig(
             endpoint=os.getenv("TOS_ENDPOINT"),

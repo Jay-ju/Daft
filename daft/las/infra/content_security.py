@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import Callable
 
+from dotenv import load_dotenv
 from volcengine.content_security.ContentSecurityService import ContentSecurityService
 
 from daft.las.infra.credentials import Credentials, UrlCredentialsProvider
@@ -48,6 +49,8 @@ class ContentSecurityConfig:
 
     @staticmethod
     def from_env() -> ContentSecurityConfig:
+        load_dotenv()
+
         access_key, secret_key = get_ak_sk("content_security")
         return ContentSecurityConfig(
             access_key=access_key,

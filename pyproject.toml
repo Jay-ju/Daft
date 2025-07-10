@@ -45,7 +45,8 @@ huggingface = ["huggingface-hub"]
 iceberg = ["pyiceberg >= 0.7.0, < 0.9.1"]
 lance = ["pylance"]
 las = [
-  "pyiceberg >= 0.7.0",
+  "python-dotenv>=1.1.1",
+  "pyiceberg>=0.7.0",
   "packaging",
   "pylance",
   "httpx[http2] >= 0.27.2",

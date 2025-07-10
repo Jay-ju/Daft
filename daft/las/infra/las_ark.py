@@ -8,6 +8,7 @@ import os
 from typing import Any
 
 import httpx
+from dotenv import load_dotenv
 from pydantic import ValidationError
 from tenacity import (
     before_sleep_log,
@@ -63,6 +64,8 @@ class LasArkConfig:
 
     @staticmethod
     def from_env() -> LasArkConfig:
+        load_dotenv()
+
         access_key, secret_key = get_ak_sk("las_ark")
         return LasArkConfig(
             base_url=os.environ.get("LAS_BASE_URL", DEFAULT_LAS_BASE_URL),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from dotenv import load_dotenv
 from volcengine.visual.VisualService import VisualService
 
 from daft.las.infra.credentials import Credentials, CredentialsProvider, UrlCredentialsProvider
@@ -47,6 +48,8 @@ class VisualServiceConfig:
 
     @staticmethod
     def from_env() -> VisualServiceConfig:
+        load_dotenv()
+
         access_key, secret_key = get_ak_sk("visual_service")
         return VisualServiceConfig(
             access_key=access_key,

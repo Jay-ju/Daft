@@ -7,6 +7,7 @@ import re
 from typing import Any
 from urllib.parse import urlparse
 
+from dotenv import load_dotenv
 from volcenginesdkarkruntime import Ark, AsyncArk
 
 from daft.las.utils import get_ak_sk, get_region, is_static_credential, not_blank
@@ -66,6 +67,8 @@ class ArkConfig:
 
     @staticmethod
     def from_env() -> ArkConfig:
+        load_dotenv()
+
         access_key, secret_key = get_ak_sk("ark")
         return ArkConfig(
             base_url=os.getenv("ARK_BASE_URL"),

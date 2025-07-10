@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
+from dotenv import load_dotenv
+
 from daft.las.infra.credentials import UrlCredentialsProvider
 from daft.las.infra.open_api import OpenAPIClient
 from daft.las.utils import get_ak_sk, get_credentials_provider_url, get_region, get_session_token, not_blank
@@ -78,6 +80,8 @@ class LasDatasetConfig:
 
     @staticmethod
     def from_env() -> LasDatasetConfig:
+        load_dotenv()
+
         region = get_region("las")
         access_key, secret_key = get_ak_sk("las")
         return LasDatasetConfig(
