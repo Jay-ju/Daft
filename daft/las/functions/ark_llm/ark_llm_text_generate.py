@@ -28,11 +28,12 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         - prompt：用户级指令模板（支持{query}占位符替换）
 
     **输入输出规范：**
-    - 输入格式：纯文本数组（pyarrow.StringArray）
-    - 输出继承：
+    - 输入格式：纯文本数据
+    - 输出格式：
         - 默认模式：str类型生成结果
-        - 诊断模式（设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true）： 返回完整的生成结果（llm_result）和模型诊断信息（finish_reason），
-            struct(llm_result:str, finish_reason:str)
+        - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
+            - llm_result：str类型，生成结果
+            - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
 
     **支持模型示例：**
     - 豆包文本模型系列：
@@ -53,10 +54,10 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,
         stop: list[str] | None = None,
-        frequency_penalty: float | None = None,
-        presence_penalty: float | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
+        frequency_penalty: float = 0,
+        presence_penalty: float = 0,
+        temperature: float = 1,
+        top_p: float = 0.7,
         logit_bias: dict[str, Any] | None = None,
         tools: list[dict[Any, Any]] | None = None,
         llm_config: dict[str, Any] | None = None,
@@ -75,10 +76,6 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
                 支持的模型有:豆包模型和DeepSeek模型。 示例 doubao-1.5-lite-32k
             version: 模型版本
                 输入模型对应的版本信息。示例 250115
-            access_key: 用户的ak
-                用户的ak，用于鉴权，校验当前用户是否开通过LAS且有工作流白名单能力
-            account_id: 账号ID
-                账号ID，用于校验当前用户是否有模型权限
             inference_type: 推理类型，支持在线推理和批量推理。默认值为batch，即采用批量推理
                 - online： 采用方舟平台提供的在线推理模块进行推理
                 - batch：采用方舟平台提供的批量推理模块进行推理
@@ -153,14 +150,13 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         """批量使用大模型对文本内容进行理解和回复.
 
         Args:
-            raw_text: 包含待处理文本的PyArrow数组。类型为str
+            raw_text: 包含待处理文本数据。类型为 str
 
         Returns:
-            pyarrow.Array: 处理后的PyArrow数组。若过程中有数据处理失败，返回与正常返回类型一致的空数组。
+            （默认情况下）当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
             当环境变量LAS_LLM_FINISH_REASON_CHECK=true时，返回字段类型为struct，包含以下字段：
                 - llm_result: 模型输出结果
                 - finish_reason: 模型输出结束原因
-            当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
         """
         messages = [gen_text_message(x.as_py(), self.prompt, self.system_content) for x in raw_text]
         return super().process(messages)

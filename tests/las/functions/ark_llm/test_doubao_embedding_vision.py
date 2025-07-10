@@ -73,7 +73,9 @@ def test_image_embedding_without_text():
 def test_video_embedding_with_text():
     """Test video embedding with text."""
     mock_callable = AsyncMock(return_value=[{"data": {"embedding": [0.1, 0.2, 0.3]}}] * 2)
-    embedder = TestDoubaoEmbeddingVision(mock_callable=mock_callable, multimodal_type="video", source_type="url")
+    embedder = TestDoubaoEmbeddingVision(
+        mock_callable=mock_callable, multimodal_type="video", source_type="url", dimensions=None
+    )
     media_data = pa.array(["http://test.com/video1.mp4", "http://test.com/video2.mp4"])
     texts = pa.array(["a cat", "a dog"])
     result = embedder.transform(media_datas=media_data, text_contents=texts)

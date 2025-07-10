@@ -48,7 +48,7 @@ class DoubaoEmbeddingVision(Operator):
         video_format: str = "mp4",
         source_type: str = "url",
         encoding_format: str | None = None,
-        dimensions: int | None = None,
+        dimensions: int = 2048,
         request_timeout: int = DEFAULT_REQUEST_TIMEOUT,
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
         **kwargs: dict[str, Any],
@@ -137,7 +137,7 @@ class DoubaoEmbeddingVision(Operator):
                 单条文本不超过模型的最大输入 token 数为 8k。
 
         Returns:
-            pa.Array: 包含模型输出结果的PyArrow数组。类型为list[float]
+            返回模型处理后的向量化数组。类型为list[float]
         """
         message_generator = {"image": self._build_image_message, "video": self._build_video_message}[
             self.multimodal_type

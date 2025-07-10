@@ -63,10 +63,10 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,
         stop: list[str] | None = None,
-        frequency_penalty: float | None = None,
-        presence_penalty: float | None = None,
-        temperature: float | None = None,
-        top_p: float | None = None,
+        frequency_penalty: float = 0,
+        presence_penalty: float = 0,
+        temperature: float = 1,
+        top_p: float = 0.7,
         logit_bias: dict[str, Any] | None = None,
         tools: list[dict[Any, Any]] | None = None,
         llm_config: dict[str, Any] | None = None,
@@ -81,10 +81,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 支持的模型有:豆包模型和DeepSeek模型。 示例 doubao-1.5-lite-32k
             version: 模型版本
                 输入模型对应的版本信息。示例 250115
-            access_key: 用户的ak
-                用户的ak，用于鉴权，校验当前用户是否开通过LAS且有工作流白名单能力
-            account_id: 账号ID
-                账号ID，用于校验当前用户是否有模型权限
             inference_type: 推理类型，支持在线推理和批量推理。默认值为batch，即采用批量推理
                 - online： 采用方舟平台提供的在线推理模块进行推理
                 - batch：采用方舟平台提供的批量推理模块进行推理
@@ -200,17 +196,14 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
 
         Args:
-            media_datas: 包含待处理消息的PyArrow数组，可以是图片，也可以是视频信息。类型为list[str]
-                每个元素为图片或视频的base64编码或url。
-            user_prompts: 包含用户提示的PyArrow数组。类型为list[str]
-                每个元素为用户提示。当图片或者视频数据使用的提示词不同时，可以通过该字段指定。若相同，则可以不指定。
+            media_datas: 传入待处理的图片或视频数据。支持传入图片或视频的base64编码或url
+            user_prompts: 传入用户提示词。当传入图片或视频数据时，若图片或视频数据使用的提示词不同时，可以通过该字段指定。若相同，则可以通过prompt参数指定。
 
         Returns:
-            pyarrow.Array: 处理后的PyArrow数组。若过程中有数据处理失败，则对应位置为None。
-                当环境变量LAS_LLM_FINISH_REASON_CHECK=true时，返回字段类型为struct，包含以下字段：
-                    - llm_result: 模型输出结果
-                    - finish_reason: 模型输出结束原因
-                当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
+            （默认情况下）当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
+            当环境变量LAS_LLM_FINISH_REASON_CHECK=true时，返回字段类型为struct，包含以下字段：
+                - llm_result: 模型输出结果
+                - finish_reason: 模型输出结束原因
         """
         message_generator = {"image": self._build_image_message, "video": self._build_video_message}[
             self.multimodal_type
