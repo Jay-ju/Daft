@@ -6,6 +6,9 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 import daft
 from daft.daft import IOConfig
 from daft.las.io import download_file, exists, file_size, upload_file
@@ -143,3 +146,28 @@ def _test_basic_io(remote_path: str, work_dir: str):
 def test_io_cache_cache():
     client = LasIOFactory.get().get_client("/a/b/c")
     assert LasIOFactory.get().get_client("/a/b/c") == client
+
+
+@pytest.mark.skip("todo fix the ci issue")
+def test_daft_io_config_consistency(object_store_test_dir):
+    tos_config = TOSConfig.from_env()
+    io_config = IOConfig(s3=tos_config.to_s3_config())
+    daft.set_planning_config(default_io_config=io_config)
+    s3_dir = object_store_test_dir.replace("tos://", "s3://")
+
+    expected = daft.from_pydict({"a": [1, 2, 3, 4], "b": [2, 4, 3, 1]})
+
+    parquet_path = f"{s3_dir}/test.parquet"
+    expected.write_parquet(parquet_path, io_config=io_config)
+    actual = daft.read_parquet(parquet_path, io_config=io_config)
+    pd.testing.assert_frame_equal(actual.to_pandas(), expected.to_pandas())
+
+    csv_path = f"{s3_dir}/test.csv"
+    expected.write_csv(csv_path, io_config=io_config)
+    actual = daft.read_csv(csv_path, io_config=io_config)
+    pd.testing.assert_frame_equal(actual.to_pandas(), expected.to_pandas())
+
+    lance_path = f"{s3_dir}/test.lance"
+    expected.write_lance(lance_path, io_config=io_config, mode="overwrite")
+    actual = daft.read_lance(lance_path, io_config=io_config)
+    pd.testing.assert_frame_equal(actual.to_pandas(), expected.to_pandas())
