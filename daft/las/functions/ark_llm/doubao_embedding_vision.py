@@ -28,8 +28,7 @@ class DoubaoEmbeddingVision(Operator):
 
     **输入输出规范：**
     - 输入格式：
-        - 图片/视频数据：string类型，支持base64编码/url地址
-        - 文本数据（可选）：string类型
+        - 图片/视频数据/文本数据：string类型，支持base64编码/url地址
     - 输出格式：
         - 默认模式：float数组类型的向量表示
 
@@ -130,7 +129,7 @@ class DoubaoEmbeddingVision(Operator):
         该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
 
         Args:
-            media_datas: 传入待处理的图片或视频数据、文本数据。图片或视频数据支持传入base64编码或url、bytes；文本数据支持传入文本数据。
+            media_datas: 传入待处理的图片或视频数据、文本数据。图片或视频数据支持传入base64编码或url、bytes；文本数据支持传入文本数据。输入文本数据，则对文本数据进行向量化。
             text_contents: 图文向量化场景下，通过media_datas字段传入图片或者视频，通过text_contents字段传入文本数据。
                 输入给模型的文本内容，需要满足一下条件
                 单条文本以 utf-8 编码，长度不超过 100,000 字节。

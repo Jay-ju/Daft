@@ -48,8 +48,7 @@ class PreSignUrlForTos(Operator):
         """对 TOS 文件路径生成带签名的 URL.
 
         Args:
-            expires: URL过期时间
-                签名 URL 的过期时间，单位秒. 默认值 3600.
+            expires: 签名 URL 的过期时间，单位秒。默认值 3600
         """
         super().__init__(**kwargs)
         self.expires = expires or 3600
@@ -88,10 +87,10 @@ class PreSignUrlForTos(Operator):
         """生成 TOS 文件路径签名 URL。当路径 schema 是 http 或 https 时，直接返回路径；若是 tos 或 s3，则对路径进行签名，其他情况返回 None.
 
         Args:
-            urls: 输入的 TOS 文件路径.
+            urls: 输入的 TOS 文件路径
 
         Returns:
-            生成的签名 URL.
+            生成的签名 URL
         """
         processed = [self._get_pre_signed_policy_url(url.as_py()) for url in urls]
         return pa.array(processed, type=pa.string())
