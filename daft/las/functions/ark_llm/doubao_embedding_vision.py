@@ -40,7 +40,8 @@ class DoubaoEmbeddingVision(Operator):
 
     def __init__(
         self,
-        version: str,
+        model: str = "doubao-embedding-vision",
+        version: str = "250615",
         access_key: str | None = None,
         account_id: str | None = None,
         multimodal_type: str = "image",
@@ -62,6 +63,7 @@ class DoubaoEmbeddingVision(Operator):
                 指定处理的是图像还是视频，默认是 image。可选值:
                 - image: 图片
                 - video: 视频
+                - text: 文本
             image_format: 图片编码格式
                 支持格式有：JPEG、PNG、WEBP、BMP、TIFF、ICO、DIB、ICNS、SGI、JPEG2000。其中，TIFF、 SGI、ICNS、JPEG2000 格式图片。
             video_format: 视频编码格式
@@ -85,10 +87,9 @@ class DoubaoEmbeddingVision(Operator):
         self.source_type = source_type.lower() if source_type else "url"
         assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
         self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
-        assert self.multimodal_type in ["image", "video"], "multimodal_type must be image, video,"
+        assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
 
         super().__init__(**kwargs)
-        model = "doubao-embedding-vision"
 
         self.image_format = image_format.lower() if image_format else "jpeg"
         self.video_format = video_format.lower() if video_format else "mp4"
@@ -129,9 +130,8 @@ class DoubaoEmbeddingVision(Operator):
         该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
 
         Args:
-            media_datas: 包含待处理消息的PyArrow数组，可以是图片，也可以是视频信息。类型为list[str]
-                每个元素为图片或视频的base64编码或url。
-            text_contents: 包含待处理文本的PyArrow数组。类型为list[str]
+            media_datas: 传入待处理的图片或视频数据、文本数据。图片或视频数据支持传入base64编码或url、bytes；文本数据支持传入文本数据。
+            text_contents: 图文向量化场景下，通过media_datas字段传入图片或者视频，通过text_contents字段传入文本数据。
                 输入给模型的文本内容，需要满足一下条件
                 单条文本以 utf-8 编码，长度不超过 100,000 字节。
                 单条文本不超过模型的最大输入 token 数为 8k。
@@ -139,9 +139,11 @@ class DoubaoEmbeddingVision(Operator):
         Returns:
             返回模型处理后的向量化数组。类型为list[float]
         """
-        message_generator = {"image": self._build_image_message, "video": self._build_video_message}[
-            self.multimodal_type
-        ]
+        message_generator = {
+            "image": self._build_image_message,
+            "video": self._build_video_message,
+            "text": self._build_text_message,
+        }[self.multimodal_type]
 
         media_list = media_datas.to_pylist()
         text_list = text_contents.to_pylist() if text_contents else [None] * len(media_datas)
@@ -180,6 +182,9 @@ class DoubaoEmbeddingVision(Operator):
         media_url_or_data = gen_media_data("video", media_data, self.video_format, self.source_type)
         video_info = {"type": "video_url", "videoUrl": media_url_or_data}
         return self._assemble_message(video_content=video_info, text_content=text_content)
+
+    def _build_text_message(self, media_data: Any, text_content: str | None = None) -> list[dict[str, Any]]:
+        return self._assemble_message(text_content=media_data)
 
     def _assemble_message(
         self,
