@@ -2,7 +2,7 @@ name: PR test suite
 trigger:
   change:
     types: [submit, create, push]
-    branches: [main, ve-main]
+    branches: [main, ve-main, branch-*]
     paths:
     - "!.github/**"
     - "!.vscode/**"

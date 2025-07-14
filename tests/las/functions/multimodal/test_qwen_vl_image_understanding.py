@@ -59,6 +59,7 @@ def test_qwen_vl_image_understanding(local_models_dir, tos_test_data_dir, local_
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_path")),
     )
 

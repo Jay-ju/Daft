@@ -38,6 +38,7 @@ def test_bge_sparse_dense_embedding(local_models_dir):
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("text")),
     )
 

@@ -71,6 +71,7 @@ def test_diarization_audio_speaker(local_models_dir, tos_test_data_dir, local_te
             AudioSpeakerDiarization,
             construct_args={"model_path": local_models_dir, "rank": rank},
             num_gpus=num_gpus,
+            concurrency=1,
         )(col("audio_path")),
     )
     actual = ds.to_pandas()

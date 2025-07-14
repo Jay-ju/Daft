@@ -81,6 +81,7 @@ def test_clip_embedding_txt(local_models_dir):
                 },
                 num_gpus=num_gpus,
                 batch_size=1,
+                concurrency=1,
             )(col("text")),
         )
 
@@ -108,6 +109,7 @@ def test_clip_embedding_img(local_models_dir, tos_test_data_dir, local_test_data
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_path")),
     )
 
@@ -135,6 +137,7 @@ def test_clip_embedding_img_base64(local_models_dir, tos_test_data_dir, local_te
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_base64")),
     )
 
@@ -161,6 +164,7 @@ def test_clip_embedding_img_binary(local_models_dir, tos_test_data_dir, local_te
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_binary")),
     )
 

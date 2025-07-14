@@ -66,6 +66,7 @@ def test_audio_asr_whisper(local_models_dir, tos_test_data_dir, local_test_data_
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("audio_path")),
     )
 

@@ -6,9 +6,9 @@ from daft.api_annotations import PublicAPI
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig
 
 from ._csv import read_csv
-from ._iceberg import read_iceberg
-from ._lance import read_lance
 from ._parquet import read_parquet
+from .iceberg._iceberg import read_iceberg
+from .lance._lance import read_lance
 
 if TYPE_CHECKING:
     from daft import DataFrame
