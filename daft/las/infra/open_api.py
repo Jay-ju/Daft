@@ -35,7 +35,13 @@ class OpenAPIClient:
         access_key: str,
         secret_key: str,
         session_token: str | None = None,
+        host: str = HOST,
+        path: str = PATH,
+        version: str = VERSION,
     ):
+        self.host = host
+        self.path = path
+        self.version = version
         self.auth = VolcAuth(access_key, secret_key, region, service, session_token=session_token)
 
     @retry(  # type: ignore[misc]
@@ -50,9 +56,9 @@ class OpenAPIClient:
         try:
             response = requests.request(
                 method=method,
-                url=f"https://{HOST}{PATH}",
+                url=f"https://{self.host}{self.path}",
                 headers=headers,
-                params={"Action": action, "Version": VERSION, **params},
+                params={"Action": action, "Version": self.version, **params},
                 json=body,
                 auth=self.auth,
                 timeout=DEFAULT_TIMEOUT,
