@@ -184,18 +184,16 @@ class ArkLLMGenerate(Operator):
     def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        return loop.run_until_complete(self._async_transform(messages))
-
-    async def _async_transform(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
         requests = [{"messages": msg, **self.options} for msg in messages]
-        results = await self.client.batch_process(requests)
-        output_array, finish_reason_array = self._update_array_with_results(results)
-        if ArkLLMGenerate._finish_reason_check:
-            return pa.StructArray.from_arrays([output_array, finish_reason_array], ["llm_result", "finish_reason"])
 
-        return output_array
+        results = loop.run_until_complete(self._async_requests(requests))
 
-    def _update_array_with_results(self, results: list[dict[str, Any]]) -> tuple[pa.Array, pa.Array]:
+        return self._update_array_with_results(results)
+
+    async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
+        return await self.client.batch_process(requests)
+
+    def _update_array_with_results(self, results: list[dict[str, Any]]) -> pa.Array:
         # init output_data and finish_reason_data
         output_data = [None] * len(results)
         finish_reason_data = [None] * len(results)
@@ -209,4 +207,10 @@ class ArkLLMGenerate(Operator):
                 else:
                     finish_reason_data[i] = result.get("choices", [{}])[0].get("finish_reason")
 
-        return (pa.array(output_data, type=pa.string()), pa.array(finish_reason_data, type=pa.string()))
+        output_array = pa.array(output_data, type=pa.string())
+
+        if ArkLLMGenerate._finish_reason_check:
+            finish_reason_array = pa.array(finish_reason_data, type=pa.string())
+            return pa.StructArray.from_arrays([output_array, finish_reason_array], ["llm_result", "finish_reason"])
+
+        return output_array

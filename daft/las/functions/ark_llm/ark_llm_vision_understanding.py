@@ -96,8 +96,9 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 指定处理的是图像还是视频，默认是 image。可选值:
                 - image: 图片
                 - video: 视频
+                - text: 文本
             image_format: 图片编码格式
-                仅在 multimodal_type=image或all 时生效，默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
+                仅在 multimodal_type=image 时生效，默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
             image_url_detail: 图片质量
                 支持手动设置图片的质量，取值范围high、low、auto。
                 - high：高细节模式，适用于需要理解图像细节信息的场景，如对图像的多个局部信息/特征提取、复杂/丰富细节的图像理解等场景，理解更全面。
@@ -164,7 +165,7 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
 
         self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
-        assert self.multimodal_type in ["image", "video"], "multimodal_type must be image, video,"
+        assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
 
         self.image_format = image_format.lower() if image_format else "jpeg"
         self.video_format = video_format.lower() if video_format else "mp4"
@@ -205,33 +206,36 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 - llm_result: 模型输出结果
                 - finish_reason: 模型输出结束原因
         """
-        message_generator = {"image": self._build_image_message, "video": self._build_video_message}[
-            self.multimodal_type
-        ]
+        message_generator = {
+            "image": self._build_image_message,
+            "video": self._build_video_message,
+            "text": self._build_text_message,
+        }[self.multimodal_type]
+
+        media_list = media_datas.to_pylist()
+        text_list = user_prompts.to_pylist() if user_prompts else [None] * len(media_datas)
 
         model_messages: list[list[dict[str, Any]]] = [
-            message_generator(
-                media_data=media.as_py(),
-                user_prompt=prompt.as_py() if prompt else None,
-            )
-            for media, prompt in zip(
-                media_datas,
-                user_prompts or [None] * len(media_datas),
-            )
+            message_generator(media_data=media, user_prompt=text) for media, text in zip(media_list, text_list)
         ]
+
         return super().process(model_messages)
 
-    def _build_image_message(self, media_data: str, user_prompt: str | None = None) -> list[dict[str, Any]]:
+    def _build_image_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
         """Build image message structure."""
         image_content = self._create_image_content(media_data)
         return self._assemble_message(image_content=image_content, user_prompt=user_prompt)
 
-    def _build_video_message(self, media_data: str, user_prompt: str | None = None) -> list[dict[str, Any]]:
+    def _build_video_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
         """Build video message structure."""
         video_content = self._create_video_content(media_data)
         return self._assemble_message(video_content=video_content, user_prompt=user_prompt)
 
-    def _create_image_content(self, media_data: str) -> dict[str, Any]:
+    def _build_text_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
+        text_content = {"type": "text", "text": media_data}
+        return self._assemble_message(text_content=text_content, user_prompt=user_prompt)
+
+    def _create_image_content(self, media_data: Any) -> dict[str, Any]:
         """Create image content structure."""
         media_url_or_data = gen_media_data("image", media_data, self.image_format, self.source_type)
         image_info: dict[str, Any] = {"url": media_url_or_data}
@@ -239,7 +243,7 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
             image_info["detail"] = self.image_url_detail
         return {"type": "image_url", "image_url": image_info}
 
-    def _create_video_content(self, media_data: str) -> dict[str, Any]:
+    def _create_video_content(self, media_data: Any) -> dict[str, Any]:
         """Create video content structure."""
         media_url_or_data = gen_media_data("video", media_data, self.video_format, self.source_type)
         video_info: dict[str, Any] = {"url": media_url_or_data}
@@ -250,6 +254,7 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
     def _assemble_message(
         self,
         *,
+        text_content: dict[str, Any] | None = None,
         image_content: dict[str, Any] | None = None,
         video_content: dict[str, Any] | None = None,
         user_prompt: str | None = None,
@@ -257,6 +262,9 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         user_content = []
         if prompt_text := (user_prompt or self.prompt):
             user_content.append({"type": "text", "text": prompt_text})
+
+        if text_content:
+            user_content.append(text_content)
 
         if image_content:
             user_content.append(image_content)

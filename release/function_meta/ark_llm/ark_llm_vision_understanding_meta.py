@@ -20,7 +20,7 @@ from daft.las.functions.ark_llm.ark_llm_vision_understanding import ArkLLMVision
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="视觉内容理解（豆包/DeepSeek 系列模型）",
+        Name="视觉内容理解（豆包系列模型）",
         Clazz=ArkLLMVisionUnderstanding,
         Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.VISION_TO_TEXT,

@@ -122,6 +122,7 @@ class SubCategory(Enum):
     VIDEO_TO_AUDIO = "视频转音频"
     VIDEO_TO_IMAGE = "视频转图片"
     MULTI_MODAL_EMBEDDING = "多模态向量化"
+    VISION_DEEP_THINKING = "多模态深度思考"
 
 
 class ValueType(Enum):
