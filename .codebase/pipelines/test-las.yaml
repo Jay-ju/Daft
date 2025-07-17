@@ -34,6 +34,8 @@ jobs:
       - export REGION=${{REGION}}
       - export TOS_ENDPOINT=${{TOS_ENDPOINT}}
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
+      - export OPENSPEECH_APPID=${{OPENSPEECH_APPID}}
+      - export OPENSPEECH_TOKEN=${{OPENSPEECH_TOKEN}}
       - make test-las
 
     - name: clean resources
