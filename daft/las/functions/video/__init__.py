@@ -2,5 +2,6 @@
 
 from .video_keyframes import VideoKeyframes
 from .video_split_by_keyframes import VideoSplitByKeyframes
+from .video_extract_audio import VideoExtractAudio
 
-__all__ = ["VideoKeyframes", "VideoSplitByKeyframes"]
+__all__ = ["VideoExtractAudio", "VideoKeyframes", "VideoSplitByKeyframes"]
