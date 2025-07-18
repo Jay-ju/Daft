@@ -42,10 +42,8 @@ def test_doubao_embedding_vision(tos_test_data_dir):
 class TestDoubaoEmbeddingVision(DoubaoEmbeddingVision):
     def __init__(self, mock_callable: callable, **kwargs):
         version = "test_version"
-        access_key = "test_ak"
-        account_id = "test_account"
 
-        super().__init__(version=version, access_key=access_key, account_id=account_id, **kwargs)
+        super().__init__(version=version, **kwargs)
         self.mock_callable = mock_callable
 
     async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
@@ -99,8 +97,6 @@ def test_video_embedding_with_text():
             ],
             "model_name": "doubao-embedding-vision",
             "version": "test_version",
-            "access_key": "test_ak",
-            "account_id": "test_account",
         },
         {
             "input": [
@@ -109,8 +105,6 @@ def test_video_embedding_with_text():
             ],
             "model_name": "doubao-embedding-vision",
             "version": "test_version",
-            "access_key": "test_ak",
-            "account_id": "test_account",
         },
     ]
     assert call_args == expected_list

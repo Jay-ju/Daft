@@ -56,8 +56,7 @@ class ArkLLMGenerate(Operator):
         self,
         model: str,
         version: str,
-        access_key: str | None = None,
-        account_id: str | None = None,
+        api_key: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,
@@ -130,17 +129,15 @@ class ArkLLMGenerate(Operator):
         ark_config.max_connections = max_concurrency
         ark_config.max_keepalive_connections = max(int(max_concurrency / 2), 1)
         ark_config.inference_type = inference_type
+        ark_config.api_key = api_key or ark_config.api_key
+
         self.client = LasArkClient(config=ark_config)
 
-        self.access_key = access_key or ark_config.access_key
-        self.account_id = account_id or ark_config.account_id
         self.llm_config = llm_config or {}
 
         options_tmp = {
             "model_name": model,
             "version": version,
-            "access_key": self.access_key,
-            "account_id": self.account_id,
             "max_tokens": max_tokens,
             "max_completion_tokens": max_completion_tokens,
             "stop": stop,

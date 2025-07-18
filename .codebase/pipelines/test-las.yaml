@@ -36,6 +36,7 @@ jobs:
       - export ARK_BASE_URL=${{ARK_BASE_URL}}
       - export OPENSPEECH_APPID=${{OPENSPEECH_APPID}}
       - export OPENSPEECH_TOKEN=${{OPENSPEECH_TOKEN}}
+      - export LAS_API_KEY=${{LAS_API_KEY}}
       - make test-las
 
     - name: clean resources

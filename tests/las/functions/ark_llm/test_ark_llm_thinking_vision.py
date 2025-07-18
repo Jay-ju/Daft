@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+from unittest.mock import AsyncMock
+
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 import daft
@@ -65,3 +69,46 @@ def test_doubao_thinking_vision(tos_test_data_dir, local_test_data_dir, http_tes
         expect_columns=expect_columns,
         expect_row_num=expect_row_num,
     )
+
+
+class MockArkLLMThinkingVision(ArkLLMThinkingVision):
+    def __init__(self, mock_callable: callable, **kwargs):
+        version = "test_version"
+        api_key = "test_ak"
+
+        super().__init__(version=version, api_key=api_key, **kwargs)
+        self.mock_callable = mock_callable
+
+    async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
+        return await self.mock_callable(requests)
+
+
+def test_image_vision_without_text():
+    ArkLLMThinkingVision._finish_reason_check = True
+    mock_callable = AsyncMock(
+        return_value=[
+            {
+                "choices": [
+                    {
+                        "message": {"content": "这是模型生成的回答", "reasoning_content": "这是模型的推理过程"},
+                        "finish_reason": "stop",
+                    }
+                ]
+            }
+        ]
+    )
+    embedder = MockArkLLMThinkingVision(mock_callable=mock_callable, multimodal_type="image", source_type="url")
+
+    media_data = pa.array(["http://test.com/img1.jpg"])
+    output_array = embedder.transform(media_datas=media_data)
+
+    expected = pa.StructArray.from_arrays(
+        [
+            pa.array(["这是模型生成的回答"]),
+            pa.array(["stop"]),
+            pa.array(["这是模型的推理过程"]),
+        ],
+        ["llm_result", "finish_reason", "reasoning_content"],  # 保持字段顺序一致
+    )
+
+    assert output_array.equals(expected)

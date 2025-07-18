@@ -47,8 +47,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         self,
         model: str,
         version: str,
-        access_key: str | None = None,
-        account_id: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         system_text: str | None = None,
         system_image_url: str | None = None,
@@ -72,7 +70,7 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         llm_config: dict[str, Any] | None = None,
         request_timeout: int = DEFAULT_REQUEST_TIMEOUT,
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> None:
         """提供基于火山方舟平台的大模型服务，进行图片或视频理解，返回文本输出.
 
@@ -173,8 +171,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         super().__init__(
             model=model,
             version=version,
-            access_key=access_key,
-            account_id=account_id,
             inference_type=inference_type,
             max_tokens=max_tokens,
             max_completion_tokens=max_completion_tokens,

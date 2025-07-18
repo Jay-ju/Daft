@@ -48,8 +48,6 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         self,
         model: str,
         version: str,
-        access_key: str | None = None,
-        account_id: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,
@@ -65,7 +63,7 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         max_concurrency: int = DEFAULT_MAX_CONCURRENCY,
         system_content: str | None = None,
         prompt: str | None = None,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> None:
         """针对纯文本的数据，调用方舟模型进行文本进行理解和回复。示例文本翻译、内容总结等场景，传入文本信息，通过大模型对这些文本信息作相应理解和回复.
 
@@ -125,8 +123,6 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         super().__init__(
             model=model,
             version=version,
-            access_key=access_key,
-            account_id=account_id,
             inference_type=inference_type,
             max_tokens=max_tokens,
             max_completion_tokens=max_completion_tokens,

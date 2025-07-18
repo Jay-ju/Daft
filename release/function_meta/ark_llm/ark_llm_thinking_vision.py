@@ -8,7 +8,7 @@ from daft.las.functions.ark_llm.ark_llm_thinking_vision import ArkLLMThinkingVis
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
-    # 需提前配置环境变量 LAS_ACCESS_KEY 和 LAS_ACCOUND_ID ： LAS_ACCESS_KEY 是账号的 AK ， LAS_ACCOUND_ID 是账号 id
+    # 需配置环境变量 LAS_API_KEY ： LAS_API_KEY 通过在 LAS 服务页面上创建获取
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
     samples = {"videos": [f"tos://{TOS_TEST_DIR}/ark_llm_thinking_vision/eating_56.mp4"]}
 

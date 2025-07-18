@@ -44,8 +44,6 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
     def __init__(
         self,
         version: str,
-        access_key: str | None = None,
-        account_id: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,
@@ -123,8 +121,6 @@ class Doubao15Lite32k(ArkLLMTextGenerate):
         super().__init__(
             model=model,
             version=version,
-            access_key=access_key,
-            account_id=account_id,
             inference_type=inference_type,
             max_tokens=max_tokens,
             max_completion_tokens=max_completion_tokens,

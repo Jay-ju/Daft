@@ -18,8 +18,6 @@ from tenacity import (
     wait_exponential,
 )
 
-from daft.las.utils import get_ak_sk
-
 DEFAULT_REQUEST_TIMEOUT = 1200
 DEFAULT_MAX_CONCURRENCY = 100
 DEFAULT_MAX_CONNECTIONS = 100
@@ -43,9 +41,7 @@ class LasArkConfig:
     def __init__(
         self,
         base_url: str | None = None,
-        access_key: str | None = None,
-        secret_key: str | None = None,
-        account_id: str | None = None,
+        api_key: str | None = None,
         request_timeout: int = DEFAULT_REQUEST_TIMEOUT,
         max_connections: int = DEFAULT_MAX_CONNECTIONS,
         max_keepalive_connections: int = DEFAULT_MAX_KEEPALIVE_CONNECTIONS,
@@ -53,9 +49,7 @@ class LasArkConfig:
         inference_type: str = DEFAULT_INFERENCE_TYPE,
     ):
         self.base_url = base_url
-        self.access_key = access_key
-        self.secret_key = secret_key
-        self.account_id = account_id
+        self.api_key = api_key
         self.request_timeout = request_timeout
         self.max_connections = max_connections
         self.max_keepalive_connections = max_keepalive_connections
@@ -66,12 +60,9 @@ class LasArkConfig:
     def from_env() -> LasArkConfig:
         load_dotenv()
 
-        access_key, secret_key = get_ak_sk("las_ark")
         return LasArkConfig(
             base_url=os.environ.get("LAS_BASE_URL", DEFAULT_LAS_BASE_URL),
-            access_key=access_key,
-            secret_key=secret_key,
-            account_id=os.environ.get("LAS_ACCOUND_ID") or os.environ.get("ACCOUNT_ID"),
+            api_key=os.environ.get("LAS_API_KEY") or os.environ.get("API_KEY"),
             request_timeout=int(os.environ.get("LAS_REQUEST_TIMEOUT", DEFAULT_REQUEST_TIMEOUT)),
             max_connections=int(os.environ.get("LAS_MAX_CONNECTIONS", DEFAULT_MAX_CONNECTIONS)),
             max_keepalive_connections=(
@@ -88,6 +79,9 @@ class LasArkClient:
     def __init__(self, config: LasArkConfig):
         assert config.base_url is not None
         assert config.inference_type.lower() in ENDPOINT_MAP
+        assert config.api_key is not None
+
+        self.api_key = config.api_key
 
         self.client = httpx.AsyncClient(
             base_url=config.base_url,
@@ -112,6 +106,9 @@ class LasArkClient:
                 response = await self.client.post(
                     self.chat_endpoint,
                     json=payload,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                    },
                 )
                 response.raise_for_status()
                 result = response.json()

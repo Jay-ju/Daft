@@ -41,8 +41,7 @@ class DoubaoEmbeddingVision(Operator):
         self,
         model: str = "doubao-embedding-vision",
         version: str = "250615",
-        access_key: str | None = None,
-        account_id: str | None = None,
+        api_key: str | None = None,
         multimodal_type: str = "image",
         image_format: str = "jpeg",
         video_format: str = "mp4",
@@ -101,17 +100,11 @@ class DoubaoEmbeddingVision(Operator):
         ark_config.max_connections = max_concurrency
         ark_config.max_keepalive_connections = max(int(max_concurrency / 2), 1)
         ark_config.inference_type = "embedding_multimodal"
-
-        self.access_key = access_key or ark_config.access_key
-        self.account_id = account_id or ark_config.account_id
-        assert self.access_key is not None, "access_key is required"
-        assert self.account_id is not None, "account_id is required"
+        ark_config.api_key = api_key or ark_config.api_key
 
         options_tmp = {
             "model_name": model,
             "version": version,
-            "access_key": self.access_key,
-            "account_id": self.account_id,
             "encoding_format": encoding_format,
             "dimensions": dimensions,
         }
