@@ -74,13 +74,13 @@ class AudioSpeakerDiarization(Operator):
         rank: int = 0,
         **kwargs: Any,
     ) -> None:
-        """初始化 AudioSpeakerDiarization 类的实例.
+        """初始化 AudioSpeakerDiarization 类的实例
 
         Args:
             model_path: 模型文件所在的路径
             rank: 用于指定使用的 GPU 设备编号
             **kwargs: 传递给父类构造函数的其他关键字参数
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
         model_config_file = Path(model_path).joinpath("speaker-diarization-3.1/models/pyannote_diarization_config.yaml")
         self.model = load_pipeline_from_pretrained(model_config_file)

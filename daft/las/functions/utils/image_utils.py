@@ -6,10 +6,14 @@ import base64
 import io
 import logging
 from io import BytesIO
+from typing import cast
 
-from PIL import Image  # noqa: TID253
+import numpy as np  # noqa: TID253
+import torch
+from PIL import Image, ImageOps  # noqa: TID253
+from torchvision.transforms import ToPILImage
 
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import load_file, run_on_local_path
 
 logger = logging.getLogger(__name__)
 
@@ -132,3 +136,56 @@ def image_to_binary(image: Image.Image) -> bytes:
     buffered = BytesIO()
     image.save(buffered, format="PNG", quality=85)
     return buffered.getvalue()
+
+
+def decode_image_pil(source: str | bytes, mode: str | None = None) -> Image.Image:
+    """Decode image from local/remote path or raw bytes into a PIL Image.
+
+    Supported sources:
+      - Raw image bytes
+      - Local file paths
+      - HTTP/TOS/S3 URIs
+
+    Automatically handles EXIF orientation correction and optional mode conversion.
+
+    Args:
+        source: Input image source, either bytes or a path-like string.
+        mode: Optional image mode to convert to (e.g., "RGB", "L"). If None, keeps original.
+
+    Returns:
+        Decoded image as a PIL Image object.
+    """
+    raw_bytes = cast("bytes", load_file(source))
+    image = Image.open(BytesIO(raw_bytes))
+
+    image.load()
+
+    exif = image.getexif()
+    if exif.get(Image.ExifTags.Base.Orientation) is not None:
+        image = ImageOps.exif_transpose(image)
+
+    if mode and image.mode != mode:
+        image = image.convert(mode)
+
+    return image
+
+
+def encode_image(image: Image.Image | torch.Tensor | np.ndarray, as_base64: bool = False) -> bytes | str:
+    # Step 1: Convert to PIL Image
+    if isinstance(image, Image.Image):
+        pil_image = image
+    elif isinstance(image, (torch.Tensor, np.ndarray)):
+        pil_image = ToPILImage()(image)
+    else:
+        raise TypeError(f"Unsupported image source type: {type(image)}")
+
+    # Step 2: Save to buffer
+    with BytesIO() as buf:
+        image_format = "PNG" if pil_image.mode in ["1", "L", "LA", "RGB", "RGBA"] else "TIFF"
+        pil_image.save(buf, format=image_format)
+        encoded = buf.getvalue()
+
+    # Step 3: Return bytes or base64
+    if as_base64:
+        return base64.b64encode(encoded).decode("utf-8")
+    return encoded

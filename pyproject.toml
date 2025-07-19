@@ -95,7 +95,8 @@ las = [
   "kenlm==0.3.0",
   "easyocr~=1.7.2",
   "openai-whisper==20250625",
-  "funasr==1.2.6"
+  "funasr==1.2.6",
+  "demucs==4.0.1"
 ]
 mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]

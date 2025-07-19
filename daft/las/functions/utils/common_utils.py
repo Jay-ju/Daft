@@ -126,6 +126,53 @@ def encode_images_to_base64(directory: str) -> dict[str, str]:
     return encoded_images
 
 
+def load_file(source: str | bytes, as_base64: bool = False) -> bytes | str:
+    """Load binary data from local/remote path into memory as bytes or base64.
+
+    Supported sources:
+      - Raw bytes (direct return)
+      - Local file paths
+      - HTTP/TOS/S3 URIs
+
+    Args:
+        source: Input data source, either bytes or a path-like string.
+        as_base64: Whether to return the content as a base64-encoded string.
+
+    Returns:
+        Raw bytes or base64-encoded string, depending on as_base64.
+    """
+    if isinstance(source, bytes):
+        return base64.b64encode(source).decode("utf-8") if as_base64 else source
+
+    if isinstance(source, str):
+
+        def reader(path: str) -> bytes:
+            return Path(path).read_bytes()
+
+        try:
+            data = run_on_local_path(source, reader)
+            return base64.b64encode(data).decode("utf-8") if as_base64 else data
+        except Exception as e:
+            raise ValueError(f"Failed to load from source: {source}") from e
+
+    raise TypeError(f"Unsupported input type: {type(source)}")
+
+
+def base64_to_bytes(data: str) -> bytes:
+    return base64.b64decode(data)
+
+
+def save_bytes_to_file(binary_data: bytes, save_path: str) -> None:
+    """Save binary data (image, video, etc.) to a file.
+
+    Args:
+        binary_data (bytes): The binary data to save.
+        save_path (str): The target file path including name and extension.
+    """
+    with Path(save_path).open("wb") as f:
+        f.write(binary_data)
+
+
 def save_file_to_local(content: str | bytes, content_type: str, directory: str, file_name: str) -> str:
     if "url" in content_type:
         if content and isinstance(content, str) and content.startswith(("tos://", "s3://", "https://", "http://")):

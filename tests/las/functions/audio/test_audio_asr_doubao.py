@@ -16,6 +16,7 @@ def generate_test_data(http_test_data_dir):
     paths = [
         f"{http_test_data_dir}/audio/non-exist.wav",
         f"{http_test_data_dir}/audio/全剧大部分都是在中国取景拍摄，地点位于浙江省温州市。.wav",
+        "",
     ]
     return pd.DataFrame({"audio_path": paths})
 
@@ -30,14 +31,16 @@ def test_audio_asr_doubao(http_test_data_dir):
         "asr_result",
         las_udf(
             AudioAsrDoubao,
-            construct_args={"appid": appid, "token": token, "concurrency": 1, "poll_interval": 15},
+            construct_args={"appid": appid, "token": token, "uid": "test", "num_coroutines": 1, "poll_interval": 15},
+            num_gpus=0,
             batch_size=1,
-            concurrency=1,
+            concurrency=2,
         )(col("audio_path")),
     )
 
     ds = ds.with_column("asr_result_raw", col("asr_result").struct.get("asr_result_raw"))
     ds = ds.with_column("asr_result_simple", col("asr_result").struct.get("asr_result_simple"))
+    ds = ds.with_column("asr_result_text", col("asr_result").struct.get("asr_result_text"))
 
     actual_df = ds.to_pandas()
     assert actual_df.iloc[0]["asr_result_simple"] is None

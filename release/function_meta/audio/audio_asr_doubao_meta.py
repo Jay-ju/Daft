@@ -33,19 +33,24 @@ def get_extra_meta() -> ExtraMetaModel:
     before = [
         DataItem(
             Type=ValueType.Audio.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_asr_doubao/sample.wav",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_asr_doubao/参观八达岭长城。.wav",
             Description="",
         ),
     ]
     after = [
         DataItem(
             Type=ValueType.Text.name,
-            Value='语音识别结果(原始)：\'{"audio_info":{"duration":3575},"result":{"text":"参观八达岭长城。"}}\'',
+            Value='语音识别结果(完整json)：\'{"audio_info":{"duration":3575},"result":{"text":"参观八达岭长城。"...}}\'',
             Description="",
         ),
         DataItem(
             Type=ValueType.Text.name,
-            Value="'说话人 1 0:00:00 0:00:02 \n参观八达岭长城。'",
+            Value="语音识别结果(带时间戳文本)：'说话人 1 0:00:00 0:00:02 \n参观八达岭长城。'",
+            Description="",
+        ),
+        DataItem(
+            Type=ValueType.Text.name,
+            Value="语音识别结果(仅文本)：'参观八达岭长城。'",
             Description="",
         ),
     ]

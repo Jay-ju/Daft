@@ -38,16 +38,17 @@ class AudioAsrDoubao(Operator):
         self,
         appid: str,
         token: str,
+        uid: str,
         enable_punc: bool = True,
         enable_ddc: bool = True,
         enable_speaker_info: bool = True,
         enable_itn: bool = True,
         enable_channel_split: bool = False,
         poll_interval: int = 10,
-        concurrency: int = 1,
+        num_coroutines: int = 1,
         **kwargs: Any,
     ) -> None:
-        """初始化 AudioAsrDoubao 类的实例.
+        """初始化 AudioAsrDoubao 类的实例
 
         Args:
             appid: 使用火山引擎控制台获取的 AppID，用于认证调用身份
@@ -58,9 +59,10 @@ class AudioAsrDoubao(Operator):
             enable_itn: 是否启用文本规范化，将 ASR 模型的原始语音输出转换为书面形式，以提高文本的可读性。
             enable_channel_split: 是否根据通道（channel_id）进行音频分轨处理
             poll_interval: 轮询查询识别结果的时间间隔
-            concurrency: 并发处理音频的最大数量
+            num_coroutines: 并发处理音频的最大数量
+            uid: 用户唯一标识
             **kwargs: 传递给父类 Operator 的其他关键字参数
-        """
+        """  # noqa: D415
         super().__init__(**kwargs)
         self.appid = appid
         self.token = token
@@ -70,7 +72,8 @@ class AudioAsrDoubao(Operator):
         self.enable_itn = enable_itn
         self.enable_channel_split = enable_channel_split
         self.poll_interval = poll_interval
-        self.concurrency = concurrency
+        self.num_coroutines = num_coroutines
+        self.uid = uid
         self.submit_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit"
         self.query_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query"
 
@@ -108,6 +111,9 @@ class AudioAsrDoubao(Operator):
         return "\n".join(lines).strip()
 
     async def process(self, audio_url: str) -> dict[str, str | None]:
+        if not audio_url or not audio_url.strip():
+            return {"asr_result_raw": None, "asr_result_simple": None, "asr_result_text": None}
+
         try:
             task_id = str(uuid.uuid4())
 
@@ -120,7 +126,7 @@ class AudioAsrDoubao(Operator):
             }
 
             request = {
-                "user": {"uid": "las-test"},
+                "user": {"uid": self.uid},
                 "audio": {"url": audio_url},
                 "request": {
                     "model_name": "bigmodel",
@@ -139,10 +145,7 @@ class AudioAsrDoubao(Operator):
                     audio_url,
                     submit_resp.headers.get("X-Api-Message"),
                 )
-                return {
-                    "asr_result_raw": None,
-                    "asr_result_simple": None,
-                }
+                return {"asr_result_raw": None, "asr_result_simple": None, "asr_result_text": None}
 
             logger.info(
                 "submit response for file %s: %s",
@@ -151,10 +154,7 @@ class AudioAsrDoubao(Operator):
             )
         except Exception as e:
             logger.error("Submit error: %s. audio_url: %s", e, audio_url)
-            return {
-                "asr_result_raw": None,
-                "asr_result_simple": None,
-            }
+            return {"asr_result_raw": None, "asr_result_simple": None, "asr_result_text": None}
 
         try:
             while True:
@@ -181,26 +181,21 @@ class AudioAsrDoubao(Operator):
                     return {
                         "asr_result_raw": resp.text,
                         "asr_result_simple": formatted,
+                        "asr_result_text": json_result.get("result", {}).get("text", ""),
                     }
 
                 if code not in {"20000001", "20000002"}:
                     logger.error("Query failed. taskid: %s, status code: %s", task_id, code)
-                    return {
-                        "asr_result_raw": None,
-                        "asr_result_simple": None,
-                    }
+                    return {"asr_result_raw": None, "asr_result_simple": None, "asr_result_text": None}
 
                 await asyncio.sleep(self.poll_interval)
 
         except Exception as e:
             logger.error("Query error: %s", e)
-            return {
-                "asr_result_raw": None,
-                "asr_result_simple": None,
-            }
+            return {"asr_result_raw": None, "asr_result_simple": None, "asr_result_text": None}
 
     async def async_run(self, audios: list[str]) -> list[dict[str, str | None]]:
-        semaphore = asyncio.Semaphore(self.concurrency)
+        semaphore = asyncio.Semaphore(self.num_coroutines)
 
         async def bounded_process(v: str) -> dict[str, str | None]:
             async with semaphore:
@@ -222,10 +217,7 @@ class AudioAsrDoubao(Operator):
             一个结构化结果数组，其中每个元素包含以下字段：
                 - asr_result_raw (str): 完整的识别结果 JSON 字符串，包含时间戳、说话人等结构化信息
                 - asr_result_simple (str): 提取后的转写文本，按说话人或时间段分段，适合直接阅读或展示
-
-        Raises:
-            RuntimeError: 当事件循环不可用或执行失败时抛出
-            Exception: 异步处理过程中发生的任何其他未捕获异常
+                - asr_result_text (str): 提取后的转写文本，仅包含转写内容
         """  # noqa: D415
         loop = asyncio.get_event_loop()
         results = loop.run_until_complete(self.async_run(audios.to_pylist()))
@@ -237,5 +229,6 @@ class AudioAsrDoubao(Operator):
             [
                 pa.field("asr_result_raw", pa.string()),
                 pa.field("asr_result_simple", pa.string()),
+                pa.field("asr_result_text", pa.string()),
             ]
         )

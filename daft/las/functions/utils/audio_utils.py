@@ -5,64 +5,47 @@ from __future__ import annotations
 import base64
 import logging
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 import numpy as np  # noqa: TID253
 import soundfile as sf
 import torch
 from torchcodec.decoders import AudioDecoder
 
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import load_file
 
 logger = logging.getLogger(__name__)
 
 
 def decode_audio(
-    source: bytes | str,
+    source: str | bytes,
     sample_rate: int | None = None,
     num_channels: int | None = None,
 ) -> AudioDecoder:
-    """Decode audio from various sources and formats.
+    """Decode audio from local/remote path or raw bytes into an AudioDecoder.
 
-    This function supports decoding audio from both pure audio and video files,
-    including formats like `.mp3`, `.wav`, `.flac`, `.mp4`, and `.mov`. It accepts
-    multiple types of input sources, such as:
+    Supported sources:
+      - Raw audio bytes
+      - Local file paths
+      - HTTP/TOS/S3 URIs
 
-      - Raw audio bytes (e.g., from memory or blob storage).
-      - Local file paths.
-      - HTTP/HTTPS URLs.
-      - TOS/S3 URIs.
-
-    It automatically handles downloading and decoding based on the file type.
+    Optionally resamples the audio and/or adjusts number of channels.
 
     Args:
-        source (bytes | str): Audio input to decode. Can be:
-            - Raw bytes of audio content.
-            - A string path pointing to a local file or remote URI.
-        sample_rate (int | None, optional): Target sampling rate in Hz. If None,
-            the original sampling rate is preserved. Defaults to None.
-        num_channels (int | None, optional): Target number of audio channels.
-            Can be 1 (mono), 2 (stereo), or None to preserve the original. Defaults to None.
+        source: Input audio source, either bytes or a path-like string.
+        sample_rate: Optional target sampling rate for resampling (e.g., 16000).
+        num_channels: Optional target number of channels (e.g., 1 for mono, 2 for stereo).
 
     Returns:
-        AudioDecoder: An object representing the decoded audio data, including waveform
-        and metadata.
-
+        Decoded audio as an AudioDecoder object.
     """
-
-    def decoder(source: bytes | str) -> AudioDecoder:
-        return AudioDecoder(source, sample_rate=sample_rate, num_channels=num_channels)
-
-    if isinstance(source, bytes):
-        return decoder(source)
-
-    if isinstance(source, str):
-        return run_on_local_path(source, decoder)
-
-    raise TypeError(f"不支持的音频输入类型：{type(source)}")
+    raw_bytes = cast("bytes", load_file(source))
+    return AudioDecoder(BytesIO(raw_bytes), sample_rate=sample_rate, num_channels=num_channels)
 
 
-def encode_audio(audio: AudioDecoder | dict[str, Any], as_base64: bool = False) -> bytes | str:
+def encode_audio(
+    audio: AudioDecoder | dict[str, Any], file_format: str = "WAV", as_base64: bool = False
+) -> bytes | str:
     """Encodes audio to WAV format from either an AudioDecoder or a dict.
 
     Args:
@@ -90,10 +73,12 @@ def encode_audio(audio: AudioDecoder | dict[str, Any], as_base64: bool = False) 
             array = array[np.newaxis, :]  # mono: (1, N)
     else:
         raise TypeError("Expected audio to be AudioDecoder or dict")
+
     # Step 2: Encode to WAV in-memory
     with BytesIO() as buffer:
-        sf.write(buffer, array.T, sample_rate, format="WAV")
+        sf.write(buffer, array.T, sample_rate, format=file_format)
         wav_bytes = buffer.getvalue()
+
     # Step 3: Return as base64 or raw bytes
     if as_base64:
         return base64.b64encode(wav_bytes).decode("utf-8")

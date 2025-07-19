@@ -17,7 +17,7 @@ from cv2 import CAP_PROP_POS_MSEC
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.common_utils import run_on_local_path
-from daft.las.functions.utils.video_utils import load_video
+from daft.las.functions.utils.video_utils import decode_video
 from daft.las.io import mkdirs, upload_file
 
 logger = logging.getLogger(__name__)
@@ -178,7 +178,7 @@ class VideoKeyframes(Operator):
     def _extract_keyframes_by_i_frame(
         self, input_video: str, local_output_path: str, tos_output_dir: str | None
     ) -> tuple[list[np.ndarray], list[str], list[float]]:
-        container = load_video(input_video)
+        container = decode_video(input_video)
         key_frames = []
         input_video_stream = container.streams.video[0]
         ori_skip_method = input_video_stream.codec_context.skip_frame
