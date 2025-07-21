@@ -84,7 +84,10 @@ las = [
   "simplejson==3.20.1",
   "mcap==1.3.0",
   "mcap-ros2-support==0.5.5",
-  "mcap-protobuf-support==0.5.3"
+  "mcap-protobuf-support==0.5.3",
+  "easyocr~=1.7.2",
+  "openai-whisper==20250625",
+  "funasr==1.2.6"
 ]
 mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]

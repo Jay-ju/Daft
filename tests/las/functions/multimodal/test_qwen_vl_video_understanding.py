@@ -65,6 +65,7 @@ def test_qwen_vl_video_understanding(local_models_dir, tos_test_data_dir, local_
     )
 
     actual_df = ds.to_pandas()
+
     assert actual_df["caption"][0] is None or len(actual_df["caption"][0]) == 0
     assert actual_df["caption"][1] is None or len(actual_df["caption"][1]) == 0
     assert "手风琴" in actual_df["caption"][2]

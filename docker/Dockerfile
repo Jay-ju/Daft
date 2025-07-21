@@ -23,6 +23,8 @@ RUN pip config set global.index-url ${INDEX_URL} \
 ARG VE_RAY_OFFLINE_FILE
 COPY post_hook.sh /tmp/post_hook.sh
 RUN chmod +x /tmp/post_hook.sh && /tmp/post_hook.sh
+RUN mkdir -p /root/.cache/whisper && \
+    ln -s /opt/las/models/iic/speech_whisper-large_lid_multilingual_pytorch/whisper/large-v3.pt /root/.cache/whisper/large-v3.pt
 
 ENV FORCE_QWENVL_VIDEO_READER=torchvision
 

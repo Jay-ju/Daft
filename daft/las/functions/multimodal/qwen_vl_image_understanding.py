@@ -66,7 +66,7 @@ class QwenVLImageUnderstanding(Operator):
             batch_size: 单次推理处理的样本数量。较大的batch_size可提升吞吐但增加显存消耗，建议根据GPU显存调整。
                 默认值：4
             dtype: 模型推理精度选择：
-                - bfloat16: 平衡精度与速度（推荐）
+                - bfloat16: 平衡精度与速度
                 - float16: 更快的推理速度
                 - float32: 最高精度但显存消耗最大
                 可选值：["bfloat16", "float16", "float32"]

@@ -8,10 +8,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
-T = TypeVar("T")
-
-
 from daft.las.io import download_file, exists, upload_file
+
+T = TypeVar("T")
 
 
 def base64_to_byte(base64_str: str) -> bytes:
@@ -124,3 +123,25 @@ def encode_images_to_base64(directory: str) -> dict[str, str]:
                 encoded_images[str(filename)] = encoded_string
 
     return encoded_images
+
+
+def save_file_to_local(content: str | bytes, content_type: str, directory: str, file_name: str) -> str:
+    if "url" in content_type:
+        if content and isinstance(content, str) and content.startswith(("tos://", "s3://", "https://", "http://")):
+            tmp_file_name = str(Path(directory) / file_name)
+        elif isinstance(content, str):
+            tmp_file_name = content
+        else:
+            raise ValueError(f"Unsupported content type: {content_type}")
+        download_file(content, tmp_file_name)
+    else:
+        tmp_file_name = str(Path(directory) / file_name)
+        if "binary" in content_type and isinstance(content, bytes):
+            content_binary = content
+        elif "base64" in content_type and isinstance(content, str):
+            content_binary = base64_to_byte(content)
+        else:
+            raise ValueError(f"Unsupported content type: {content_type}")
+        with Path(tmp_file_name).open("wb") as f:
+            f.write(content_binary)
+    return tmp_file_name

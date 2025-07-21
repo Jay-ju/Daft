@@ -10,8 +10,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import base64_to_byte
-from daft.las.io import download_file
+from daft.las.functions.utils.common_utils import save_file_to_local
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ class QwenVLVideoUnderstanding(Operator):
             batch_size: 单次推理处理的样本数量。较大的batch_size可提升吞吐但增加显存消耗，建议根据GPU显存调整。
                 默认值：4
             dtype: 模型推理精度选择：
-                - bfloat16: 平衡精度与速度（推荐）
+                - bfloat16: 平衡精度与速度
                 - float16: 更快的推理速度
                 - float32: 最高精度但显存消耗最大
                 可选值：["bfloat16", "float16", "float32"]
@@ -229,32 +228,21 @@ class QwenVLVideoUnderstanding(Operator):
                         if self.video_src_type == "video_url":
                             logger.info("video url is %s", video)
                             if video and video.startswith(("tos://", "s3://")):
-                                tmp_file_name = (Path(tmp_dir) / f"video_{batch_idx}_{idx}").with_suffix(
-                                    f".{video.split('.')[-1]}"
-                                )
+                                file_name = f"video_{batch_idx}_{idx}.{video.split('.')[-1]}"
                             elif video and video.startswith(("https://", "http://")):
-                                tmp_file_name = Path(tmp_dir) / f"{int(time.time())!s}_{idx}.mp4"
+                                file_name = f"{int(time.time())!s}_{idx}.mp4"
                             else:
-                                tmp_file_name = video
-
-                            logger.info("Downloading %s to %s", video, tmp_file_name)
-                            download_file(video, str(tmp_file_name))
-
+                                file_name = ""
                         else:
-                            tmp_file_name = Path(tmp_dir) / "video_binary"
-                            if self.video_src_type == "video_binary":
-                                video_binary = video
-                            elif self.video_src_type == "video_base64":
-                                video_binary = base64_to_byte(video)
-                            else:
-                                ValueError(f"Unsupported video type: {self.video_src_type}")
-                            with tmp_file_name.open("wb") as f:
-                                f.write(video_binary)
+                            file_name = "video_binary"
+
+                        tmp_file_name = save_file_to_local(video, self.video_src_type, tmp_dir, file_name)
+                        logger.info("Downloading %s to %s", video, tmp_file_name)
 
                         if not Path(tmp_file_name).exists():
                             raise FileNotFoundError(tmp_file_name)
 
-                        message = self._build_message_template(str(tmp_file_name))
+                        message = self._build_message_template(tmp_file_name)
                         batch_messages.append(message)
 
                     inputs = self._prepare_model_inputs(batch_messages)
