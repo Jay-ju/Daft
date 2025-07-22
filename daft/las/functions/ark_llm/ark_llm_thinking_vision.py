@@ -42,7 +42,6 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
     **支持模型示例：**
     - doubao-Seed-1.6（版本250615）
     - doubao-Seed-1.6-thinking（版本250715）
-    - doubao-1.5-vision-lite（版本250315）
     """  # noqa: D415
 
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK

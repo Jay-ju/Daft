@@ -15,47 +15,40 @@ from function_meta.meta import (
     ValueType,
 )
 
-from daft.las.functions.ark_llm.doubao_1_5_lite_32k import Doubao15Lite32k
+from daft.las.functions.ark_llm.ark_llm_thinking_vision import ArkLLMThinkingVision
 
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="文本生成（doubao-1.5-lite-32k）",
-        Clazz=Doubao15Lite32k,
+        Name="深度思考（deepseek-r1-distill-qwen-7b）",
+        Clazz=ArkLLMThinkingVision,
         Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.TEXT_GENERATION,
-        Tags=["文本生成"],
+        Tags=["文本生成", "深度思考"],
     )
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao_1_5_lite_32k/doubao_1_5_lite_32k.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/deepseek-r1-distill-qwen-7b/deepseek-r1-distill-qwen-7b.py"
     code_description = (
-        "下面的代码展示了如何使用 daft"
-        "访问火山方舟 Doubao-1.5-lite-32k 模型进行批量理解。"
-        "请注意每次大模型推理结果可能不同。"
+        "下面的代码展示了如何使用 daft" "访问火山方舟 文本生成 模型进行批量推理。" "请注意每次大模型推理结果可能不同。"
     )
     before = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="""中国的首都在哪里""",
+            Value="""帮我规划5月去新疆的10天旅行安排""",
             Description="",
-        ),
-        DataItem(
-            Type=ValueType.Text.name,
-            Value="""十字花科植物有哪些""",
-            Description="",
-        ),
+        )
     ]
     after = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="""中国的首都是北京。""",
+            Value="""以下是为你规划的5月新疆10天旅行安排，主打北疆伊犁环…""",
             Description="",
         ),
         DataItem(
             Type=ValueType.Text.name,
-            Value="""白菜、萝卜、油菜、花椰菜、荠菜等都是十字花科植物。""",
+            Value="""好的，用户让我帮忙规划一个5月份去新疆的10天旅行安排。首…""",
             Description="",
         ),
     ]

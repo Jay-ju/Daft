@@ -53,8 +53,7 @@ class Category(Enum):
     IMAGE = "图片"
     VIDEO = "视频"
     MULTI_MODAL = "多模态"
-    LLM_ONLINE_REASONING = "大模型在线推理"
-    LLM_OFFLINE_REASONING = "大模型批量推理接入点"
+    LLM_ONLINE_REASONING = "大模型推理"
 
 
 class SubCategory(Enum):

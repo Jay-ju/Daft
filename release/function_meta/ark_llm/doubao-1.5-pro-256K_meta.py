@@ -15,26 +15,23 @@ from function_meta.meta import (
     ValueType,
 )
 
-from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
+from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
 
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="文本生成或视觉理解（豆包/DeepSeek 系列模型）",
-        Clazz=ArkLLMGenerate,
-        Description="提供通用的文本或视觉理解能力，输入字段格式需满足:[{'role': 'user', 'content': query}]类似的格式，"
-        "详细格式请参考方舟大模型服务平台要求的messages格式（https://www.volcengine.com/docs/82379/1494384）",
+        Name="文本生成（doubao-1.5-pro-256K）",
+        Clazz=ArkLLMTextGenerate,
         Category=Category.LLM_ONLINE_REASONING,
-        SubCategory=SubCategory.VISION_TO_TEXT,
-        Tags=["多模态"],
+        SubCategory=SubCategory.TEXT_GENERATION,
+        Tags=["文本生成"],
     )
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/ark_llm_generate/ark_llm_generate.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/doubao-1.5-pro-256K/doubao-1.5-pro-256K.py"
     code_description = (
-        "下面的代码展示了如何使用 daft"
-        "访问火山方舟 文本生成或视觉理解模型进行批量推理。请注意每次大模型推理结果可能不同。"
+        "下面的代码展示了如何使用 daft" "访问火山方舟 文本生成 模型进行批量推理。" "请注意每次大模型推理结果可能不同。"
     )
     before = [
         DataItem(

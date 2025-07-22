@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import daft
 from daft import col
-from daft.las.functions.ark_llm.doubao_1_5_lite_32k import Doubao15Lite32k
+from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
@@ -18,8 +18,9 @@ if __name__ == "__main__":
     ds = ds.with_column(
         "llm_result",
         las_udf(
-            Doubao15Lite32k,
+            ArkLLMTextGenerate,
             construct_args={
+                "model": "doubao-1.5-lite-32k",
                 "version": "250115",
                 "inference_type": "online",
             },

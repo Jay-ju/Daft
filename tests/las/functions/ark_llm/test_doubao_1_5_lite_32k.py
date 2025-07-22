@@ -7,7 +7,7 @@ import pytest
 
 import daft
 from daft import col
-from daft.las.functions.ark_llm.doubao_1_5_lite_32k import Doubao15Lite32k
+from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
 from daft.las.functions.udf import las_udf
 
 OUTPUT_COLUMN_NAME = "llm_result"
@@ -27,7 +27,10 @@ def test_doubao_1_5_lite_32k():
     ds = daft.from_pandas(data)
     ds = ds.with_column(
         OUTPUT_COLUMN_NAME,
-        las_udf(Doubao15Lite32k, construct_args={"version": "250115", "inference_type": "batch"})(col("query")),
+        las_udf(
+            ArkLLMTextGenerate,
+            construct_args={"model": "doubao-1.5-lite-32k", "version": "250115", "inference_type": "batch"},
+        )(col("query")),
     )
 
     result_df = ds.to_pandas()
