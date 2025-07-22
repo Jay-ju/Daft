@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import unittest
 from unittest.mock import patch
 
@@ -106,6 +107,22 @@ def test_gen_message_image_with_system_content():
     ]
 
     assert result == except_res
+
+
+def test_gen_message_video_with_tos_url():
+    """Test video type and user prompt parameter."""
+    vision_generate = ArkLLMVisionUnderstanding(
+        model="test_model",
+        version="test_version",
+        multimodal_type="video",
+        source_type="url",
+        video_fps=2.0,
+    )
+
+    os.environ["TOS_PRE_SIGN_URL_EXPIRES"] = "3600"
+    result = vision_generate._build_video_message("tos://test_bucket/object_for_test", user_prompt="Analyze this video")
+    sign_url = result[0]["content"][1]["video_url"]["url"]
+    assert sign_url and sign_url.startswith("https") and "X-Tos-Expires=3600" in sign_url
 
 
 class TestArkLLMImageUnderstandingBuildVideoMessage(unittest.TestCase):

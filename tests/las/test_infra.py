@@ -7,6 +7,7 @@ import requests
 
 from daft.las.infra.ark import ArkConfig, get_ark_client
 from daft.las.infra.top.volcauth import VolcAuth
+from daft.las.infra.tos_client import TosClient
 from daft.las.utils import get_ak_sk
 
 VERSION = "2024-06-30"
@@ -135,3 +136,13 @@ def test_openapi():
     response = requests.request(method="POST", url=url, headers=headers, params=params, auth=auth, json=body)
 
     assert response.json()["Result"]["Exists"] is False
+
+
+def test_tos_client():
+    tos_client = TosClient()
+    assert tos_client.tos_client is not None
+    url = tos_client.pre_sign_url("tos://test_bucket/object_for_test")
+    assert url is not None and "test_bucket" in url and url.startswith("https")
+
+    instance2 = TosClient()
+    assert id(tos_client) == id(instance2)

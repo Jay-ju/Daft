@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
+from daft.las.infra.tos_client import TosClient
 from daft.las.io import download_file, exists, upload_file
 
 T = TypeVar("T")
@@ -145,3 +146,16 @@ def save_file_to_local(content: str | bytes, content_type: str, directory: str, 
         with Path(tmp_file_name).open("wb") as f:
             f.write(content_binary)
     return tmp_file_name
+
+
+def pre_sign_url_for_tos(url: str, expires: int | None = None) -> str:
+    """Pre-signs a URL for TOS.
+
+    Args:
+        url (str): The original URL.
+        expires (int, optional): Expiration time in seconds. Defaults to 3600 * 24. Set TOS_PRE_SIGN_URL_EXPIRES to override.
+
+    Returns:
+        str: The pre-signed URL.
+    """
+    return TosClient().pre_sign_url(url, expires)

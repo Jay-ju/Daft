@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from daft.las.functions.utils.common_utils import (
     byte_to_base64,
     path_to_base64,
+    pre_sign_url_for_tos,
     run_on_local_path,
 )
 
@@ -49,6 +50,10 @@ def gen_media_data(data_type: str, media_info: Any, media_type: str, source_type
     if scheme and scheme in ["http", "https"]:
         # For http data, ark llm can support http/https url, so we don't need to convert it to base64
         return media_info
+
+    if scheme and scheme in ["tos", "s3"]:
+        sign_url = pre_sign_url_for_tos(media_info)
+        return sign_url
 
     base64_data = run_on_local_path(media_info, lambda path: path_to_base64(path))
     return f"data:{data_type}/{media_type};base64,{base64_data}"
