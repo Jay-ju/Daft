@@ -66,7 +66,7 @@ class ContentSecurityConfig:
 
 def get_content_security_service(config: ContentSecurityConfig) -> ContentSecurityService:
     """Get visual service by the default settings."""
-    visual_service = ContentSecurityService()
+    content_security_service = ContentSecurityService()
 
     ak: str | None = None
     sk: str | None = None
@@ -87,13 +87,13 @@ def get_content_security_service(config: ContentSecurityConfig) -> ContentSecuri
         sk = credentials.secret_key
         token = credentials.session_token
 
-    visual_service.set_ak(ak)
-    visual_service.set_sk(sk)
+    content_security_service.set_ak(ak)
+    content_security_service.set_sk(sk)
     if not_blank(token):
-        visual_service.set_session_token(token)
-    visual_service.set_host(config.host)
-    visual_service.set_scheme(config.scheme)
-    visual_service.set_connection_timeout(config.connect_timeout)
-    visual_service.set_socket_timeout(config.socket_timeout)
+        content_security_service.set_session_token(token)
+    content_security_service.set_host(config.host)
+    content_security_service.set_scheme(config.scheme)
+    content_security_service.set_connection_timeout(config.connect_timeout)
+    content_security_service.set_socket_timeout(config.socket_timeout)
 
-    return visual_service
+    return content_security_service

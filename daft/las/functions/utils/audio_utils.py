@@ -7,6 +7,7 @@ import logging
 from io import BytesIO
 from typing import Any, cast
 
+import ffmpeg
 import numpy as np  # noqa: TID253
 import soundfile as sf
 import torch
@@ -15,6 +16,11 @@ from torchcodec.decoders import AudioDecoder
 from daft.las.functions.utils.common_utils import load_file
 
 logger = logging.getLogger(__name__)
+
+
+def get_duration(local_file_path: str) -> float:
+    probe = ffmpeg.probe(local_file_path)
+    return float(probe["format"]["duration"])
 
 
 def decode_audio(
