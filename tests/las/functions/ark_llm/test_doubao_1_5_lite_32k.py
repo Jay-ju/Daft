@@ -13,7 +13,7 @@ from daft.las.functions.udf import las_udf
 OUTPUT_COLUMN_NAME = "llm_result"
 
 
-@pytest.mark.skip
+@pytest.mark.ark_llm
 def test_doubao_1_5_lite_32k():
     data = pd.DataFrame(
         {
@@ -31,7 +31,6 @@ def test_doubao_1_5_lite_32k():
     )
 
     result_df = ds.to_pandas()
-    print(result_df)
     assert "llm_result" in result_df.columns
     assert len(result_df) == 2
     assert "线程" in result_df["llm_result"][0]

@@ -118,7 +118,7 @@ def test_error_handling():
     result = embedder.transform(media_datas=media_data)
 
     # Check the error handling
-    assert result.to_pylist() == [[], []]
+    assert result.to_pylist() == [None, None]
 
 
 def test_binary_input():
@@ -143,3 +143,25 @@ def test_binary_input():
     # Check the binary input
     call_args = embedder.mock_callable.call_args[0][0]
     assert call_args[0]["input"][0]["imageUrl"].startswith("data:image/jpeg;base64")
+
+
+def test_image_embedding_with_empty():
+    """Test image embedding with empty."""
+    mock_callable = AsyncMock(
+        return_value=[{"data": {"embedding": [0.1, 0.2, 0.3]}}, None, None, {"data": {"error": "error"}}]
+    )
+    embedder = TestDoubaoEmbeddingVision(mock_callable=mock_callable, multimodal_type="image", source_type="url")
+
+    media_data = pa.array(["http://test.com/img1.jpg", "", None, "http://test.com/img2.jpg"])
+    result = embedder.transform(media_datas=media_data)
+
+    assert result.type == pa.list_(pa.float32())
+    assert len(result) == 4
+
+    from pytest import approx
+
+    result_list = result.to_pandas().tolist()
+    assert result_list[0].tolist() == approx([0.1, 0.2, 0.3])
+    assert result_list[1] is None
+    assert result_list[2] is None
+    assert result_list[3] is None

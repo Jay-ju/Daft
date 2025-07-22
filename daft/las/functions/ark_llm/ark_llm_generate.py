@@ -179,23 +179,28 @@ class ArkLLMGenerate(Operator):
         return self.process(messages)
 
     def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        requests = [{"messages": msg, **self.options} for msg in messages]
+        try:
+            requests = [{"messages": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
+            results = asyncio.run(self._async_requests(requests))
+            return self._update_array_with_results(results)
+        except Exception:
+            logger.exception("Error in transform.")
+            return pa.nulls(len(messages), type=self.__return_column_type__())
 
-        results = loop.run_until_complete(self._async_requests(requests))
-
-        return self._update_array_with_results(results)
-
-    async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
+    async def _async_requests(self, requests: list[dict[Any, Any] | None]) -> pa.Array:
         return await self.client.batch_process(requests)
 
-    def _update_array_with_results(self, results: list[dict[str, Any]]) -> pa.Array:
+    def _update_array_with_results(self, results: list[dict[str, Any] | None]) -> pa.Array:
         # init output_data and finish_reason_data
         output_data = [None] * len(results)
-        finish_reason_data = [None] * len(results)
+        finish_reason_data: list[str | None] = [None] * len(results)
 
         for i, result in enumerate(results):
+            if result is None:
+                output_data[i] = None
+                finish_reason_data[i] = "skip_empty_payload"
+                continue
+
             output_data[i] = result.get("choices", [{}])[0].get("message", {}).get("content")
 
             if ArkLLMGenerate._finish_reason_check:

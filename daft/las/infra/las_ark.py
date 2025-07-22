@@ -100,7 +100,10 @@ class LasArkClient:
         before_sleep=before_sleep_log(logger, logging.WARNING),
         retry=retry_if_exception_type((httpx.HTTPError, Exception)),
     )
-    async def _send_request(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _send_request(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
+        if payload is None:
+            return None
+
         async with self.semaphore:
             try:
                 response = await self.client.post(
@@ -128,7 +131,7 @@ class LasArkClient:
             except Exception:
                 raise
 
-    async def batch_process(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    async def batch_process(self, requests: list[dict[str, Any] | None]) -> list[dict[str, Any] | None]:
         """Process batch requests."""
         tasks = [self._send_request(req) for req in requests]
         results = await asyncio.gather(*tasks, return_exceptions=True)

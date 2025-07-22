@@ -69,6 +69,7 @@ def test_doubao_thinking_vision(tos_test_data_dir, local_test_data_dir, http_tes
         expect_columns=expect_columns,
         expect_row_num=expect_row_num,
     )
+    ArkLLMThinkingVision._finish_reason_check = False
 
 
 class MockArkLLMThinkingVision(ArkLLMThinkingVision):
@@ -108,7 +109,8 @@ def test_image_vision_without_text():
             pa.array(["stop"]),
             pa.array(["这是模型的推理过程"]),
         ],
-        ["llm_result", "finish_reason", "reasoning_content"],  # 保持字段顺序一致
+        ["llm_result", "finish_reason", "reasoning_content"],
     )
 
     assert output_array.equals(expected)
+    ArkLLMThinkingVision._finish_reason_check = False

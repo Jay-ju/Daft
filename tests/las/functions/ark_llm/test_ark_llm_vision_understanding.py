@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import os
 import unittest
-from unittest.mock import patch
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
+import pyarrow as pa
 import pytest
 
 import daft
 from daft import col
+from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.ark_llm_vision_understanding import ArkLLMVisionUnderstanding
 from daft.las.functions.udf import las_udf
 
@@ -135,18 +138,15 @@ class TestArkLLMImageUnderstandingBuildVideoMessage(unittest.TestCase):
     @patch.object(ArkLLMVisionUnderstanding, "_assemble_message")
     def test_build_video_message_with_user_prompt(self, mock_assemble, mock_create):
         """Test video type and user prompt parameter."""
-        # Mock data
         mock_create.return_value = {"video": "test_video_data"}
         mock_assemble.return_value = {"role": "user", "content": "test_content"}
 
-        # Test data
         media_data = "test_media_data"
         user_prompt = "test_prompt"
 
         # Build message
         result = self.ark_llm._build_video_message(media_data, user_prompt)
 
-        # Assert
         mock_create.assert_called_once_with(media_data)
         mock_assemble.assert_called_once_with(video_content={"video": "test_video_data"}, user_prompt=user_prompt)
         self.assertEqual(result, {"role": "user", "content": "test_content"})
@@ -193,3 +193,180 @@ class TestArkLLMImageUnderstandingBuildVideoMessage(unittest.TestCase):
         mock_create.assert_called_once_with(media_data)
         mock_assemble.assert_called_once_with(video_content={"video": "special_chars_data"}, user_prompt=user_prompt)
         self.assertEqual(result, {"role": "user", "content": "special_content"})
+
+    def test_full_message_with_system(self):
+        """Test full message structure with system content."""
+        vision_generate = ArkLLMVisionUnderstanding(
+            model="test_model",
+            version="test_version",
+            multimodal_type="image",
+            source_type="url",
+            system_text="System instruction",
+        )
+
+        result = vision_generate._build_image_message("http://test.media.url")
+
+        except_res = [
+            {"role": "system", "content": [{"type": "text", "text": "System instruction"}]},
+            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.media.url"}}]},
+        ]
+        assert result == except_res
+
+    def test_gen_message_video_with_user_prompt(self):
+        """Test video type and user prompt parameter."""
+        vision_generate = ArkLLMVisionUnderstanding(
+            model="test_model",
+            version="test_version",
+            multimodal_type="video",
+            source_type="url",
+            video_fps=2.0,
+        )
+
+        result = vision_generate._build_video_message("http://test.video.url", user_prompt="Analyze this video")
+        except_res = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "Analyze this video"},
+                    {"type": "video_url", "video_url": {"url": "http://test.video.url", "fps": 2.0}},
+                ],
+            }
+        ]
+
+        assert result == except_res
+
+    def test_gen_message_image_with_system_content(self):
+        """Test image type and system content parameter."""
+        vision_generate = ArkLLMVisionUnderstanding(
+            model="test_model",
+            version="test_version",
+            multimodal_type="image",
+            source_type="url",
+            system_text="You are a helpful assistant.",
+            image_url_detail="detail info",
+        )
+
+        result = vision_generate._build_image_message("http://test.image.url")
+
+        except_res = [
+            {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": "http://test.image.url", "detail": "detail info"}}
+                ],
+            },
+        ]
+
+        assert result == except_res
+
+
+class MockArkLLMTextGenerateTransform(ArkLLMVisionUnderstanding):
+    def __init__(self, mock_callable: callable, **kwargs):
+        version = "test_version"
+        api_key = "test_ak"
+        model = "model"
+
+        super().__init__(version=version, api_key=api_key, model=model, **kwargs)
+        self.mock_callable = mock_callable
+
+    async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
+        return await self.mock_callable(requests)
+
+
+def test_process_normal_image_without_prompt():
+    mock_callable = AsyncMock(
+        return_value=[
+            {"choices": [{"message": {"content": "response1"}}]},
+            None,
+            None,
+            None,
+            {"choices": [{"message": {"content": "response5"}}]},
+        ]
+    )
+    mock_class = MockArkLLMTextGenerateTransform(
+        mock_callable=mock_callable,
+        source_type="url",
+    )
+
+    requests = pa.array(
+        [
+            "http://test.image.url",
+            None,
+            "",
+            "  ",
+            "http://test.image.url2",
+        ]
+    )
+    result = mock_class.transform(requests)
+
+    assert result.to_pylist() == ["response1", None, None, None, "response5"]
+
+
+def test_process_video_with_prompt():
+    ArkLLMGenerate._finish_reason_check = True
+    mock_callable = AsyncMock(
+        return_value=[
+            {"choices": [{"message": {"content": "response1"}, "finish_reason": "stop"}]},
+            None,
+            {"choices": [{"message": {"content": "response3"}, "finish_reason": "stop"}]},
+            None,
+            {"choices": [{"message": {"content": "response6"}, "finish_reason": "stop"}, {"a": "b"}]},
+        ]
+    )
+
+    mock_class = MockArkLLMTextGenerateTransform(
+        mock_callable=mock_callable, source_type="url", multimodal_type="video"
+    )
+
+    requests = pa.array(
+        [
+            "http://test.video.url",
+            None,
+            "",
+            "  ",
+            "http://test.video.url2",
+        ]
+    )
+    prompts = pa.array(
+        [
+            "prompt1",
+            None,
+            "prompt3",
+            "  ",
+            None,
+        ]
+    )
+    result = mock_class.transform(requests, prompts)
+
+    assert result.to_pylist() == [
+        {"llm_result": "response1", "finish_reason": "stop"},
+        {"llm_result": None, "finish_reason": "skip_empty_payload"},
+        {"llm_result": "response3", "finish_reason": "stop"},
+        {"llm_result": None, "finish_reason": "skip_empty_payload"},
+        {"llm_result": "response6", "finish_reason": "stop"},
+    ]
+    ArkLLMGenerate._finish_reason_check = False
+
+
+def test_binary_input():
+    mock_callable = AsyncMock(return_value=[{"choices": [{"message": {"content": "response1"}}]}])
+    mock_class = MockArkLLMTextGenerateTransform(
+        mock_callable=mock_callable, source_type="binary", multimodal_type="image"
+    )
+    requests = pa.array([b"base64_data"])
+
+    result = mock_class.transform(requests)
+    assert result.to_pylist() == ["response1"]
+
+
+def test_process_no_valid_indices():
+    mock_callable = AsyncMock(return_value=[None, None])
+
+    mock_class = MockArkLLMTextGenerateTransform(
+        mock_callable=mock_callable, source_type="url", multimodal_type="video"
+    )
+    requests = pa.array(["", None])
+
+    result = mock_class.transform(requests)
+    assert result.to_pylist() == [None, None]

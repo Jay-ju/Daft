@@ -185,13 +185,19 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
 
         return pa.struct({"llm_result": pa.string(), "reasoning_content": pa.string()})
 
-    def _update_array_with_results(self, results: list[dict[str, Any]]) -> tuple[pa.Array, pa.Array]:
+    def _update_array_with_results(self, results: list[dict[str, Any] | None]) -> tuple[pa.Array, pa.Array]:
         # init output_data and finish_reason_data
         output_data = [None] * len(results)
-        finish_reason_data = [None] * len(results)
+        finish_reason_data: list[str | None] = [None] * len(results)
         reasoning_content_data = [None] * len(results)
 
         for i, result in enumerate(results):
+            if result is None:
+                output_data[i] = None
+                finish_reason_data[i] = "skip_empty_payload"
+                reasoning_content_data[i] = None
+                continue
+
             output_data[i] = result.get("choices", [{}])[0].get("message", {}).get("content")
             reasoning_content_data[i] = result.get("choices", [{}])[0].get("message", {}).get("reasoning_content")
 

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+import logging
+from typing import Any, Callable
 
 from daft.dependencies import pa
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
@@ -14,6 +15,8 @@ from daft.las.infra.las_ark import (
     LasArkClient,
     LasArkConfig,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class DoubaoEmbeddingVision(Operator):
@@ -140,37 +143,57 @@ class DoubaoEmbeddingVision(Operator):
         media_list = media_datas.to_pylist()
         text_list = text_contents.to_pylist() if text_contents else [None] * len(media_datas)
 
-        model_messages: list[list[dict[str, Any]]] = [
-            message_generator(media_data=media, text_content=text) for media, text in zip(media_list, text_list)
+        model_messages: list[list[dict[str, Any]] | None] = [
+            self._safe_generate_message(message_generator, media, text) for media, text in zip(media_list, text_list)
         ]
         return self.process(model_messages)
 
-    def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        requests = [{"input": msg, **self.options} for msg in messages]
-        results = loop.run_until_complete(self._async_requests(requests))
+    def _safe_generate_message(
+        self,
+        message_generator: Callable[[Any, str | None], list[dict[str, Any]] | None],
+        media_data: Any,
+        text_content: str | None = None,
+    ) -> list[dict[str, Any]] | None:
+        try:
+            return message_generator(media_data, text_content)
+        except Exception:
+            return None
 
-        return self._update_array_with_results(results)
+    def process(self, messages: list[list[dict[Any, Any]] | None]) -> pa.Array:
+        try:
+            requests = [{"input": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
+            results = asyncio.run(self._async_requests(requests))
+            return self._update_array_with_results(results)
+        except Exception:
+            logger.exception("Error in transform.")
+            return pa.nulls(len(messages), type=self.__return_column_type__())
 
-    async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:
+    async def _async_requests(self, requests: list[dict[str, Any] | None]) -> pa.Array:
         return await self.client.batch_process(requests)
 
-    def _update_array_with_results(self, results: list[dict[str, Any]]) -> pa.Array:
+    def _update_array_with_results(self, results: list[dict[str, Any] | None]) -> pa.Array:
         # init output_data and finish_reason_data
-        output_data: list[list[float]] = []
-
+        output_data: list[list[float] | None] = []
         for i, result in enumerate(results):
-            output_data.append(result.get("data", {}).get("embedding", []))
+            if result is None:
+                output_data.append(None)
+                continue
+            output_data.append(result.get("data", {}).get("embedding"))
 
         return pa.array(output_data, type=pa.list_(pa.float32()))
 
-    def _build_image_message(self, media_data: Any, text_content: str | None = None) -> list[dict[str, Any]]:
+    def _build_image_message(self, media_data: Any, text_content: str | None = None) -> list[dict[str, Any]] | None:
+        if media_data is None:
+            return None
+
         media_url_or_data = gen_media_data("image", media_data, self.image_format, self.source_type)
         image_info = {"type": "image_url", "imageUrl": media_url_or_data}
         return self._assemble_message(image_content=image_info, text_content=text_content)
 
-    def _build_video_message(self, media_data: Any, text_content: str | None = None) -> list[dict[str, Any]]:
+    def _build_video_message(self, media_data: Any, text_content: str | None = None) -> list[dict[str, Any]] | None:
+        if media_data is None:
+            return None
+
         media_url_or_data = gen_media_data("video", media_data, self.video_format, self.source_type)
         video_info = {"type": "video_url", "videoUrl": media_url_or_data}
         return self._assemble_message(video_content=video_info, text_content=text_content)

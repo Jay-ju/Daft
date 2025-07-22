@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+if TYPE_CHECKING:
+    from daft.dependencies import pa
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.llm_generate_utils import gen_text_message
 from daft.las.infra.las_ark import (
@@ -11,9 +13,6 @@ from daft.las.infra.las_ark import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_REQUEST_TIMEOUT,
 )
-
-if TYPE_CHECKING:
-    from daft.dependencies import pa
 
 
 class ArkLLMTextGenerate(ArkLLMGenerate):
@@ -154,5 +153,5 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
                 - llm_result: 模型输出结果
                 - finish_reason: 模型输出结束原因
         """
-        messages = [gen_text_message(x.as_py(), self.prompt, self.system_content) for x in raw_text]
+        messages = [gen_text_message(text, self.prompt, self.system_content) for text in raw_text.to_pylist()]
         return super().process(messages)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any, Callable
 
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
@@ -15,8 +15,7 @@ from daft.las.infra.las_ark import (
 
 logger = logging.getLogger(__name__)
 
-if TYPE_CHECKING:
-    from daft.dependencies import pa
+from daft.dependencies import pa
 
 
 class ArkLLMVisionUnderstanding(ArkLLMGenerate):
@@ -212,10 +211,21 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         text_list = user_prompts.to_pylist() if user_prompts else [None] * len(media_datas)
 
         model_messages: list[list[dict[str, Any]]] = [
-            message_generator(media_data=media, user_prompt=text) for media, text in zip(media_list, text_list)
+            self._safe_generate_message(message_generator, media, text) for media, text in zip(media_list, text_list)
         ]
 
-        return super().process(model_messages)
+        messages_array = pa.array(model_messages)
+        return super().transform(messages_array)
+
+    def _safe_generate_message(
+        self, generator: Callable[[Any, str | None], list[dict[str, Any]]], media: Any, prompt: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Safe generate message."""
+        try:
+            return generator(media, prompt)
+        except Exception:
+            logger.exception("The message generation failed ")
+            return []
 
     def _build_image_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
         """Build image message structure."""
@@ -228,19 +238,28 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         return self._assemble_message(video_content=video_content, user_prompt=user_prompt)
 
     def _build_text_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
-        text_content = {"type": "text", "text": media_data}
+        if media_data is None:
+            text_content = None
+        else:
+            text_content = {"type": "text", "text": media_data}
         return self._assemble_message(text_content=text_content, user_prompt=user_prompt)
 
-    def _create_image_content(self, media_data: Any) -> dict[str, Any]:
+    def _create_image_content(self, media_data: Any) -> dict[str, Any] | None:
         """Create image content structure."""
+        if media_data is None:
+            return None
+
         media_url_or_data = gen_media_data("image", media_data, self.image_format, self.source_type)
         image_info: dict[str, Any] = {"url": media_url_or_data}
         if self.image_url_detail:
             image_info["detail"] = self.image_url_detail
         return {"type": "image_url", "image_url": image_info}
 
-    def _create_video_content(self, media_data: Any) -> dict[str, Any]:
+    def _create_video_content(self, media_data: Any) -> dict[str, Any] | None:
         """Create video content structure."""
+        if media_data is None:
+            return None
+
         media_url_or_data = gen_media_data("video", media_data, self.video_format, self.source_type)
         video_info: dict[str, Any] = {"url": media_url_or_data}
         if self.video_fps is not None:
@@ -267,7 +286,10 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         if video_content:
             user_content.append(video_content)
 
-        messages = [{"role": "user", "content": user_content}]
+        if user_content:
+            messages = [{"role": "user", "content": user_content}]
+        else:
+            messages = []
 
         if system_content := self._build_system_message():
             messages.insert(0, {"role": "system", "content": system_content})
@@ -276,10 +298,10 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
 
     def _build_system_message(self) -> list[dict[str, Any]]:
         system_content = []
-        if self.system_image_url:
-            system_content.append(self._create_image_content(self.system_image_url))
-        if self.system_video_url:
-            system_content.append(self._create_video_content(self.system_video_url))
+        if image_content := self._create_image_content(self.system_image_url):
+            system_content.append(image_content)
+        if video_content := self._create_video_content(self.system_video_url):
+            system_content.append(video_content)
         if self.system_text:
             system_content.append({"type": "text", "text": self.system_text})
         return system_content
