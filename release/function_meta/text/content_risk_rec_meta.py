@@ -30,7 +30,7 @@ def get_meta() -> OpMetaModel:
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/text/content_risk_rec.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/content_risk_rec/content_risk_rec.py"
     code_description = "下面的代码展示了如何使用 Daft（适用于分布式）运行算子进行文本内容风险识别。"
     before = [
         DataItem(
