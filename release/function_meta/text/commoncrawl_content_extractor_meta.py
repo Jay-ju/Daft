@@ -35,11 +35,11 @@ def get_extra_meta() -> ExtraMetaModel:
     before = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="ceshi/las_data/test/data/warc/sample.warc.gz",
+            Value="/path/to/warc/sample.warc.gz",
             Description="TOS挂载的WARC文件路径",
         ),
         DataItem(
-            Type=ValueType.Binary.name,
+            Type=ValueType.Text.name,
             Value="[binary WARC data]",
             Description="二进制WARC数据",
         ),

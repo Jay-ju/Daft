@@ -44,13 +44,13 @@ def get_extra_meta() -> ExtraMetaModel:
     ]
     after = [
         DataItem(
-            Type=ValueType.Float.name,
-            Value=0.16666666666666666,
+            Type=ValueType.Text.name,
+            Value="0.16666666666666666",
             Description="特殊字符占比：2/12 ≈ 0.167（感叹号+空格）",
         ),
         DataItem(
-            Type=ValueType.Float.name,
-            Value=1.0,
+            Type=ValueType.Text.name,
+            Value="1.0",
             Description="特殊字符占比：10/10 = 1.0（全数字）",
         ),
     ]

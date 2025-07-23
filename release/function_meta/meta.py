@@ -85,6 +85,7 @@ class SubCategory(Enum):
     AUDIO_GENERATION = "音频生成"
     AUDIO_QUALITY_ASSESSMENT = "音频质量评估"
     AUDIO_CONTENT_SECURITY = "音频安全识别"
+    AUDIO_PREPROCESSING = "音频预处理"
 
     # image
     IMAGE_CLEAN = "图片清洗"

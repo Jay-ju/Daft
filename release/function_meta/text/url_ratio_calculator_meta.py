@@ -49,18 +49,18 @@ def get_extra_meta() -> ExtraMetaModel:
     ]
     after = [
         DataItem(
-            Type=ValueType.Float.name,
-            Value=0.0,
+            Type=ValueType.Text.name,
+            Value="0.0",
             Description="URL字符占比：0/11 = 0.0",
         ),
         DataItem(
-            Type=ValueType.Float.name,
-            Value=0.4418604651162791,
+            Type=ValueType.Text.name,
+            Value="0.4418604651162791",
             Description="URL字符占比：19/43 ≈ 0.442",
         ),
         DataItem(
-            Type=ValueType.Float.name,
-            Value=0.7380952380952381,
+            Type=ValueType.Text.name,
+            Value="0.7380952380952381",
             Description="URL字符占比：31/42 ≈ 0.738",
         ),
     ]

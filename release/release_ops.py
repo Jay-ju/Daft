@@ -159,7 +159,10 @@ def _extract_fn_info(fn: Callable) -> tuple[list[ParameterModel], OutputModel]:
 
 
 def _extract_input_output(cls: type) -> tuple[list[InputModel], OutputModel]:
-    inputs, output = _extract_fn_info(cls.transform)
+    try:
+        inputs, output = _extract_fn_info(cls.transform)
+    except ValueError:
+        inputs, output = _extract_fn_info(cls.__call__)
     inputs = [
         InputModel(
             Name=input.Name,

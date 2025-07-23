@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from daft.las.functions.text.perplexity_calculator import PerplexityCalculator
-from function_meta.meta import (
+from release.function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
     OP_REGION,
@@ -49,18 +49,18 @@ def get_extra_meta() -> ExtraMetaModel:
     ]
     after = [
         DataItem(
-            Type=ValueType.Float.name,
-            Value=335.9,
+            Type=ValueType.Text.name,
+            Value="335.9",
             Description="中文文本困惑度",
         ),
         DataItem(
-            Type=ValueType.Float.name,
-            Value=274.0,
+            Type=ValueType.Text.name,
+            Value="274.0",
             Description="英文文本困惑度",
         ),
         DataItem(
-            Type=ValueType.Float.name,
-            Value=9081.4,
+            Type=ValueType.Text.name,
+            Value="9081.4",
             Description="乱码文本困惑度",
         ),
     ]

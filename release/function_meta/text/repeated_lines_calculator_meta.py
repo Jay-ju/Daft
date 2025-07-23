@@ -49,17 +49,17 @@ def get_extra_meta() -> ExtraMetaModel:
     ]
     after = [
         DataItem(
-            Type=ValueType.Float.name,
+            Type=ValueType.Text.name,
             Value="0.25",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Float.name,
+            Type=ValueType.Text.name,
             Value="0.6666666666666666",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Float.name,
+            Type=ValueType.Text.name,
             Value="0.0",
             Description="",
         ),
