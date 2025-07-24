@@ -42,7 +42,7 @@ def get_extra_meta() -> ExtraMetaModel:
     after = [
         DataItem(
             Type=ValueType.Audio.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_standardization/耙耙柑大叔_standardization.aac",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_standardization/耙耙柑大叔_standardization.wav",
             Description="",
         ),
     ]
