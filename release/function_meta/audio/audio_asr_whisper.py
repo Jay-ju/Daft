@@ -21,7 +21,6 @@ if __name__ == "__main__":
     compression_ratio_threshold = 1.35
     temperature = 0.5
     logprob_threshold = -1.0
-    is_flat = True
     batch_size = 1
     rank = 0
 

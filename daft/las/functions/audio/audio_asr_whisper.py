@@ -62,9 +62,9 @@ class AudioAsrWhisper(Operator):
         Args:
             audio_src_type: 音频格式类型
                 支持的音频格式类型，包含：
-                - audio_binary: 原始二进制数据
-                - audio_base64: Base64编码数据
-                - audio_url: TOS存储链接
+                - tos/http 地址(audio_url)
+                - base64 编码(audio_base64)
+                - 二进制流(audio_binary)
                 可选值：["audio_binary", "audio_url", "audio_base64"]
             model_path: 模型存储路径
                 默认值："/opt/las/models"

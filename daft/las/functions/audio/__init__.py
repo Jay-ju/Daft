@@ -12,6 +12,7 @@ from .audio_lid_whisper import AudioLidWhisper
 from .audio_standardization import AudioStandardization
 from .audio_source_separation import AudioSourceSeparation
 from .audio_tts_doubao import AudioTtsDoubao
+from .audio_vad_fsmn import AudioVadFsmn
 
 __all__ = [
     "AudioAsrDoubao",
@@ -24,4 +25,5 @@ __all__ = [
     "AudioSplitByTimestamps",
     "AudioStandardization",
     "AudioTtsDoubao",
+    "AudioVadFsmn",
 ]

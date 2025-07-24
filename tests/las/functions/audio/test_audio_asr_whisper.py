@@ -47,10 +47,6 @@ def test_audio_asr_whisper(local_models_dir, tos_test_data_dir, local_test_data_
         las_udf(
             AudioAsrWhisper,
             construct_args={
-                "input_column": "audio_path",
-                "output_column": "asr_result",
-                "output_timestamp_column": "audio_timestamps",
-                "output_segments_column": "audio_segments",
                 "audio_src_type": audio_src_type,
                 "model_path": local_models_dir,
                 "model_name": "openai/whisper-large-v3",
