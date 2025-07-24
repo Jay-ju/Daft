@@ -67,8 +67,7 @@ class RepeatedLinesCalculator(Operator):
             else:
                 ratio = self._calculate_repeated_ratio(text_value)
                 results.append(ratio)
-
-            logger.debug("Text: %s, Repeated ratio: %f", text_value[:50], ratio)
+                logger.debug("Text: %s, Repeated ratio: %f", text_value[:50], ratio)
 
         return pa.array(results, type=pa.float64())
 

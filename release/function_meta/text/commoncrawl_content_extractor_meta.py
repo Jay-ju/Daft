@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 from daft.las.functions.text.commoncrawl_content_extractor import CommonCrawlContentExtractor
 from function_meta.meta import (
     OP_BUCKET,
@@ -21,7 +23,6 @@ def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="CommonCrawl WARC文件内容提取",
         Clazz=CommonCrawlContentExtractor,
-        Description="从CommonCrawl的WARC文件中提取网页正文内容，支持多种解析策略和输入格式",
         Category=Category.TEXT,
         SubCategory=SubCategory.TEXT_PROCESSING,
         Tags=["WARC提取", "CommonCrawl", "网页内容", "多格式支持"],
@@ -38,42 +39,49 @@ def get_extra_meta() -> ExtraMetaModel:
             Value="/path/to/warc/sample.warc.gz",
             Description="TOS挂载的WARC文件路径",
         ),
-        DataItem(
-            Type=ValueType.Text.name,
-            Value="[binary WARC data]",
-            Description="二进制WARC数据",
-        ),
-        DataItem(
-            Type=ValueType.Text.name,
-            Value="data:application/octet-stream;base64,UklGRiQAAABXQVZFZm10...",
-            Description="base64编码的WARC数据",
-        ),
     ]
-
     after = [
         DataItem(
-            Type=ValueType.List.name,
-            Value=[
+            Type=ValueType.Text.name,
+            Value=json.dumps(
                 {
                     "url": "http://example.com",
-                    "content": "Hello World This is a test page about artificial intelligence.",
+                    "content": "This is the first page content.",
                     "warc_file": "sample.warc.gz",
                     "extractor": "trafilatura",
                 },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            Description="提取的第一页网页内容",
+        ),
+        DataItem(
+            Type=ValueType.Text.name,
+            Value=json.dumps(
                 {
-                    "url": "http://example.com",
-                    "content": "Hello World This is a test page about artificial intelligence.",
-                    "warc_file": "[binary_input]",
+                    "url": "http://example2.com",
+                    "content": "This is the second page content.",
+                    "warc_file": "sample.warc.gz",
                     "extractor": "trafilatura",
                 },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            Description="提取的第二页网页内容",
+        ),
+        DataItem(
+            Type=ValueType.Text.name,
+            Value=json.dumps(
                 {
-                    "url": "http://example.com",
-                    "content": "Hello World This is a test page about artificial intelligence.",
-                    "warc_file": "data:application/octet-stream;base64,UklGRiQAAABXQVZFZm10...",
+                    "url": "http://example3.com",
+                    "content": "This is the third page content.",
+                    "warc_file": "sample.warc.gz",
                     "extractor": "trafilatura",
                 },
-            ],
-            Description="提取的网页内容列表，支持多种输入格式",
+                ensure_ascii=False,
+                indent=2,
+            ),
+            Description="提取的第三页网页内容",
         ),
     ]
 
