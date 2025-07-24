@@ -22,7 +22,7 @@ def get_meta() -> OpMetaModel:
         Name="生成TOS的普通预签名",
         Clazz=PreSignUrlForTos,
         Category=Category.TEXT,
-        SubCategory=SubCategory.OTHER,
+        SubCategory=SubCategory.TOS_PRE_SIGN,
         Description="生成 TOS 文件路径签名 URL。当路径 schema 是 http 或 https 时，直接返回路径；若是 tos 或 s3，则对路径进行签名，其他情况返回 None。",
         Tags=["TOS 签名"],
     )

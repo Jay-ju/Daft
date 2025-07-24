@@ -21,6 +21,7 @@ from function_meta.meta import (
     OP_BUCKET,
     OP_ENVIRONMENT,
     OP_VERSION,
+    Category,
     ExtraMetaModel,
     InputModel,
     OpMetaModel,
@@ -186,19 +187,40 @@ def _collect_ops() -> list[Any]:
 
         module = op_meta.Clazz.__module__
         qualname = op_meta.Clazz.__qualname__
-        op = ComposedModel(
-            Name=op_meta.Name,
-            OperatorId=f"{module}.{qualname}",
-            Description=op_meta.Description,
-            FunctionCategory=op_meta.Category.value,
-            SubFunctionCategory=op_meta.SubCategory.value,
-            Tags=op_meta.Tags,
-            Parameters=parameters,
-            Input=input,
-            Output=[output],
-            Precondition=precondition,
-            ExtraMeta=extra_meta,
-        )
+        if (
+            op_meta.Category == Category.LLM_ONLINE_REASONING
+            and "系列" not in op_meta.Name
+            and "豆包" not in op_meta.Name
+        ):
+            match = re.search(r"（(.*?)）", op_meta.Name)
+            module_name = match.group(1) if match else ""
+            op = ComposedModel(
+                Name=op_meta.Name,
+                OperatorId=f"{module}.{qualname}.{module_name}",
+                Description=op_meta.Description,
+                FunctionCategory=op_meta.Category.value,
+                SubFunctionCategory=op_meta.SubCategory.value,
+                Tags=op_meta.Tags,
+                Parameters=parameters,
+                Input=input,
+                Output=[output],
+                Precondition=precondition,
+                ExtraMeta=extra_meta,
+            )
+        else:
+            op = ComposedModel(
+                Name=op_meta.Name,
+                OperatorId=f"{module}.{qualname}",
+                Description=op_meta.Description,
+                FunctionCategory=op_meta.Category.value,
+                SubFunctionCategory=op_meta.SubCategory.value,
+                Tags=op_meta.Tags,
+                Parameters=parameters,
+                Input=input,
+                Output=[output],
+                Precondition=precondition,
+                ExtraMeta=extra_meta,
+            )
         result.append(asdict(op))
     return result
 

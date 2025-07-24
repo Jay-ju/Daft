@@ -20,7 +20,7 @@ from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="文本生成（doubao-lite-32K）",
+        Name="文本生成（Doubao-lite-32K）",
         Clazz=ArkLLMTextGenerate,
         Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.TEXT_GENERATION,

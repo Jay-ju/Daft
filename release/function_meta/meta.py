@@ -53,7 +53,7 @@ class Category(Enum):
     IMAGE = "图片"
     VIDEO = "视频"
     MULTI_MODAL = "多模态"
-    LLM_ONLINE_REASONING = "大模型推理"
+    LLM_ONLINE_REASONING = "方舟大模型系列"
 
 
 class SubCategory(Enum):
@@ -75,6 +75,7 @@ class SubCategory(Enum):
     TEXT_ENTITY_RECOGNITION = "文本实体识别"
     TEXT_QUALITY_ASSESSMENT = "文本质量评估"
     TEXT_CONTENT_SECURITY = "文本安全识别"
+    TOS_PRE_SIGN = "TOS路径预签名"
 
     # audio
     AUDIO_CLEAN = "音频清洗"

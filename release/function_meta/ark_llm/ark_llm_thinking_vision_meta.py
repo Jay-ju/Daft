@@ -20,7 +20,7 @@ from daft.las.functions.ark_llm.ark_llm_thinking_vision import ArkLLMThinkingVis
 
 def get_meta() -> OpMetaModel:
     return OpMetaModel(
-        Name="多模态深度思考模型（豆包系列）",
+        Name="多模态深度思考（豆包系列模型）",
         Clazz=ArkLLMThinkingVision,
         Category=Category.LLM_ONLINE_REASONING,
         SubCategory=SubCategory.VISION_DEEP_THINKING,

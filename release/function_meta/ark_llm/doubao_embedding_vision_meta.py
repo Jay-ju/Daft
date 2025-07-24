@@ -42,13 +42,13 @@ def get_extra_meta() -> ExtraMetaModel:
             Value="猫",
             Description="",
         ),
-    ]
-    after = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="[ 0.01916504, 0.01879883, 0.01135254 ... -0.01818848, 0.04443359, -0.00714111]",
-            Description="image embedding",
+            Value="图片和猫 向量化",
+            Description="",
         ),
+    ]
+    after = [
         DataItem(
             Type=ValueType.Text.name,
             Value="[ 0.047607422, 0.044433594,0.…    ",
@@ -57,6 +57,11 @@ def get_extra_meta() -> ExtraMetaModel:
         DataItem(
             Type=ValueType.Text.name,
             Value="[0.036376953, 0.017333984, 0.…    ",
+            Description="image embedding",
+        ),
+        DataItem(
+            Type=ValueType.Text.name,
+            Value="[ 0.01916504, 0.01879883, 0.01135254 ... -0.01818848, 0.04443359, -0.00714111]",
             Description="image embedding",
         ),
     ]
