@@ -36,20 +36,20 @@ def get_extra_meta() -> ExtraMetaModel:
     )
     before = [
         DataItem(
-            Type=ValueType.Video.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/ark_llm_thinking_vision/eating_56.mp4",
+            Type=ValueType.Text.name,
+            Value="""帮我规划5月去新疆的10天旅行安排""",
             Description="",
-        ),
+        )
     ]
     after = [
         DataItem(
             Type=ValueType.Text.name,
-            Value="""视频中呈现的是一段动画内容：起初展示的是一个**多层卡通风…""",
+            Value="""5 月是新疆旅行的 “初夏黄金期”，草原渐绿、花海初绽…""",
             Description="",
         ),
         DataItem(
             Type=ValueType.Text.name,
-            Value="""用户现在需要描述视频里的内容。首先看画面：开头是一个多层蛋…""",
+            Value="""好的，用户让我帮忙规划一个5月份去新疆的10天旅行安排。首…""",
             Description="",
         ),
     ]
