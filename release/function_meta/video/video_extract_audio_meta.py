@@ -21,7 +21,7 @@ def get_meta() -> OpMetaModel:
     return OpMetaModel(
         Name="视频音频抽取",
         Clazz=VideoExtractAudio,
-        Category=Category.Video,
+        Category=Category.VIDEO,
         SubCategory=SubCategory.VIDEO_PROCESSING,
         Tags=["音频提取", "视频处理", "多流", "采样率", "格式转换"],
     )
