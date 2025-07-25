@@ -13,6 +13,7 @@ from .audio_standardization import AudioStandardization
 from .audio_source_separation import AudioSourceSeparation
 from .audio_tts_doubao import AudioTtsDoubao
 from .audio_vad_fsmn import AudioVadFsmn
+from .audio_split_by_duration import AudioSplitByDuration
 
 __all__ = [
     "AudioAsrDoubao",
@@ -22,6 +23,7 @@ __all__ = [
     "AudioSize",
     "AudioSourceSeparation",
     "AudioSpeakerDiarization",
+    "AudioSplitByDuration",
     "AudioSplitByTimestamps",
     "AudioStandardization",
     "AudioTtsDoubao",
