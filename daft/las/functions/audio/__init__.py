@@ -14,15 +14,11 @@ from .audio_source_separation import AudioSourceSeparation
 from .audio_tts_doubao import AudioTtsDoubao
 from .audio_vad_fsmn import AudioVadFsmn
 from .audio_split_by_duration import AudioSplitByDuration
-from .audio_extract_and_split import AudioExtractAndSplit
-from .audio_duration_torchcodec import AudioDurationTorchcodec
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrWhisper",
     "AudioDuration",
-    "AudioDurationTorchcodec",
-    "AudioExtractAndSplit",
     "AudioLidWhisper",
     "AudioSize",
     "AudioSourceSeparation",
