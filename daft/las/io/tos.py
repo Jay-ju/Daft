@@ -183,6 +183,25 @@ class TOSConfig:
             force_virtual_addressing=True,
         )
 
+    def virtual_host_endpoint(self, bucket: str) -> str:
+        if bucket is None:
+            raise ValueError("bucket must be specified")
+
+        if self.endpoint is None:
+            raise ValueError("endpoint is not found.")
+
+        if self.endpoint.startswith("https://"):
+            endpoint = self.endpoint[8:]
+            scheme = "https"
+        elif self.endpoint.startswith("https://"):
+            endpoint = self.endpoint[7:]
+            scheme = "http"
+        else:
+            endpoint = self.endpoint
+            scheme = "https"
+
+        return f"{scheme}://{bucket}.{endpoint}"
+
 
 @register_io_client(scheme="tos")
 class TosIO(LasIO):

@@ -36,6 +36,16 @@ class CredentialsProvider:
         raise NotImplementedError
 
 
+class StaticCredentialsProvider(CredentialsProvider):
+    """The class provides the credentials from a static ak, sk."""
+
+    def __init__(self, access_key: str, secret_key: str, session_token: str | None = None):
+        self.credentials = Credentials(access_key, secret_key, session_token)
+
+    def get_credentials(self) -> Credentials:
+        return self.credentials
+
+
 class UrlCredentialsProvider(CredentialsProvider):
     """The class provides the credentials from an url."""
 

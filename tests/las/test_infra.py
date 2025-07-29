@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import pytest
-import requests
 
 from daft.las.infra.ark import ArkConfig, get_ark_client
-from daft.las.infra.top.volcauth import VolcAuth
+from daft.las.infra.open_api import OpenAPIClient
 from daft.las.infra.tos_client import TosClient
 from daft.las.utils import get_ak_sk
 
@@ -119,22 +118,16 @@ def test_get_ak_sk(service, monkeypatch):
 
 def test_openapi():
     access_key, secret_key = get_ak_sk("las")
-
-    auth = VolcAuth(access_key, secret_key, "cn-beijing", "las_ai_qa")
-
-    url = f"https://{HOST}{PATH}"
-    params = {"Action": "ExistsDataset", "Version": VERSION}
-    headers = {
-        "ServiceName": "las_ai_qa",
-        "AccessKey": access_key,
-        "SecretKey": secret_key,
-        "Region": "cn-beijing",
-        "Content-Type": "application/json",
-    }
-    body = {"DatasetName": "non_exist_ds"}
-
-    response = requests.request(method="POST", url=url, headers=headers, params=params, auth=auth, json=body)
-
+    client = OpenAPIClient(service="las_ai_qa", region="cn-beijing", access_key=access_key, secret_key=secret_key)
+    response = client.call_api(
+        method="POST",
+        params={},
+        headers={
+            "Content-Type": "application/json",
+        },
+        action="ExistsDataset",
+        body={"DatasetName": "non_exist_ds"},
+    )
     assert response.json()["Result"]["Exists"] is False
 
 
