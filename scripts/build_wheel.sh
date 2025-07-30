@@ -105,7 +105,7 @@ uv pip install twine yq setuptools_scm
 # =========================================
 
 # Patch package version with setuptools_scm
-VERSION=${VERSION:-$(python -m setuptools_scm | sed 's/\.dev/-dev/g')}
+VERSION=${VERSION:-$(python -m setuptools_scm | sed 's/\.dev/-dev/g' | sed 's/\.post/-post/g')}
 echo "Patching package version..."
 echo "Setting package version to: $VERSION"
 
@@ -154,7 +154,7 @@ else
 fi
 
 # =========================================
-# Build Wheels - Platform Specific
+# Build Daft Wheels - Platform Specific
 # =========================================
 BUILD_ARGS="--profile release-lto --out dist"
 SDIST_ARG="--sdist"
@@ -197,6 +197,31 @@ case "$OS" in
         esac
         ;;
 esac
+
+# ===============================================
+# Build Daft-libs Wheels - Platform Independent
+# ===============================================
+
+# Replace dependencies in ../las/pyproject.toml with that in ../pyproject.toml
+TEXT=$(tomlq '.project["optional-dependencies"].las' "$DIR/pyproject.toml")
+REPLACEMENT="dependencies = $TEXT"
+
+if awk -v repl="$REPLACEMENT" '
+    $0 == "dependencies = []" {found=1; print repl; next}
+    {print}
+    END {exit !found}
+' $DIR/pyproject.toml > tmp; then
+    mv tmp $DIR/las/pyproject.toml
+    echo "replace dependencies success"
+else
+    rm -f tmp
+    echo "replace dependencies failed"
+fi
+
+# Build the wheel
+pushd "$DIR/las" > /dev/null || exit 1
+uv build --python $DIR/.venv/bin/python
+popd > /dev/null || exit 1
 
 # =========================================
 # Artifact Handling

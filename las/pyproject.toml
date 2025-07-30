@@ -1,0 +1,58 @@
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling", "setuptools_scm"]
+
+[project]
+authors = [{name = "Las Team, Volc corp."}]
+dependencies = []
+description = "The LAS Extension of Daft"
+dynamic = ["version"]
+license = {file = "LICENSE"}
+name = "daft-las"
+readme = "README.rst"
+requires-python = ">=3.9"
+
+[tool.hatch.build]
+targets.wheel.artifacts = ["daft"]
+targets.wheel.packages = ["daft-las"]
+
+[tool.hatch.version]
+path = "_version.py"
+source = "code"
+
+[tool.mypy]
+exclude = ['daft/pickle/*.py$']
+files = ["daft/**/*.py", "daft/**/*.pyx", "tests/**/*.py"]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+
+[[tool.mypy.overrides]]
+ignore_missing_imports = true
+module = [
+  "pyarrow.*",
+  "fsspec.*",
+  "icebridge.*",
+  "cloudpickle.*",
+  "docker.*",
+  "uvicorn.*",
+  "numba.*",
+  "viztracer.*"
+]
+
+[[tool.mypy.overrides]]
+enable_error_code = ["attr-defined"]
+module = 'daft.*'
+warn_return_any = false
+
+[tool.pyright]
+typeCheckingMode = "off"
+venv = ".venv"
+venvPath = "../"
+
+[tool.pytest.ini_options]
+addopts = "-m 'not (integration or benchmark or hypothesis)'"
+minversion = "6.0"
+testpaths = [
+  "../tests"
+]
