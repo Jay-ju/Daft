@@ -10,6 +10,7 @@ from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
 from daft.las.functions.utils.common_utils import tracking_usage
+from daft.las.functions.utils.audio_utils import decode_audio_torchaudio, encode_audio
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +62,13 @@ class AudioStandardization(Operator):
         if not audio:
             return None
         try:
-            samples = decode_audio(
-                audio, sample_rate=self.target_sr, num_channels=self.target_channels
-            ).get_all_samples()
-            waveform = samples.data.numpy()
+            waveform, _ = decode_audio_torchaudio(
+                audio,
+                sample_rate=self.target_sr,
+                num_channels=self.target_channels,
+            )
+
+            waveform = waveform.numpy()
             # 响度归一化
             if self.target_dbfs is not None:
                 rms = np.sqrt(np.mean(waveform**2))
