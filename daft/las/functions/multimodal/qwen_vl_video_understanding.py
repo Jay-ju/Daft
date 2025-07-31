@@ -237,7 +237,7 @@ class QwenVLVideoUnderstanding(Operator):
                             file_name = "video_binary"
 
                         tmp_file_name = save_file_to_local(video, self.video_src_type, tmp_dir, file_name)
-                        logger.info("Downloading %s to %s", video, tmp_file_name)
+                        logger.info("Downloading video to %s", tmp_file_name)
 
                         if not Path(tmp_file_name).exists():
                             raise FileNotFoundError(tmp_file_name)

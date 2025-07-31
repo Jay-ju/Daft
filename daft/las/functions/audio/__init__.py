@@ -14,6 +14,7 @@ from .audio_source_separation import AudioSourceSeparation
 from .audio_tts_doubao import AudioTtsDoubao
 from .audio_vad_fsmn import AudioVadFsmn
 from .audio_split_by_duration import AudioSplitByDuration
+from .audio_speaker_verification_eres2net import AudioSpeakerVerificationEres2net
 
 __all__ = [
     "AudioAsrDoubao",
@@ -23,6 +24,7 @@ __all__ = [
     "AudioSize",
     "AudioSourceSeparation",
     "AudioSpeakerDiarization",
+    "AudioSpeakerVerificationEres2net",
     "AudioSplitByDuration",
     "AudioSplitByTimestamps",
     "AudioStandardization",

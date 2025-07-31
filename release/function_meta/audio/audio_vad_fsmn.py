@@ -9,7 +9,7 @@ from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
-    samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_asr_whisper/参观八达岭长城。.wav"]}
+    samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_vad_fsmn/参观八达岭长城。.wav"]}
 
     model_path = os.getenv("MODEL_PATH", "./models")
     model_name = "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     df = daft.from_pydict(samples)
     df = df.with_column(
-        "asr_result_detail",
+        "audio_vad_result",
         las_udf(
             AudioVadFsmn,
             construct_args={
@@ -37,11 +37,19 @@ if __name__ == "__main__":
         )(col("audio_path")),
     )
     df.show()
+    df = df.with_column(
+        "audio_vad_result_length",
+        col("audio_vad_result").apply(
+            lambda x: len(x),
+            return_dtype=daft.DataType.int8(),
+        ),
+    )
+    df.show()
 
     # ╭────────────────────────────────┬─────────────────────╮
-    # │ audio_path                     ┆ asr_result_detail   │
+    # │ audio_path                     ┆ audio_vad_result    │
     # │ ---                            ┆ ---                 │
     # │ Utf8                           ┆ List[List[Float32]] │
     # ╞════════════════════════════════╪═════════════════════╡
-    # │ tos://las-ai-cn-beijing/qa/op… ┆ [[0.51, 2.8]]       │
+    # │ tos://tos_bucket/audio_asr_wh… ┆ [[0.51, 2.8]]       │
     # ╰────────────────────────────────┴─────────────────────╯

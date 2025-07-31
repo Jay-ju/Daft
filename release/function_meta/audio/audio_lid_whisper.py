@@ -9,7 +9,7 @@ from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
-    samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_asr_whisper/参观八达岭长城。.wav"]}
+    samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_lid_whisper/参观八达岭长城。.wav"]}
 
     model_path = os.getenv("MODEL_PATH", "./models")
     model_name = "iic/speech_whisper-large_lid_multilingual_pytorch"
@@ -40,6 +40,6 @@ if __name__ == "__main__":
     # │ ---                            ┆ ---                                                        │
     # │ Utf8                           ┆ Struct[language_code: Utf8, language_code_full_name: Utf8] │
     # ╞════════════════════════════════╪════════════════════════════════════════════════════════════╡
-    # │ tos://tos_bucket/audio_asr_wh… ┆ {language_code: zh,                                        │
+    # │ tos://tos_bucket/audio_lid_wh… ┆ {language_code: zh,                                        │
     # │                                ┆ language_…                                                 │
     # ╰────────────────────────────────┴────────────────────────────────────────────────────────────╯
