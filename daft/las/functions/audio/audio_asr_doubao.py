@@ -11,6 +11,7 @@ import httpx
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,8 @@ class AudioAsrDoubao(Operator):
         self.query_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query"
 
         self.client = httpx.AsyncClient()
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="openspeech")
 
     def generate_uid(self) -> str:
         return str(uuid.uuid4())

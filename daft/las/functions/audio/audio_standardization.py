@@ -9,6 +9,7 @@ from typing import Any
 from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,8 @@ class AudioStandardization(Operator):
         self.target_dbfs = target_dbfs
         self.target_gain_range = target_gain_range or [-3, 3]
         self.num_coroutines = num_coroutines
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="torchcodec")
 
     async def process(self, audio: Any) -> bytes | None:
         if not audio:

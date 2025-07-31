@@ -7,6 +7,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,8 @@ class TextLengthCalculator(Operator):
         """  # noqa: D415
         super().__init__(**kwargs)
         logger.info("Text length calculator initialized successfully")
+
+        log_op_call(logger=logger, op=self.__class__.__name__)
 
     def transform(self, texts: pa.Array) -> pa.Array:
         """批量计算文本列的长度

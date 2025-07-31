@@ -9,6 +9,7 @@ from bs4 import BeautifulSoup
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ class CleanHtmlTag(Operator):
         super().__init__(**kwargs)
         self.separator = separator
         self.strip = strip
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="bs4")
 
     def transform(self, texts: pa.Array) -> pa.Array:
         """批量处理HTML文本数组并清理标签.

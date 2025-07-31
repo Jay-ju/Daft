@@ -9,6 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.functions.utils.special_characters import SPECIAL_CHARACTERS
 
 logger = logging.getLogger(__name__)
@@ -100,6 +101,8 @@ class WordRepetitionCalculator(Operator):
             self._tokenizer = None
 
         logger.info("Word repetition calculator initialized with repetition=%d, lang=%s", self.repetition, self.lang)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _tokenize_text(self, text: str) -> list[str]:
         if self._tokenizer:

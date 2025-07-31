@@ -14,6 +14,7 @@ from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_afte
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.infra.content_security import ContentSecurityConfig, get_content_security_service
 
 logger = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ class ContentRiskRec(Operator):
         self.timeout = timeout
         self._content_service = get_content_security_service(ContentSecurityConfig.from_env())
         self.executor = ThreadPoolExecutor(max_workers=5)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="Content Security")
 
     @retry(  # type: ignore[misc]
         wait=wait_exponential(multiplier=1.5, min=1, max=10),

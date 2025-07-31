@@ -12,7 +12,7 @@ import ffmpeg
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
 from daft.las.functions.video.video_keyframes import VideoKeyframes
 from daft.las.io import mkdirs, upload_file
 
@@ -81,6 +81,8 @@ class VideoSplitByKeyframes(Operator):
         logger.info("Keyframe threshold: %s", self.threshold)
         logger.info("Max keyframes count: %s", self.keyframes_cnt)
         logger.info("Seconds per frame: %s", self.seconds_per_frame)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
     def _get_output_extension(self, video_path: str | None, video_format: str | None) -> str:
         """Determine the output file extension."""

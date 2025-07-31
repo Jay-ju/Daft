@@ -15,6 +15,7 @@ from torch.nn import functional as F
 from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,8 @@ class AudioSourceSeparation(Operator):
         self.model = torch.load(model_name, weights_only=False)
         self.model.eval().to(self.device)
         logger.info("Loaded Demucs model from %s on %s", model_path, device)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="demucs")
 
     def _preprocess(self, tensor: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         ref = tensor.mean(0)

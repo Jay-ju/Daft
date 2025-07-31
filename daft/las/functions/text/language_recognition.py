@@ -9,7 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,8 @@ class LanguageRecognitionOperator(Operator):
 
         self._load_model()
         logger.info("Initialized LanguageRecognitionOperator")
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _load_model(self) -> None:
         try:

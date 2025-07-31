@@ -14,6 +14,7 @@ from pyannote.audio import Pipeline
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio
+from daft.las.functions.utils.common_utils import log_op_call
 
 if TYPE_CHECKING:
     from collections.abc import Generator
@@ -95,6 +96,8 @@ class AudioSpeakerDiarization(Operator):
         else:
             self.device = "cpu"
         logger.info("The model is loaded from %s.", model_config_file)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="speaker-diarization-3.1")
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:

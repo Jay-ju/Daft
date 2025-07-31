@@ -10,6 +10,7 @@ from regex import Pattern
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,8 @@ class RegexReplacer(Operator):
 
         logger.debug("Configured replacement patterns: %s", self.patterns)
         logger.debug("Configured replacement replacements: %s", self.replacements)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="regex")
 
     def _prepare_pattern(self, pattern: str) -> Pattern[str]:
         if (pattern is not None and len(pattern) > 2) and (

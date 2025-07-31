@@ -8,7 +8,7 @@ from typing import Any
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import get_duration
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,8 @@ class AudioDuration(Operator):
         except Exception:
             logger.exception("Failed to calculate duration for input: %s", audio)
             return float("nan")
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
     def transform(self, audio_inputs: pa.Array) -> pa.Array:
         """计算音频文件时长

@@ -9,6 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.functions.utils.image_utils import decode_image
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,8 @@ class ImageEasyOcr(Operator):
                 "Failed to initialize EasyOCR! Model config: %s\n GPU available: %s", model_dir, self.use_gpu
             )
             raise RuntimeError("OCR model not initialized!")
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _ocr(self, current_batch: list[Any]) -> list[str | None]:
         import numpy as np

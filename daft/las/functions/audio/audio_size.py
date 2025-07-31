@@ -7,6 +7,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.io import file_size
 
 logger = logging.getLogger(__name__)
@@ -31,6 +32,7 @@ class AudioSize(Operator):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        log_op_call(logger=logger, op=self.__class__.__name__)
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:

@@ -5,11 +5,15 @@ from __future__ import annotations
 import base64
 import os
 import tempfile
+import time
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, TypeVar
 
 from daft.las.infra.tos_client import TosClient
 from daft.las.io import download_file, exists, upload_file
+
+if TYPE_CHECKING:
+    import logging
 
 T = TypeVar("T")
 
@@ -206,3 +210,8 @@ def pre_sign_url_for_tos(url: str, expires: int | None = None) -> str:
         str: The pre-signed URL.
     """
     return TosClient().pre_sign_url(url, expires)
+
+
+def log_op_call(logger: logging.Logger, op: str, model_service_or_lib: str | None = None) -> None:
+    ts = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
+    logger.info("Operator calling info: %s - %s - %s", ts, op, model_service_or_lib)

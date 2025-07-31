@@ -10,7 +10,7 @@ from typing import Any, BinaryIO
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import run_on_local_path
+from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,8 @@ class CommonCrawlContentExtractor(Operator):
         self._loaded_extractors: dict[str, Any] = {}
         self._load_extractor(extractor_type)
         logger.info("Initialized CommonCrawl content extractor with extractor_type: %s", extractor_type)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.extractor_type)
 
     def _load_extractor(self, extractor_type: str) -> None:
         if extractor_type == "trafilatura":

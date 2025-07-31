@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.infra.las_ark import (
     DEFAULT_INFERENCE_TYPE,
     DEFAULT_MAX_CONCURRENCY,
@@ -151,22 +152,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
             max_concurrency: 并发数
                 每个进程的最大并发数
         """
-        self.system_text = system_text
-        self.system_image_url = system_image_url
-        self.system_video_url = system_video_url
-        self.prompt = prompt
-        self.image_url_detail = image_url_detail
-        self.video_fps = video_fps
-
-        self.source_type = source_type.lower() if source_type else "url"
-        assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
-
-        self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
-        assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
-
-        self.image_format = image_format.lower() if image_format else "jpeg"
-        self.video_format = video_format.lower() if video_format else "mp4"
-
         super().__init__(
             model=model,
             version=version,
@@ -185,6 +170,24 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
             max_concurrency=max_concurrency,
             **kwargs,
         )
+
+        self.system_text = system_text
+        self.system_image_url = system_image_url
+        self.system_video_url = system_video_url
+        self.prompt = prompt
+        self.image_url_detail = image_url_detail
+        self.video_fps = video_fps
+
+        self.source_type = source_type.lower() if source_type else "url"
+        assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
+
+        self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
+        assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
+
+        self.image_format = image_format.lower() if image_format else "jpeg"
+        self.video_format = video_format.lower() if video_format else "mp4"
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
 
     def transform(self, media_datas: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
         """批量使用大模型进行视频理解.

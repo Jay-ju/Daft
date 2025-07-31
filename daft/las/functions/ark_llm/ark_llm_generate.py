@@ -9,6 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.infra.las_ark import (
     DEFAULT_INFERENCE_TYPE,
     DEFAULT_MAX_CONCURRENCY,
@@ -152,6 +153,8 @@ class ArkLLMGenerate(Operator):
         self.options = {k: v for k, v in options_tmp.items() if v is not None}
 
         self.options |= self.llm_config
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:

@@ -8,6 +8,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,8 @@ class AlphanumericRatioCalculator(Operator):
             self.tokenizer = None
 
         logger.info("Alphanumeric ratio calculator initialized with tokenization=%s", self.tokenization)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _calculate_ratio(self, text: str) -> float:
         if self.tokenization and self.tokenizer:

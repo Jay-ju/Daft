@@ -8,6 +8,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.functions.utils.text_utils import strip_markdown_images
 from daft.las.utils import not_blank
 
@@ -83,6 +84,8 @@ class ChunkTextSentenceSplitter(Operator):
 
         self._md_parser = MarkdownReader()
         self._html_parser = HTMLTagReader("section")
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="LlamaIndex")
 
     def transform(self, texts: pa.Array) -> pa.Array:
         """批量处理文本数组生成分句chunks.

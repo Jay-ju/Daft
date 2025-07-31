@@ -8,6 +8,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.ark_llm.ark_llm_vision_understanding import ArkLLMVisionUnderstanding
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +155,8 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
             multimodal_type=multimodal_type,
             **kwargs,
         )
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
 
     def transform(self, media_datas: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
         """批量使用大模型进行视频理解.

@@ -11,6 +11,7 @@ from tos import HttpMethodType
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.io.tos import TOSConfig
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,8 @@ class PreSignUrlForTos(Operator):
         self.tos_client = tos.TosClientV2(
             tosconfig.access_key, tosconfig.secret_key, tosconfig.endpoint, tosconfig.region
         )
+
+        log_op_call(logger=logger, op=self.__class__.__name__)
 
     def _get_pre_signed_policy_url(self, url: str) -> Any:
         parsed_url = urlparse(url)

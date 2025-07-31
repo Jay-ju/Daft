@@ -10,6 +10,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,8 @@ class PerplexityCalculator(Operator):
         logger.info("Perplexity calculator initialized for language: %s", self.lang)
         logger.info("Model path: %s", self.model_path)
         logger.info("Model name: %s", self.model_name)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _initialize_models(self) -> None:
         try:

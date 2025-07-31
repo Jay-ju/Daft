@@ -9,6 +9,7 @@ import regex as re
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,8 @@ class MaximumWordLengthCalculator(Operator):
         """  # noqa: D415
         super().__init__(**kwargs)
         logger.info("Maximum word length calculator initialized successfully")
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="regex")
 
     def transform(self, texts: pa.Array) -> pa.Array:
         """批量计算文本列中英文单词的最大长度

@@ -13,7 +13,7 @@ import librosa
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import save_file_to_local
+from daft.las.functions.utils.common_utils import log_op_call, save_file_to_local
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +107,8 @@ class AudioSpeakerVerificationEres2net(Operator):
             self.device,
             self.cuda_device_count if use_gpu else 0,
         )
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def transform(self, speaker_a_audios: pa.Array, speaker_b_audios: pa.Array) -> pa.Array:
         """批量处理音频对并生成说话人验证分数.

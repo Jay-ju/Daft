@@ -9,6 +9,7 @@ from typing import Any, Callable
 from daft.dependencies import pa
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
 from daft.las.functions.types import Operator
+from daft.las.functions.utils.common_utils import log_op_call
 from daft.las.infra.las_ark import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_REQUEST_TIMEOUT,
@@ -85,12 +86,12 @@ class DoubaoEmbeddingVision(Operator):
             max_concurrency: 并发数
                 每个进程的最大并发数.
         """
+        super().__init__(**kwargs)
+
         self.source_type = source_type.lower() if source_type else "url"
         assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
         self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
         assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
-
-        super().__init__(**kwargs)
 
         self.image_format = image_format.lower() if image_format else "jpeg"
         self.video_format = video_format.lower() if video_format else "mp4"
@@ -114,6 +115,8 @@ class DoubaoEmbeddingVision(Operator):
         self.options = {k: v for k, v in options_tmp.items() if v is not None}
 
         self.client = LasArkClient(config=ark_config)
+
+        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:
