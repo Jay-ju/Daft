@@ -29,10 +29,12 @@ class Operator(ABC):
 
         self.cuda_device_count = math.ceil(num_gpus)
 
-    def __call__(self, *args: Any) -> pa.Array:
-        return self.transform(*[arg.to_arrow() if isinstance(arg, Series) else arg for arg in args])
+    def __call__(self, *args: Any, **kwargs: Any) -> pa.Array:
+        _args = [arg.to_arrow() if isinstance(arg, Series) else arg for arg in args]
+        _kwargs = {key: arg.to_arrow() if isinstance(arg, Series) else arg for key, arg in kwargs.items()}
+        return self.transform(*_args, **_kwargs)
 
-    def transform(self, *columns: pa.Array) -> pa.Array:
+    def transform(self, *args: Any, **kwargs: Any) -> pa.Array:
         raise NotImplementedError
 
     @staticmethod

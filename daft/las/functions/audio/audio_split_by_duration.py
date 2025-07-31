@@ -260,7 +260,7 @@ class AudioSplitByDuration(Operator):
         else:
             return result
 
-    def __call__(
+    def transform(
         self,
         audio_paths: pa.Array | None = None,
         audio_binaries: pa.Array | None = None,

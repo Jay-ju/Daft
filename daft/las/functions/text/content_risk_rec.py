@@ -143,7 +143,7 @@ class ContentRiskRec(Operator):
         if hasattr(self, "executor"):
             self.executor.shutdown(wait=False)
 
-    def __call__(
+    def transform(
         self,
         text_col: pa.Array,
         account_id_col: pa.Array | None = None,
