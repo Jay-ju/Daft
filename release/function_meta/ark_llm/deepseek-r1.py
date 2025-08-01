@@ -20,7 +20,6 @@ if __name__ == "__main__":
             ArkLLMThinkingVision,
             construct_args={
                 "model": "deepseek-r1",
-                "version": "250120",
                 "multimodal_type": "text",  # 采用 DeepSeek-R1 系列模型进行推理时，需要设置 multimodal_type = "text"
                 "inference_type": "online",
             },

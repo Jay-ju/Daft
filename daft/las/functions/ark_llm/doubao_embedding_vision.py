@@ -35,16 +35,12 @@ class DoubaoEmbeddingVision(Operator):
         - 图片/视频数据/文本数据：string类型，支持base64编码/url地址
     - 输出格式：
         - 默认模式：float数组类型的向量表示
-
-    **支持模型版本示例：**
-        - 250615
-        - 250328
     """  # noqa: D415
 
     def __init__(
         self,
         model: str = "doubao-embedding-vision",
-        version: str = "250615",
+        version: str | None = None,
         api_key: str | None = None,
         multimodal_type: str = "image",
         image_format: str = "jpeg",

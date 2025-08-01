@@ -19,7 +19,6 @@ if __name__ == "__main__":
             ArkLLMVisionUnderstanding,
             construct_args={
                 "model": "doubao-1.5-vision-pro-32k",
-                "version": "250115",
                 "prompt": "图片里有什么？",
                 "inference_type": "online",
             },

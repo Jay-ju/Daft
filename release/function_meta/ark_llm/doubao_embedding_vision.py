@@ -22,7 +22,6 @@ if __name__ == "__main__":
         las_udf(
             DoubaoEmbeddingVision,
             construct_args={
-                "version": "250328",
                 "image_format": "jpeg",
             },
         )(col("image_path"), col("text")),
@@ -34,7 +33,6 @@ if __name__ == "__main__":
         las_udf(
             DoubaoEmbeddingVision,
             construct_args={
-                "version": "250328",
                 "image_format": "jpeg",
             },
         )(col("image_path")),
@@ -46,7 +44,6 @@ if __name__ == "__main__":
         las_udf(
             DoubaoEmbeddingVision,
             construct_args={
-                "version": "250328",
                 "multimodal_type": "text",
             },
         )(col("text")),

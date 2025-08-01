@@ -19,7 +19,6 @@ if __name__ == "__main__":
             ArkLLMVisionUnderstanding,
             construct_args={
                 "model": "doubao-1.5-vision-pro",
-                "version": "250328",
                 "multimodal_type": "video",
                 "prompt": "视频里有什么？",
                 "inference_type": "batch",

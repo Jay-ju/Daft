@@ -37,20 +37,12 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
             - llm_result：str类型，生成结果
             - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
-
-    **支持模型示例：**
-    - 豆包文本模型系列：
-        - doubao-1.5-lite-32k（版本250115）
-        - doubao-1.5-pro-256k（版本250115）
-        - 等等
-    - DeepSeek系列：
-        - DeepSeek-V3（版本250324）
     """  # noqa: D415
 
     def __init__(
         self,
         model: str,
-        version: str,
+        version: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         max_tokens: int | None = None,
         max_completion_tokens: int | None = None,

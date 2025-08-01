@@ -56,7 +56,7 @@ class ArkLLMGenerate(Operator):
     def __init__(
         self,
         model: str,
-        version: str,
+        version: str | None = None,
         api_key: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         max_tokens: int | None = None,

@@ -39,18 +39,14 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
     - 思维链可视化：通过 reasoning_content 字段输出模型的推理过程
     - 结果可靠性控制：通过 finish_reason 字段识别异常终止情况
     - 多模态理解：支持图片/视频/文本的混合输入解析
-
-    **支持模型示例：**
-    - doubao-Seed-1.6（版本250615）
-    - doubao-Seed-1.6-thinking（版本250715）
     """  # noqa: D415
 
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK
 
     def __init__(
         self,
-        model: str = "doubao-seed-1.6",
-        version: str = "250615",
+        model: str,
+        version: str | None = None,
         thinking_type: str | None = None,
         multimodal_type: str = "image",
         **kwargs: Any,
@@ -62,7 +58,7 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
 
         Args:
             model: 模型名称
-                支持的模型有:豆包模型和DeepSeek模型。 示例 doubao-1.5-lite-32k
+                支持的模型有:豆包模型和DeepSeek模型。 示例 doubao-seed-1.6
             version: 模型版本
                 输入模型对应的版本信息。示例 250115
             inference_type: 推理类型，支持在线推理和批量推理。默认值为batch，即采用批量推理

@@ -19,7 +19,6 @@ if __name__ == "__main__":
             ArkLLMThinkingVision,
             construct_args={
                 "model": "doubao-seed-1.6",
-                "version": "250615",
                 "multimodal_type": "video",
                 "prompt": "视频里有什么？",
                 "inference_type": "online",

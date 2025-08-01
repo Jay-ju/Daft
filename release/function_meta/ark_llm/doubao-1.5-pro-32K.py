@@ -21,7 +21,6 @@ if __name__ == "__main__":
             ArkLLMTextGenerate,
             construct_args={
                 "model": "doubao-1.5-pro-32k",
-                "version": "250115",
                 "inference_type": "online",
             },
         )(col("query")),

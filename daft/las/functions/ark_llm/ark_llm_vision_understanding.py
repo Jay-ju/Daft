@@ -35,18 +35,12 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
             - llm_result：str类型，生成结果
             - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
-
-    **支持模型示例：**
-    - 豆包多模态模型示例：
-        - doubao-1.5-vision-pro-32k（版本250115）
-        - doubao-1.5-vision-lite（版本250315）
-        - doubao-1.5-vision-pro（版本250328）
     """  # noqa: D415
 
     def __init__(
         self,
         model: str,
-        version: str,
+        version: str | None = None,
         inference_type: str = DEFAULT_INFERENCE_TYPE,
         system_text: str | None = None,
         system_image_url: str | None = None,

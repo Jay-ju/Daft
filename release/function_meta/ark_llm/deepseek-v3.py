@@ -21,7 +21,6 @@ if __name__ == "__main__":
             ArkLLMTextGenerate,
             construct_args={
                 "model": "deepseek-v3",
-                "version": "250324",
                 "inference_type": "online",
             },
         )(col("query")),

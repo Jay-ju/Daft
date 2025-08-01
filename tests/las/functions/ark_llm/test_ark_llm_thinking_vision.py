@@ -76,8 +76,9 @@ class MockArkLLMThinkingVision(ArkLLMThinkingVision):
     def __init__(self, mock_callable: callable, **kwargs):
         version = "test_version"
         api_key = "test_ak"
+        model = "test_model"
 
-        super().__init__(version=version, api_key=api_key, **kwargs)
+        super().__init__(model=model, version=version, api_key=api_key, **kwargs)
         self.mock_callable = mock_callable
 
     async def _async_requests(self, requests: list[dict[Any, Any]]) -> pa.Array:

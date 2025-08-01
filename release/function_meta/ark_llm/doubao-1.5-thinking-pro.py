@@ -24,7 +24,6 @@ if __name__ == "__main__":
             ArkLLMThinkingVision,
             construct_args={
                 "model": "doubao-1.5-thinking-pro",
-                "version": "250415",
                 "multimodal_type": "text",
                 "inference_type": "online",
             },
