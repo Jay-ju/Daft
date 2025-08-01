@@ -20,6 +20,22 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir):
     return {"video_path": paths}
 
 
+def generate_test_data_binary(tos_test_data_dir):
+    from daft.las.functions.utils.common_utils import load_file
+
+    sample_video_path = f"{tos_test_data_dir}/video/sample.mp4"
+    video_binary = load_file(sample_video_path)
+    output_basename = "my_test_video_202408"
+
+    samples = {
+        "video_path": [None],
+        "video_binary": [video_binary],
+        "video_format": ["mp4"],
+        "output_basename": [output_basename],
+    }
+    return samples
+
+
 def test_video_split_by_keyframes(tos_test_data_dir, local_test_data_dir):
     input_dict = generate_test_data(tos_test_data_dir, local_test_data_dir)
     df = daft.from_pydict(input_dict)
@@ -31,6 +47,7 @@ def test_video_split_by_keyframes(tos_test_data_dir, local_test_data_dir):
             "keyframes_cnt": 2,
             "output_tos_dir": f"{tos_test_data_dir}/video/video_split_by_keyframes",
             "output_segments_binary": True,
+            "output_video_format": "avi",
         },
     )
 
@@ -41,6 +58,10 @@ def test_video_split_by_keyframes(tos_test_data_dir, local_test_data_dir):
         col("results").struct.get("segments_binary").alias("segments_binary"),
     )
     pd_df = df.to_pandas()
+
+    for segs in pd_df["segments"]:
+        for seg in segs:
+            assert seg.endswith(".avi")
 
     # Verify dataframe structure
     assert_dataframe_result(
@@ -55,4 +76,46 @@ def test_video_split_by_keyframes(tos_test_data_dir, local_test_data_dir):
 
     # Verify TOS video processing
     assert len(pd_df.iloc[2]["segments"]) == 2
-    assert len(pd_df.iloc[2]["segments_binary"][0]) == pytest.approx(24178388, abs=10)
+    assert pd_df.iloc[2]["segments_binary"][0][0] == pytest.approx(82, abs=10)
+
+
+def test_video_split_by_keyframes_binary_and_basename(tos_test_data_dir):
+    samples = generate_test_data_binary(tos_test_data_dir)
+    df = daft.from_pydict(samples)
+
+    splitter = las_udf(
+        VideoSplitByKeyframes,
+        construct_args={
+            "method": "I_frame",
+            "keyframes_cnt": 2,
+            "output_tos_dir": f"{tos_test_data_dir}/video/video_split_by_keyframes",
+            "output_segments_binary": True,
+        },
+    )
+
+    df = df.with_column(
+        "results",
+        splitter(
+            col("video_path"),
+            col("video_binary"),
+            col("video_format"),
+            col("output_basename"),
+        ),
+    )
+    df = df.select(
+        "video_path",
+        "video_binary",
+        "video_format",
+        "output_basename",
+        col("results").struct.get("segments").alias("segments"),
+        col("results").struct.get("segments_binary").alias("segments_binary"),
+    )
+    pd_df = df.to_pandas()
+
+    assert_dataframe_result(
+        pd_df,
+        expect_columns=["video_path", "video_binary", "video_format", "output_basename", "segments", "segments_binary"],
+        expect_row_num=1,
+    )
+    assert len(pd_df.iloc[0]["segments"]) == 2
+    assert all(isinstance(b, (bytes, bytearray)) for b in pd_df.iloc[0]["segments_binary"])

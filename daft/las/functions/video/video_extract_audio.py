@@ -201,6 +201,7 @@ class VideoExtractAudio(Operator):
         video_path: str | None,
         video_binary: bytes | None,
         video_format: str | None,
+        output_basename: str | None = None,
     ) -> tuple[list[str], list[bytes], list[float], list[np.ndarray]]:
         """Process a single video input, supporting path or binary input.
 
@@ -208,6 +209,7 @@ class VideoExtractAudio(Operator):
             video_path: Path to the video file (can be local, TOS, HTTP, etc.)
             video_binary: Video file content in bytes (optional)
             video_format: Video format string (optional)
+            output_basename: Optional output subdirectory name
 
         Returns:
             Tuple of (audio_paths, binaries, original_audio_sampling_rates, audio_arrays)
@@ -216,8 +218,15 @@ class VideoExtractAudio(Operator):
         if not is_valid_video_path and video_binary is None:
             return [], [], [], []
 
+        # 选择子目录名
+        if not_blank(output_basename):
+            video_sub_dir = output_basename
+        elif is_valid_video_path:
+            video_sub_dir = Path(str(video_path)).stem
+        else:
+            video_sub_dir = f"binary_{uuid.uuid4().hex}"
+
         if self.output_tos_dir:
-            video_sub_dir = Path(str(video_path)).stem if is_valid_video_path else f"binary_{uuid.uuid4().hex}"
             tos_output_dir = f"{self.output_tos_dir}/{video_sub_dir}"
             mkdirs(tos_output_dir)
         else:
@@ -228,8 +237,7 @@ class VideoExtractAudio(Operator):
             if is_valid_video_path and video_path is not None:
 
                 def process_with_path(local_path: str) -> tuple[list[str], list[bytes], list[float], list[np.ndarray]]:
-                    video_name = Path(str(video_path)).stem
-                    local_output_dir = Path(local_path).parent / Path(video_name)
+                    local_output_dir = Path(local_path).parent / video_sub_dir  # type: ignore[operator]
                     local_output_dir.mkdir(exist_ok=True)
                     return self._extract_audio_from_video(
                         local_path,
@@ -247,12 +255,12 @@ class VideoExtractAudio(Operator):
                 with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
                     temp_dir = temp_sub_dir.rstrip("/")
                     ext = f".{video_format.lower()}" if video_format else ".mp4"
-                    temp_filename = f"binary_input_{uuid.uuid4().hex}{ext}"
+                    temp_filename = f"{video_sub_dir}{ext}"
                     temp_filepath = Path(temp_dir) / temp_filename
                     with temp_filepath.open("wb") as tmp:
                         tmp.write(video_binary)
 
-                    local_output_dir = Path(temp_dir) / "audio"
+                    local_output_dir = Path(temp_dir) / video_sub_dir  # type: ignore[operator]
                     local_output_dir.mkdir(exist_ok=True)
 
                     return self._extract_audio_from_video(
@@ -279,6 +287,7 @@ class VideoExtractAudio(Operator):
         video_paths: pa.Array | None = None,
         video_binaries: pa.Array | None = None,
         video_formats: pa.Array | None = None,
+        output_basenames: pa.Array | None = None,
     ) -> pa.Array:
         """从视频中抽取音频流，支持多种输入格式，输出结构体字段，所有输出音频均为用户指定格式（默认 mp3）
 
@@ -286,6 +295,7 @@ class VideoExtractAudio(Operator):
             video_paths: 视频文件路径数组（本地、TOS、HTTP等）
             video_binaries: 视频二进制数据数组（可选）
             video_formats: 视频格式字符串数组（可选）
+            output_basenames: 可选，输出子目录名（文件名）数组
 
         Returns:
             结构体数组，包含：
@@ -306,12 +316,13 @@ class VideoExtractAudio(Operator):
         paths_list = video_paths.to_pylist() if video_paths is not None else [None] * n
         binaries_list = video_binaries.to_pylist() if video_binaries is not None else [None] * n
         formats_list = video_formats.to_pylist() if video_formats is not None else [None] * n
+        basenames_list = output_basenames.to_pylist() if output_basenames is not None else [None] * n
 
         results = []
 
-        for video_path, binary, fmt in zip(paths_list, binaries_list, formats_list):
+        for video_path, binary, fmt, basename in zip(paths_list, binaries_list, formats_list, basenames_list):
             audio_paths, binaries, original_audio_sampling_rates, audio_arrays = self._process_video(
-                video_path, binary, fmt
+                video_path, binary, fmt, basename
             )
             # audio_arrays: list[np.ndarray] or empty
             if self.output_audio_array:

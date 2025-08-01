@@ -46,6 +46,7 @@ class VideoSplitByKeyframes(Operator):
         seconds_per_frame: int = -1,
         output_tos_dir: str = "",
         output_segments_binary: bool = False,
+        output_video_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """初始化视频按关键帧切分算子。
@@ -67,6 +68,7 @@ class VideoSplitByKeyframes(Operator):
                 默认值：""
             output_segments_binary: 是否输出视频片段的二进制数据。
                 默认值：False
+            output_video_format: 全局指定输出视频格式（如"mp4"、"avi"等），优先级高于输入文件后缀和video_format列。
             **kwargs: 其他参数，透传给父类。
         """  # noqa: D415
         super().__init__(**kwargs)
@@ -76,16 +78,20 @@ class VideoSplitByKeyframes(Operator):
         self.seconds_per_frame = seconds_per_frame
         self.output_tos_dir = output_tos_dir.strip("/") if output_tos_dir else ""
         self.output_segments_binary = output_segments_binary
+        self.output_video_format = output_video_format.lower() if output_video_format else None
 
         logger.info("Keyframe extraction method: %s", self.method)
         logger.info("Keyframe threshold: %s", self.threshold)
         logger.info("Max keyframes count: %s", self.keyframes_cnt)
         logger.info("Seconds per frame: %s", self.seconds_per_frame)
+        logger.info("Output video format: %s", self.output_video_format)
 
         log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
     def _get_output_extension(self, video_path: str | None, video_format: str | None) -> str:
         """Determine the output file extension."""
+        if self.output_video_format:
+            return f".{self.output_video_format}"
         if video_format:
             return f".{video_format.lower()}"
         if video_path:
@@ -123,9 +129,14 @@ class VideoSplitByKeyframes(Operator):
     ) -> str | None:
         """Process a segment and upload to TOS if needed."""
         try:
+            output_kwargs = {"strict": "experimental"}
+            # 如果指定了output_video_format，则不指定vcodec/acodec，让ffmpeg自动选择编码器
+            if not self.output_video_format:
+                output_kwargs["vcodec"] = "copy"
+                output_kwargs["acodec"] = "copy"
             (
                 ffmpeg.input(video_path, ss=start_time, to=end_time)
-                .output(segment_path, vcodec="copy", acodec="copy", strict="experimental")
+                .output(segment_path, **output_kwargs)
                 .overwrite_output()
                 .run(quiet=True)
             )
@@ -179,11 +190,25 @@ class VideoSplitByKeyframes(Operator):
         return segments, binaries, output_exts
 
     def _process_video(
-        self, video: str | None, video_binary: bytes | None, video_format: str | None, timestamps: list[float]
+        self,
+        video: str | None,
+        video_binary: bytes | None,
+        video_format: str | None,
+        timestamps: list[float],
+        output_basename: str | None = None,
     ) -> tuple[list[str], list[bytes], list[str]]:
         """Process a single video file and return tuple of (segments, binaries, formats)."""
+        from daft.las.utils import not_blank
+
+        # 选择子目录名
+        if not_blank(output_basename):
+            video_sub_dir = output_basename
+        elif video:
+            video_sub_dir = Path(video).stem
+        else:
+            video_sub_dir = f"binary_{uuid.uuid4().hex}"
+
         if self.output_tos_dir:
-            video_sub_dir = Path(video).stem if video else f"binary_{uuid.uuid4().hex}"
             tos_output_dir = f"{self.output_tos_dir}/{video_sub_dir}"
             logger.info("Video segments tos output dir: %s", tos_output_dir)
             mkdirs(tos_output_dir)
@@ -195,12 +220,12 @@ class VideoSplitByKeyframes(Operator):
                 with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
                     temp_dir = temp_sub_dir.rstrip("/")
                     ext = self._get_output_extension(None, video_format)
-                    temp_filename = f"binary_input_{uuid.uuid4().hex}{ext}"
+                    temp_filename = f"{video_sub_dir}{ext}"
                     temp_filepath = Path(temp_dir) / temp_filename
                     with temp_filepath.open("wb") as tmp:
                         tmp.write(video_binary)
 
-                    local_output_dir = Path(temp_dir) / "segments"
+                    local_output_dir = Path(temp_dir) / video_sub_dir  # type: ignore[operator]
                     local_output_dir.mkdir(exist_ok=True)
 
                     return self._split_video_by_keyframes(
@@ -209,8 +234,7 @@ class VideoSplitByKeyframes(Operator):
             elif video:
 
                 def process_video(local_path: str) -> tuple[list[str], list[bytes], list[str]]:
-                    video_name = Path(local_path).stem
-                    local_output_dir = Path(local_path).parent / video_name
+                    local_output_dir = Path(local_path).parent / video_sub_dir  # type: ignore[operator]
                     Path(local_output_dir).mkdir(exist_ok=True)
                     return self._split_video_by_keyframes(
                         str(local_path), str(local_output_dir), tos_output_dir, timestamps, video_format
@@ -269,6 +293,7 @@ class VideoSplitByKeyframes(Operator):
         video_paths: pa.Array | None = None,
         video_binaries: pa.Array | None = None,
         video_formats: pa.Array | None = None,
+        output_basenames: pa.Array | None = None,
     ) -> pa.Array:
         """将视频按关键帧切分为片段
 
@@ -281,6 +306,7 @@ class VideoSplitByKeyframes(Operator):
                 默认值：None
             video_formats: 包含输入视频格式（如 'mp4'、'avi' 等）的数组，指定 video_binaries 时可以提供格式信息
                 默认值：None
+            output_basenames: 可选，输出子目录名（文件名）数组
 
         Returns:
             pa.Array: 处理后的结构体字段包括：
@@ -299,14 +325,15 @@ class VideoSplitByKeyframes(Operator):
         paths_list = video_paths.to_pylist() if video_paths is not None else [None] * n
         binaries_list = video_binaries.to_pylist() if video_binaries is not None else [None] * n
         formats_list = video_formats.to_pylist() if video_formats is not None else [None] * n
+        basenames_list = output_basenames.to_pylist() if output_basenames is not None else [None] * n
 
         all_timestamps = self._extract_timestamps(video_paths, video_binaries, video_formats)
 
         results = []
-        for video, video_binary, video_format, timestamps in zip(
-            paths_list, binaries_list, formats_list, all_timestamps
+        for video, video_binary, video_format, timestamps, basename in zip(
+            paths_list, binaries_list, formats_list, all_timestamps, basenames_list
         ):
-            segments, binaries, formats = self._process_video(video, video_binary, video_format, timestamps)
+            segments, binaries, formats = self._process_video(video, video_binary, video_format, timestamps, basename)
 
             result_dict = {
                 "segments": segments,

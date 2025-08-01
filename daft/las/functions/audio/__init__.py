@@ -15,12 +15,14 @@ from .audio_tts_doubao import AudioTtsDoubao
 from .audio_vad_fsmn import AudioVadFsmn
 from .audio_split_by_duration import AudioSplitByDuration
 from .audio_speaker_verification_eres2net import AudioSpeakerVerificationEres2net
+from .audio_risk_rec import AudioRiskRec
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrWhisper",
     "AudioDuration",
     "AudioLidWhisper",
+    "AudioRiskRec",
     "AudioSize",
     "AudioSourceSeparation",
     "AudioSpeakerDiarization",

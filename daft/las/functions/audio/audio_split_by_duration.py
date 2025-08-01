@@ -47,28 +47,18 @@ class AudioSplitByDuration(Operator):
         output_segments_binary: bool = False,
         segment_duration: float = 5.0,
         min_segment_duration: float = 0.0,
+        output_format: str | None = None,
         **kwargs: Any,
     ) -> None:
         """
         初始化音频时长切分处理器参数
 
         Args:
-            output_tos_dir (str): 切分后的音频片段保存到 TOS 的路径
-                - 如果指定该参数，所有切分后的音频片段将自动上传到该 TOS 路径下的子目录
-                - 支持以 "tos://" 或 "s3://" 开头的远程路径，也支持本地路径
-                - 为空时仅在本地生成片段，不上传
-            output_segments_binary (bool): 是否返回切分后音频片段的二进制数据
-                - True：返回每个片段的二进制内容（适合直接用于后续处理）
-                - False：不返回二进制，仅返回片段路径
-            output_audio_format (bool): 是否返回音频格式信息
-                - True：返回每个片段的音频格式（如 "mp3"、"wav"）
-                - False：不返回格式信息
-            segment_duration (float): 每个片段的时长（单位：秒）
-                - 必须为正数，决定每个音频片段的最大时长
-                - 例如 5.0 表示每 5 秒切分一个片段
-            min_segment_duration (float): 最小片段时长（单位：秒）
-                - 小于该时长的片段不会被单独保存
-                - 例如设置为 1.0，则最后不足 1 秒的片段会被丢弃
+            output_tos_dir: 切分后的音频片段保存到 TOS 的路径
+            output_segments_binary: 是否返回切分后音频片段的二进制数据
+            output_format: 全局指定输出音频格式（如"mp3"、"wav"等），优先级高于输入文件后缀和audio_format列。
+            segment_duration: 每个片段的时长（单位：秒）
+            min_segment_duration: 最小片段时长（单位：秒）
         """  # noqa: D212, D415
         super().__init__(**kwargs)
 
@@ -84,11 +74,13 @@ class AudioSplitByDuration(Operator):
         self.output_segments_binary = output_segments_binary
         self.segment_duration = segment_duration
         self.min_segment_duration = min_segment_duration
+        self.output_format = output_format.lower() if output_format else None
 
         logger.info("Output to TOS dir: %s", self.output_tos_dir)
         logger.info("Output binary data: %s", self.output_segments_binary)
         logger.info("Segment duration: %s", self.segment_duration)
         logger.info("Minimum segment duration: %s", self.min_segment_duration)
+        logger.info("Output format: %s", self.output_format)
 
         log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
@@ -99,6 +91,8 @@ class AudioSplitByDuration(Operator):
         audio_format: str | None,
     ) -> str:
         """Determine the output file extension."""
+        if self.output_format:
+            return f".{self.output_format}"
         if audio_binary is not None and audio_format:
             return f".{audio_format.lower()}"
         if audio_path:
@@ -115,9 +109,13 @@ class AudioSplitByDuration(Operator):
     ) -> bool:
         """Process and save a single audio segment."""
         try:
+            output_kwargs = {"strict": "experimental"}
+            # 如果指定了output_format，则不指定acodec，让ffmpeg自动选择编码器
+            if not self.output_format:
+                output_kwargs["acodec"] = "copy"
             (
                 ffmpeg.input(audio_path, ss=start_time, to=end_time)
-                .output(segment_filename, acodec="copy", strict="experimental")
+                .output(segment_filename, **output_kwargs)
                 .overwrite_output()
                 .run(quiet=True)
             )
@@ -202,15 +200,20 @@ class AudioSplitByDuration(Operator):
         audio_path: str | None,
         audio_binary: bytes | None,
         audio_format: str | None,
+        output_basename: str | None = None,
     ) -> tuple[list[str], list[bytes]]:
         """Process a single audio file."""
         is_valid_audio_path = not_blank(audio_path)
 
+        # 选择子目录名
+        if not_blank(output_basename):
+            audio_sub_dir = output_basename
+        elif is_valid_audio_path:
+            audio_sub_dir = Path(audio_path).stem  # type: ignore[arg-type]
+        else:
+            audio_sub_dir = f"binary_{uuid.uuid4().hex}"
+
         if self.output_tos_dir:
-            if is_valid_audio_path:
-                audio_sub_dir = Path(audio_path).stem  # type: ignore[arg-type]
-            else:
-                audio_sub_dir = f"binary_{uuid.uuid4().hex}"
             tos_output_dir = f"{self.output_tos_dir}/{audio_sub_dir}"
             logger.info("Audio segments tos output dir: %s", tos_output_dir)
             mkdirs(tos_output_dir)
@@ -221,8 +224,7 @@ class AudioSplitByDuration(Operator):
             if is_valid_audio_path:
                 # If audio_path is valid, always use it (prefer path over binary)
                 def process_with_path(local_path: str) -> tuple[list[str], list[bytes]]:
-                    audio_name = ".".join(Path(audio_path).name.split(".")[:-1])  # type: ignore[arg-type]
-                    local_output_dir = Path(local_path).parent / Path(audio_name)
+                    local_output_dir = Path(local_path).parent / audio_sub_dir  # type: ignore[operator]
                     local_output_dir.mkdir(exist_ok=True)
                     return self.split_audio_by_duration(
                         local_path,
@@ -238,12 +240,12 @@ class AudioSplitByDuration(Operator):
                 with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
                     temp_dir = temp_sub_dir.rstrip("/")
                     ext = self._get_output_extension(None, audio_binary, audio_format)
-                    temp_filename = f"binary_input_{uuid.uuid4().hex}{ext}"
+                    temp_filename = f"{audio_sub_dir}{ext}"
                     temp_filepath = Path(temp_dir) / temp_filename
                     with temp_filepath.open("wb") as tmp:
                         tmp.write(audio_binary)
 
-                    local_output_dir = Path(temp_dir) / "segments"
+                    local_output_dir = Path(temp_dir) / audio_sub_dir  # type: ignore[operator]
                     local_output_dir.mkdir(exist_ok=True)
 
                     result = self.split_audio_by_duration(
@@ -267,6 +269,7 @@ class AudioSplitByDuration(Operator):
         audio_paths: pa.Array | None = None,
         audio_binaries: pa.Array | None = None,
         audio_formats: pa.Array | None = None,
+        output_basenames: pa.Array | None = None,
     ) -> pa.Array:
         """根据给定的音频输入批量按时长切分音频
 
@@ -275,9 +278,10 @@ class AudioSplitByDuration(Operator):
         Args:
             audio_paths: 可选，包含音频文件路径的列
             audio_binaries: 可选，包含音频二进制数据的列
-            audio_formats: 可选，包含音频格式字符串的列
+            audio_formats: 可选，包含音频格式字符串的列，指定 audio_binaries 时必须指定该列
+            output_basenames: 可选，包含指定文件名的列
         Returns:
-            结构体数组，包含：
+            一个结构体数组，包含音频切分结果：
                 - segments: 片段路径列表
                 - binaries: 片段二进制数据列表（可选）
         """  # noqa: D415
@@ -295,11 +299,12 @@ class AudioSplitByDuration(Operator):
         paths_list = audio_paths.to_pylist() if audio_paths is not None else [None] * batch_size
         binaries_list = audio_binaries.to_pylist() if audio_binaries is not None else [None] * batch_size
         formats_list = audio_formats.to_pylist() if audio_formats is not None else [None] * batch_size
+        basenames_list = output_basenames.to_pylist() if output_basenames is not None else [None] * batch_size
 
         results = []
 
-        for path, binary, fmt in zip(paths_list, binaries_list, formats_list):
-            segments, binaries = self._process_audio(path, binary, fmt)
+        for path, binary, fmt, basename in zip(paths_list, binaries_list, formats_list, basenames_list):
+            segments, binaries = self._process_audio(path, binary, fmt, basename)
 
             result: dict[str, Any] = {
                 "segments": segments,

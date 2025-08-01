@@ -32,12 +32,12 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir):
         [],
         [],
         [
-            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/耙耙柑大叔/segment_0-5.aac",
-            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/耙耙柑大叔/segment_5-10.aac",
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/耙耙柑大叔/segment_0_0-5_0.wav",
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/耙耙柑大叔/segment_5_0-10_0.wav",
         ],
         [
-            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/sample/segment_0-5.mp3",
-            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/sample/segment_5-10.mp3",
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/sample/segment_0_0-5_0.wav",
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/sample/segment_5_0-10_0.wav",
         ],
     ]
     expected_df = pd.DataFrame(
@@ -51,8 +51,69 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir):
     return input_df, expected_df
 
 
+def generate_test_data_binary(tos_test_data_dir):
+    from daft.las.functions.utils.common_utils import load_file
+
+    sample_audio_path = f"{tos_test_data_dir}/audio/sample.mp3"
+    audio_binary = load_file(sample_audio_path)
+    output_basename = "my_test_audio_202408"
+
+    samples = {
+        "audios": [None],
+        "audio_binaries": [audio_binary],
+        "audio_formats": ["mp3"],
+        "timestamps": [[(0, 5), (5, 10)]],
+        "output_basenames": [output_basename],
+    }
+
+    input_df = pd.DataFrame(samples)
+
+    expected_segments = [
+        [
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/{output_basename}/segment_0_0-5_0.mp3",
+            f"{tos_test_data_dir}/audio/audio_split_by_timestamps/{output_basename}/segment_5_0-10_0.mp3",
+        ]
+    ]
+    expected_df = pd.DataFrame(
+        {
+            "audios": samples["audios"],
+            "audio_binaries": samples["audio_binaries"],
+            "audio_formats": samples["audio_formats"],
+            "timestamps": samples["timestamps"],
+            "output_basenames": samples["output_basenames"],
+            "results.segments": expected_segments,
+        }
+    )
+    return input_df, expected_df
+
+
 def test_audio_split_by_timestamps(tos_test_data_dir, local_test_data_dir):
     input_df, expected_df = generate_test_data(tos_test_data_dir, local_test_data_dir)
+
+    df = daft.from_pandas(input_df)
+
+    output_tos_dir = f"{tos_test_data_dir}/audio/audio_split_by_timestamps"
+    constructor_kwargs = {
+        "output_tos_dir": output_tos_dir,
+        "output_format": "wav",
+    }
+
+    df = df.with_column(
+        "results",
+        las_udf(AudioSplitByTimestamps, construct_args=constructor_kwargs)(col("timestamps"), col("audios")),
+    )
+    df = df.with_column("results.segments", col("results").struct.get("segments"))
+    actual_df = df.select("audios", "timestamps", "results.segments").to_pandas()
+
+    for segs in actual_df["results.segments"]:
+        for seg in segs:
+            assert seg.endswith(".wav")
+
+    assert_dataframe_result(actual_df, expected_df)
+
+
+def test_audio_split_by_timestamps_binary_and_basename(tos_test_data_dir):
+    input_df, expected_df = generate_test_data_binary(tos_test_data_dir)
 
     df = daft.from_pandas(input_df)
 
@@ -63,9 +124,17 @@ def test_audio_split_by_timestamps(tos_test_data_dir, local_test_data_dir):
 
     df = df.with_column(
         "results",
-        las_udf(AudioSplitByTimestamps, construct_args=constructor_kwargs)(col("timestamps"), col("audios")),
+        las_udf(AudioSplitByTimestamps, construct_args=constructor_kwargs)(
+            col("timestamps"),
+            col("audios"),
+            col("audio_binaries"),
+            col("audio_formats"),
+            col("output_basenames"),
+        ),
     )
     df = df.with_column("results.segments", col("results").struct.get("segments"))
-    actual_df = df.select("audios", "timestamps", "results.segments").to_pandas()
+    actual_df = df.select(
+        "audios", "audio_binaries", "audio_formats", "timestamps", "output_basenames", "results.segments"
+    ).to_pandas()
 
     assert_dataframe_result(actual_df, expected_df)
