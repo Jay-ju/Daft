@@ -146,7 +146,7 @@ class LasDatasetClient:
             method="POST",
             params={},
             headers={},
-            action="ExistsDataset",
+            action="CheckDatasetExists",
             body=body,
         )
         return bool(response.json()["Result"]["Exists"])
