@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class PDFParse(Operator):
-    """**PDF 智能文档解析处理器，支持多维度内容提取与结构化输出。**
+    """**PDF 智能文档解析处理器，支持多维度内容提取与结构化输出**
 
     **核心功能**
     - 高精度 PDF 文本提取
@@ -44,10 +44,10 @@ class PDFParse(Operator):
     - 服务 QPS 较低，建议设置并发量为1
     - 大文档处理可能需要较长时间
 
-    Notes
+    Notes:
     -----
     算子使用前置条件：开通视觉智能产品-文字识别-智能文档解析服务，产品链接见：https://www.volcengine.com/docs/6790/117690
-    """  # noqa: D415, D416
+    """  # noqa: D415
 
     def __init__(
         self,
