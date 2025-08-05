@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
@@ -58,6 +59,7 @@ def generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_
     return pd.DataFrame({"image_binary": image_binary})
 
 
+@pytest.mark.gpu
 def test_clip_embedding_txt(local_models_dir):
     model_list = [
         "iic/multi-modal_clip-vit-large-patch14_zh",
@@ -91,6 +93,7 @@ def test_clip_embedding_txt(local_models_dir):
     assert actual_df["embedding"][4] is None
 
 
+@pytest.mark.gpu
 def test_clip_embedding_img(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
@@ -119,6 +122,7 @@ def test_clip_embedding_img(local_models_dir, tos_test_data_dir, local_test_data
     assert math.fabs(actual_df["embedding"][2][0] - 0.0477461) < 0.001
 
 
+@pytest.mark.gpu
 def test_clip_embedding_img_base64(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_base64(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
@@ -146,6 +150,7 @@ def test_clip_embedding_img_base64(local_models_dir, tos_test_data_dir, local_te
     assert math.fabs(actual_df["embedding"][0][0] - 0.0477461) < 0.001
 
 
+@pytest.mark.gpu
 def test_clip_embedding_img_binary(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

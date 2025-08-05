@@ -92,6 +92,10 @@ ve-test: .venv build  ## Run tests
 test-las: .venv build
 	$(VENV_BIN)/pytest tests/las tests/io/test_las_dataset.py -m "not ark_llm" --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
 
+.PHONY: test-las-cpu
+test-las-cpu: .venv build
+	$(VENV_BIN)/pytest tests/las tests/io/test_las_dataset.py -m "not ark_llm and not gpu" --ignore tests/las/functions/ark_llm/test_ark_llm_generate.py -s
+
 .PHONY: doctests
 doctests: .venv
 	DAFT_BOLD_TABLE_HEADERS=0 DAFT_PROGRESS_BAR=0 $(VENV_BIN)/pytest --doctest-modules --continue-on-collection-errors --ignore=daft/functions/llm.py --ignore=daft/functions/ai/__init__.py daft/dataframe/dataframe.py daft/expressions/expressions.py daft/convert.py daft/udf/__init__.py daft/functions/ daft/datatype.py

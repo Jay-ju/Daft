@@ -37,6 +37,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     )
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("extractor_type", ["justext", "trafilatura", "goose3"])
 def test_commoncrawl_content_extractor(tos_test_data_dir, local_test_data_dir, http_test_data_dir, extractor_type):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)

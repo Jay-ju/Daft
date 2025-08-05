@@ -56,6 +56,7 @@ def generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_
     return pd.DataFrame({"image_binary": image_binary})
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize(
     "model_name",
     [
@@ -94,6 +95,7 @@ def test_vit_embedding(local_models_dir, tos_test_data_dir, local_test_data_dir,
         assert math.fabs(actual_df["embedding"][2][0] - 0.006334126) < 0.001
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("dtype", ["bfloat16", "float16", "float32"])
 def test_vit_embedding_img_base64(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir, dtype):
     input_df = generate_test_data_base64(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
@@ -122,6 +124,7 @@ def test_vit_embedding_img_base64(local_models_dir, tos_test_data_dir, local_tes
     assert math.fabs(actual_df["embedding"][0][0] - 0.0079315146) < 0.001
 
 
+@pytest.mark.gpu
 def test_vit_embedding_img_binary(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

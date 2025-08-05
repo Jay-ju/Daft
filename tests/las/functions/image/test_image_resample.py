@@ -57,6 +57,7 @@ def generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_
     return pd.DataFrame({"image_binary": image_binary, "image_name": image_name})
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("method", ["nearest", "bilinear", "bicubic", "lanczos"])
 def test_image_resample(tos_test_data_dir, local_test_data_dir, http_test_data_dir, method):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
@@ -84,6 +85,7 @@ def test_image_resample(tos_test_data_dir, local_test_data_dir, http_test_data_d
     assert "iVBORw0KGgoAAAA" in actual_df["image_resample"][2]["base64"]
 
 
+@pytest.mark.gpu
 def test_image_resample_base64(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_base64(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
@@ -109,6 +111,7 @@ def test_image_resample_base64(tos_test_data_dir, local_test_data_dir, http_test
     assert "iVBORw0KGgoAAAA" in actual_df["image_resample"][2]["base64"]
 
 
+@pytest.mark.gpu
 def test_image_resample_binary(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

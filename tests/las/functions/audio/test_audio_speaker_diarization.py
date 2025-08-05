@@ -6,6 +6,7 @@ import os
 import random
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
@@ -62,6 +63,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return input_df, expected_df
 
 
+@pytest.mark.gpu
 def test_diarization_audio_speaker(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df, expected_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
     ds = daft.from_pandas(input_df)

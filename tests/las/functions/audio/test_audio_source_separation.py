@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
@@ -22,6 +23,7 @@ def generate_test_data(tos_test_data_dir: str) -> pd.DataFrame:
     )
 
 
+@pytest.mark.gpu
 def test_audio_source_separation(tos_test_data_dir: str, local_models_dir: str):
     input_df = generate_test_data(tos_test_data_dir)
 

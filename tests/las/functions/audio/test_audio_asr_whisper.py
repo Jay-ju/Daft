@@ -38,6 +38,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return pd.DataFrame({"audio_path": paths})
 
 
+@pytest.mark.gpu
 def test_audio_asr_whisper(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

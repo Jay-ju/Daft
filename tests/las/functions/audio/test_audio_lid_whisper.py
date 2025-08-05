@@ -6,6 +6,7 @@ import os
 import random
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
@@ -31,6 +32,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return pd.DataFrame({"audio_path": paths})
 
 
+@pytest.mark.gpu
 def test_audio_lid_whisper(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

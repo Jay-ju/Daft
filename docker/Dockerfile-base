@@ -14,7 +14,7 @@ ENV HOME=/root
 
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime\
     && apt update -y \
-    && apt install -y wget vim git tzdata unzip sudo iputils-ping curl telnet openssh-server openssh-client software-properties-common \
+    && apt install -y wget vim git tzdata unzip sudo iputils-ping curl telnet openssh-server openssh-client software-properties-common gcc build-essential cmake libboost-all-dev zlib1g-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt clean \
     && PY_V=$(echo $PYTHON_VERSION | sed 's;\.;;g') \

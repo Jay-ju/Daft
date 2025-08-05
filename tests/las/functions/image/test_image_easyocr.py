@@ -53,6 +53,7 @@ def generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_
     return pd.DataFrame({"image_binary": image_binary})
 
 
+@pytest.mark.gpu
 @pytest.mark.parametrize("quantize", [True, False])
 def test_easyocr(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir, quantize):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
@@ -79,6 +80,7 @@ def test_easyocr(local_models_dir, tos_test_data_dir, local_test_data_dir, http_
     assert "人生四然" in actual_df["ocr_result"][2]
 
 
+@pytest.mark.gpu
 def test_easyocr_base64(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_base64(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
@@ -104,6 +106,7 @@ def test_easyocr_base64(local_models_dir, tos_test_data_dir, local_test_data_dir
     assert "人生四然" in actual_df["ocr_result"][2]
 
 
+@pytest.mark.gpu
 def test_easyocr_binary(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data_binary(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
