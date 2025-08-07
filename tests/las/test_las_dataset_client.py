@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import daft
 from daft.daft import IOConfig
-from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig, LasDatasetFormat, LasDatasetInfo
+from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig, LasDatasetInfo
 from daft.las.io.tos import TOSConfig
 
 
-def test_las_dataset(uuid_short, monkeypatch, object_store_test_dir):
+def test_las_dataset_client(uuid_short, monkeypatch, object_store_test_dir):
     monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
 
     config: LasDatasetConfig = LasDatasetConfig()
@@ -24,10 +24,9 @@ def test_las_dataset(uuid_short, monkeypatch, object_store_test_dir):
     ds_name = "test_dataset_" + uuid_short
     expected = LasDatasetInfo(
         name=ds_name,
-        format=LasDatasetFormat.CSV,
+        format="CSV",
         nick_name=ds_name,
         data_path=data_path,
-        labels=["test_dataset"],
         description="A dataset for test",
     )
 

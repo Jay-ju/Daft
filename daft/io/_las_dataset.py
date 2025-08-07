@@ -35,26 +35,26 @@ def read_las_dataset(name: str, io_config: IOConfig | None, **kwargs: Any) -> Da
 
     dataset_info = client.get_dataset(name=name)
 
-    format = dataset_info.format
+    format = dataset_info.format.lower()  # type: ignore
     assert dataset_info.data_path is not None
 
     path = dataset_info.data_path
     if path.startswith("tos://"):
         path = path.replace("tos://", "s3://")
 
-    if format.name == "CSV":
+    if format == "csv":
         kwargs.pop("path", None)
         return read_csv(path=path, io_config=io_config, **kwargs)
-    elif format.name == "PARQUET":
+    elif format == "parquet":
         kwargs.pop("path", None)
         return read_parquet(path=path, io_config=io_config, **kwargs)
-    elif format.name == "LANCE":
+    elif format == "lance":
         kwargs.pop("url", None)
         return read_lance(url=path, io_config=io_config, **kwargs)
-    elif format.name == "ICEBERG":
+    elif format == "iceberg":
         kwargs.pop("table", None)
         table = dataset_info.table
         assert table is not None
         return read_iceberg(table=table, io_config=io_config, **kwargs)
     else:
-        raise ValueError(f"Unsupported data format: {format.name}")
+        raise ValueError(f"Unsupported data format: {format}")

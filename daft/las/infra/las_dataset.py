@@ -38,25 +38,39 @@ class LasDatasetFormat(Enum):
     TEXT = 10
 
 
-class Privacy(Enum):
-    PUBLIC = 1
-    PRIVATE = 2
+las_dataset_privacy = {
+    "public": "Public",
+    "private": "Private",
+}
 
 
-class Storage(Enum):
-    TOS = 1
-    VEPFS = 2
+las_dataset_format = {
+    "csv": "CSV",
+    "json": "JSONL",
+    "jsonl": "JSONL",
+    "parquet": "Parquet",
+    "lance": "Lance",
+    "iceberg": "Iceberg",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "text": "Text",
+    "webdataset": "WebDataset",
+}
+
+
+las_dataset_storage = {"tos": "TOS", "vepfs": "vePFS"}
 
 
 @dataclass
 class LasDatasetInfo:
     name: str
-    format: LasDatasetFormat
+    format: str | None = None
     nick_name: str | None = None
-    storage: Storage = Storage.TOS
+    storage: str = "TOS"
     data_path: str | None = None
-    labels: list[str] | None = None
-    privacy: Privacy = Privacy.PUBLIC
+    tags: list[str] | None = None
+    privacy: str = "Private"
     description: str | None = None
     table: str | None = None
 
@@ -125,11 +139,11 @@ class LasDatasetClient:
         body = {
             "DatasetName": dataset.name,
             "Nickname": dataset.nick_name,
-            "Format": dataset.format.name,
-            "Storage": dataset.storage.name,
+            "Format": dataset.format,
+            "Storage": dataset.storage,
             "DataPath": dataset.data_path,
-            "Labels": dataset.labels,
-            "Privacy": dataset.privacy.name,
+            "Tags": dataset.tags,
+            "Privacy": dataset.privacy,
             "Description": dataset.description,
         }
         self.api_client.call_api(
@@ -163,21 +177,21 @@ class LasDatasetClient:
         result = response.json()["Result"]
 
         table: str | None = None
-        if result["Catalog"] is not None:
+        if result.get("Catalog", None) is not None:
             catalog = result["Catalog"]
             catalog_name = catalog["CatalogName"]
             schema_name = catalog["SchemaName"]
-            table_name = catalog_name["TableName"]
+            table_name = catalog["TableName"]
             table = f"{catalog_name}.{schema_name}.{table_name}"
 
         return LasDatasetInfo(
-            name=result["DatasetName"],
-            nick_name=result["Nickname"],
-            labels=result["Labels"],
-            privacy=Privacy[result["Privacy"]],
-            description=result["Description"],
-            format=LasDatasetFormat[result["Format"].upper()],
-            storage=Storage[result["Storage"].upper()],
-            data_path=result["DataPath"],
+            name=result.get("DatasetName", None),
+            nick_name=result.get("Nickname", None),
+            tags=result.get("Labels", None),
+            privacy=result.get("Privacy", None),
+            description=result.get("Description", None),
+            format=result.get("Format", None),
+            storage=result.get("Storage", None),
+            data_path=result.get("DataPath", None),
             table=table,
         )

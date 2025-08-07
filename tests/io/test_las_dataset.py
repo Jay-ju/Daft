@@ -8,7 +8,7 @@ from daft.daft import IOConfig
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig
 from daft.las.io.tos import TOSConfig
 
-formats = ["csv", "parquet", "lance"]
+formats = ["CSV", "Parquet", "Lance"]
 
 data = {"name": ["Bush", "Obama", "Trump"], "age": [79, 64, 79]}
 
@@ -34,7 +34,6 @@ def test_las_dataset_basic(format, uuid_short, object_store_test_dir, monkeypatc
         io_config=io_config,
         format=format,
         nick_name=dataset_nickname,
-        labels=["label1", "label2"],
         privacy="PRIVATE",
         description="This is test dataset",
     )
@@ -59,7 +58,7 @@ def test_append_data(uuid_short, object_store_test_dir, monkeypatch):
 
     # 2. write dataset, but didn't provide root_dir
     with pytest.raises(ValueError, match=r"You must specify the 'root_dir'*"):
-        dataframe.write_las_dataset(name=dataset_name)
+        dataframe.write_las_dataset(name=dataset_name, format="csv")
 
     # 3. write the dataset and make sure it has been created
     dataframe.write_las_dataset(
@@ -68,7 +67,6 @@ def test_append_data(uuid_short, object_store_test_dir, monkeypatch):
         io_config=io_config,
         format="csv",
         nick_name=dataset_nickname,
-        labels=["label1", "label2"],
         privacy="PRIVATE",
         description="This is test dataset",
     )
@@ -80,10 +78,10 @@ def test_append_data(uuid_short, object_store_test_dir, monkeypatch):
 
     # 5. write the existing dataset, but provide different root_dir
     with pytest.raises(ValueError, match="already exists, but the data path it records"):
-        dataframe.write_las_dataset(name=dataset_name, root_dir="tos://another/non/exist/root_dir")
+        dataframe.write_las_dataset(name=dataset_name, root_dir="tos://another/non/exist/root_dir", format="csv")
 
     # 6. write to the existing dataset
-    dataframe.write_las_dataset(name=dataset_name, io_config=io_config)
+    dataframe.write_las_dataset(name=dataset_name, io_config=io_config, format="csv")
 
     # 7. read the dataset and check the result
     actual = daft.read_las_dataset(name=dataset_name, io_config=io_config)
