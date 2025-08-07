@@ -13,7 +13,7 @@ import numpy as np  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
+from daft.las.functions.utils.common_utils import run_on_local_path, tracking_usage
 from daft.las.io import mkdirs, upload_file
 from daft.las.utils import not_blank
 
@@ -64,7 +64,7 @@ class AudioSplitByTimestamps(Operator):
         logger.info("Output binary data: %s", self.output_segments_binary)
         logger.info("Output format: %s", self.output_format)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
     def _process_segment(
         self,

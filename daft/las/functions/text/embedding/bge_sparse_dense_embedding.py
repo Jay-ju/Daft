@@ -9,7 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class BgeSparseDenseEmbedding(Operator):
 
         self.embedding_model = BGEM3FlagModel(model_dir, use_fp16=use_fp16, device=device)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _generate_embeddings(self, texts: list[str]) -> dict[str, Any]:
         logger.debug("Start model inference with batch_size=%s", self.batch_size)

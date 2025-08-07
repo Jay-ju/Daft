@@ -9,7 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.functions.utils.image_utils import decode_image
 
 logger = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ class ClipEmbedding(Operator):
             self.model_device,
         )
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def transform(self, content: pa.Array) -> pa.Array:
         """批量生成文本或图像的CLIP嵌入向量

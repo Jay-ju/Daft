@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import base64
+import logging
 import os
 import tempfile
-import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from daft.las.infra.tos_client import TosClient
 from daft.las.io import download_file, exists, upload_file
-
-if TYPE_CHECKING:
-    import logging
 
 T = TypeVar("T")
 
@@ -212,6 +209,23 @@ def pre_sign_url_for_tos(url: str, expires: int | None = None) -> str:
     return TosClient().pre_sign_url(url, expires)
 
 
-def log_op_call(logger: logging.Logger, op: str, model_service_or_lib: str | None = None) -> None:
-    ts = time.strftime("%Y/%m/%d %H:%M:%S", time.localtime())
-    logger.info("Operator calling info: %s - %s - %s", ts, op, model_service_or_lib)
+def _init_tracking_logger() -> logging.Logger:
+    logging_level_str = os.getenv("LOG_LEVEL_FOR_USAGE_TRACKING", "WARN")
+    logging_level = logging.getLevelName(logging_level_str.upper())
+    if not isinstance(logging_level, int):
+        raise ValueError(f"Invalid settings of LOG_LEVEL_FOR_USAGE_TRACKING: {logging_level_str}")
+
+    usage_tracking_logger = logging.getLogger("UsageTracking")
+    usage_tracking_logger.setLevel(logging_level)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
+    handler.setFormatter(formatter)
+    usage_tracking_logger.addHandler(handler)
+    return usage_tracking_logger
+
+
+usage_tracking_logger = _init_tracking_logger()
+
+
+def tracking_usage(op: str, model_service_or_lib: str | None = None) -> None:
+    usage_tracking_logger.info("Operator calling info: {op: %s, model_or_lib: %s}", op, model_service_or_lib)

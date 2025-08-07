@@ -10,7 +10,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, save_file_to_local
+from daft.las.functions.utils.common_utils import save_file_to_local, tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +156,7 @@ class QwenVLVideoUnderstanding(Operator):
 
         self.processor = AutoProcessor.from_pretrained(str(model_dir), trust_remote_code=True)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _build_message_template(self, tmp_file_name: str) -> list[dict[str, Any]]:
         message: list[dict[str, Any]] = [

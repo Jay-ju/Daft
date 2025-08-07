@@ -11,9 +11,9 @@ from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.common_utils import (
     base64_to_byte,
-    log_op_call,
     path_to_byte,
     run_on_local_path,
+    tracking_usage,
 )
 
 logger = logging.getLogger(__name__)
@@ -186,7 +186,7 @@ class AudioAsrWhisper(Operator):
             logger.critical("Pipeline creation failed!")
             raise RuntimeError("ASR pipeline initialization failed") from e
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     @staticmethod
     def _update_timestamps(timestamps: list[list[float]]) -> list[list[float]]:

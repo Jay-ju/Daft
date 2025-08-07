@@ -9,7 +9,7 @@ from typing import Any, Callable
 from daft.dependencies import pa
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.infra.las_ark import (
     DEFAULT_MAX_CONCURRENCY,
     DEFAULT_REQUEST_TIMEOUT,
@@ -112,7 +112,7 @@ class DoubaoEmbeddingVision(Operator):
 
         self.client = LasArkClient(config=ark_config)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=model)
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:

@@ -11,7 +11,7 @@ from typing import Any
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +101,7 @@ class AudioLidWhisper(Operator):
             self.language_map = json.load(f)[0]
         logger.info("Language map: %s", self.language_map)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def transform(self, audios: pa.Array) -> pa.Array:
         """批量处理音频数组生成语言识别结果.

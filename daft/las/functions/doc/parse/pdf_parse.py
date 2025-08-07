@@ -23,7 +23,7 @@ import pdfplumber
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.infra.visual_service import VisualServiceConfig, get_visual_service
 from daft.las.io import mkdirs, upload_file
 
@@ -134,7 +134,7 @@ class PDFParse(Operator):
         self.base_delay = 1.5
         self._visual_service = get_visual_service(VisualServiceConfig.from_env())
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="visual service")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="visual service")
 
     def get_pdf_page_count_from_base64(self, base64_str: str) -> int:
         try:

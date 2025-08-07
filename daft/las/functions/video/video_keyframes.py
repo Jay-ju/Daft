@@ -16,7 +16,7 @@ from cv2 import CAP_PROP_POS_MSEC
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
+from daft.las.functions.utils.common_utils import run_on_local_path, tracking_usage
 from daft.las.functions.utils.video_utils import decode_video
 from daft.las.io import mkdirs, upload_file
 
@@ -89,7 +89,7 @@ class VideoKeyframes(Operator):
         logger.info("The count of extracting keyframe : %s", self.keyframes_cnt)
         logger.info("The seconds per frame : %s", self.seconds_per_frame)
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="cv2")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="cv2")
 
     def extract_keyframes_by_img_feature(
         self, video_path: str, local_output_path: str, tos_output_dir: str | None

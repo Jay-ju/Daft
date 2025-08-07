@@ -13,7 +13,7 @@ import numpy as np  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path
+from daft.las.functions.utils.common_utils import run_on_local_path, tracking_usage
 from daft.las.io import mkdirs, upload_file
 from daft.las.utils import not_blank
 
@@ -78,7 +78,7 @@ class VideoExtractAudio(Operator):
         self.output_format = output_format.lower()
         self.output_sample_rate = output_sample_rate
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="ffmpeg")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
     def _extract_audio_from_video(
         self,

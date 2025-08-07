@@ -15,7 +15,7 @@ from PIL import Image  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.functions.utils.image_utils import decode_image
 from daft.las.io import upload_file
 
@@ -97,7 +97,7 @@ class ImageResample(Operator):
 
         self.tos_dir = self.tos_dir.strip("/") if self.tos_dir else ""
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="PIL")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="PIL")
 
     def _resample_image(self, image: Image.Image) -> tuple[Image.Image, str]:
         method_map = {

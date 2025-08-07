@@ -12,7 +12,7 @@ from tenacity import before_sleep_log, retry, retry_if_exception_type, stop_afte
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.infra.content_security import ContentSecurityConfig, get_content_security_service
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ class AudioRiskRec(Operator):
         self.async_result_timeout = self.timeout - 1 if self.timeout > 1 else self.timeout
         self.num_coroutines = num_coroutines
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="Content Security")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="Content Security")
 
     @retry(  # type: ignore[misc]
         wait=wait_exponential(multiplier=1.5, min=1, max=10),

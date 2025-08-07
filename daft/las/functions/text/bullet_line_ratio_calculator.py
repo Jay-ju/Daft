@@ -7,7 +7,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.functions.utils.special_characters import BULLET_POINTS
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class BulletLineRatioCalculator(Operator):
 
         logger.info("Bullet line ratio calculator initialized successfully")
 
-        log_op_call(logger=logger, op=self.__class__.__name__)
+        tracking_usage(op=self.__class__.__name__)
 
     def _calculate_bullet_ratio(self, text: str) -> float:
         lines = [line for line in text.splitlines() if line.strip()]

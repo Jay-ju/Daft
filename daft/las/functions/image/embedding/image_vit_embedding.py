@@ -9,7 +9,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.functions.utils.image_utils import decode_image
 
 logger = logging.getLogger(__name__)
@@ -133,7 +133,7 @@ class ImageViTEmbedding(Operator):
             )
             self._model.to(f"cuda:{rank}")
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def _generate_embedding(self, current_batch: list[Any]) -> list[str | None]:
         import torch

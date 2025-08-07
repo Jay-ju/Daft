@@ -7,7 +7,7 @@ from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class RepeatedLinesCalculator(Operator):
 
         logger.info("Repeated lines calculator initialized successfully")
 
-        log_op_call(logger=logger, op=self.__class__.__name__)
+        tracking_usage(op=self.__class__.__name__)
 
     def _calculate_repeated_ratio(self, text: str) -> float:
         lines = [line for line in text.splitlines() if line.strip()]

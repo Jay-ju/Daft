@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from daft.dependencies import pa
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.llm_generate_utils import gen_text_message
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.infra.las_ark import (
     DEFAULT_INFERENCE_TYPE,
     DEFAULT_MAX_CONCURRENCY,
@@ -137,7 +137,7 @@ class ArkLLMTextGenerate(ArkLLMGenerate):
         self.system_content = system_content
         self.prompt = prompt
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=model)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=model)
 
     def transform(self, raw_text: pa.Array) -> pa.Array:
         """批量使用大模型对文本内容进行理解和回复.

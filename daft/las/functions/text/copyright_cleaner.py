@@ -9,7 +9,7 @@ import regex as re
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call
+from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class CopyrightCleaner(Operator):
 
         logger.info("Copyright cleaner initialized successfully")
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="regex")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="regex")
 
     def _clean_copyright_content(self, content: str) -> str:
         block_match = self.block_comment_pattern.search(content)

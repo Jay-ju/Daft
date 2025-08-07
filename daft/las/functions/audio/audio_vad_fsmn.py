@@ -13,7 +13,7 @@ import numpy as np  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, save_file_to_local
+from daft.las.functions.utils.common_utils import save_file_to_local, tracking_usage
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class AudioVadFsmn(Operator):
             self.audio_src_type,
         )
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib=self.model_name)
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
     def transform(self, videos: pa.Array) -> pa.Array:
         """批量处理音频数组，提取语音端点时间戳.

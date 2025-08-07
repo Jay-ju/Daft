@@ -10,7 +10,7 @@ import pandas as pd  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import log_op_call, run_on_local_path, upload_folder
+from daft.las.functions.utils.common_utils import run_on_local_path, tracking_usage, upload_folder
 from daft.las.io import mkdirs
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class XlsxParse(Operator):
             raise ValueError("Invalid output_tos_path: it should be a valid tos path")
         self.output_tos_path = output_tos_path
 
-        log_op_call(logger=logger, op=self.__class__.__name__, model_service_or_lib="pandas")
+        tracking_usage(op=self.__class__.__name__, model_service_or_lib="pandas")
 
     def transform(
         self,
