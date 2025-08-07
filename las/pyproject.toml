@@ -8,13 +8,13 @@ dependencies = []
 description = "The LAS Extension of Daft"
 dynamic = ["version"]
 license = {file = "LICENSE"}
-name = "daft-las"
+name = "ve-daft-las"
 readme = "README.rst"
 requires-python = ">=3.9"
 
 [tool.hatch.build]
 targets.wheel.artifacts = ["daft"]
-targets.wheel.packages = ["daft-las"]
+targets.wheel.packages = ["daft"]
 
 [tool.hatch.version]
 path = "_version.py"
