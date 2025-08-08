@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 import logging
 import os
 from io import BytesIO
@@ -33,6 +32,7 @@ class CommonCrawlContentExtractor(Operator):
 
     def __init__(
         self,
+        warc_src_type: str,
         extractor_type: str = "trafilatura",
         max_records: int | None = None,
         **kwargs: Any,
@@ -40,6 +40,12 @@ class CommonCrawlContentExtractor(Operator):
         """初始化CommonCrawl内容提取器
 
         Args:
+            warc_src_type: WARC数据来源类型
+                支持的WARC格式类型，包含：
+                - warc_binary: 原始二进制数据
+                - warc_base64: Base64编码数据
+                - warc_url: 文件路径或TOS存储链接
+                可选值：["warc_binary", "warc_url", "warc_base64"]
             extractor_type: 选择使用的网页内容提取器类型
                 可选值：["trafilatura", "justext", "goose3"]
                 默认值："trafilatura"
@@ -48,11 +54,16 @@ class CommonCrawlContentExtractor(Operator):
             **kwargs: 其他参数
         """  # noqa: D415
         super().__init__(**kwargs)
+        self.warc_src_type = warc_src_type
         self.extractor_type = extractor_type
         self.max_records = max_records
         self._loaded_extractors: dict[str, Any] = {}
         self._load_extractor(extractor_type)
-        logger.info("Initialized CommonCrawl content extractor with extractor_type: %s", extractor_type)
+        logger.info(
+            "Initialized CommonCrawl content extractor with warc_src_type: %s, extractor_type: %s",
+            warc_src_type,
+            extractor_type,
+        )
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.extractor_type)
 
@@ -161,54 +172,54 @@ class CommonCrawlContentExtractor(Operator):
         logger.info("Processed %s: total=%d, extracted=%d", source, processed_count, len(results))
         return results
 
-    def _process_warc_file(self, warc_path: str) -> list[dict[str, Any]]:
-        def inner(local_path: str) -> list[dict[str, Any]]:
-            with open(local_path, "rb") as f:
-                return self._process_warc_stream(f, os.path.basename(warc_path))
-
-        return run_on_local_path(warc_path, inner)
-
-    def _process_warc_bytes(self, warc_bytes: bytes) -> list[dict[str, Any]]:
-        return self._process_warc_stream(BytesIO(warc_bytes), "[binary_input]")
-
-    def _process_warc_data(self, warc_input: str | bytes) -> list[dict[str, Any]]:
-        logger.info("Processing input of type: %s", type(warc_input))
-        if isinstance(warc_input, bytes):
-            return self._process_warc_bytes(warc_input)
-        elif isinstance(warc_input, str):
-            if warc_input.startswith("data:application/octet-stream;base64,"):
-                base64_data = warc_input.split(",", 1)[1]
-                binary_data = base64.b64decode(base64_data)
-                return self._process_warc_bytes(binary_data)
-            else:
-                return self._process_warc_file(warc_input)
-        else:
-            raise ValueError(f"Unsupported input type: {type(warc_input)}")
-
     def transform(self, warc_files: pa.Array) -> pa.Array:
         """批量处理WARC数据，提取网页正文
 
         Args:
-            warc_files: 包含WARC数据的列，支持文件路径、TOS路径、二进制数据和base64编码
+            warc_files: 包含WARC数据的列，支持以下格式：
+                - warc_base64: base64编码的WARC字符串
+                - warc_url: WARC文件路径或TOS链接
+                - warc_binary: 原始WARC二进制数据
 
         Returns:
-            pyarrow.Array: 处理后的列，包含提取的文本内容列表
-                每个元素是一个字典列表，包含url、content、warc_file、extractor字段
+            pyarrow.Array: 提取结果列表，每个元素包含以下字段：
+                - url: 网页URL
+                - content: 提取的正文内容
+                - warc_file: 源WARC文件标识
+                - extractor: 使用的提取器名称
+
+        Raises:
+            ValueError: 当warc_src_type不支持时抛出
+            Exception: 处理过程中出现未捕获的异常时抛出
         """  # noqa: D415
-        logger.debug("Processing %s WARC files using %s", len(warc_files), self.extractor_type)
+        logger.info("Processing WARC source type: %s", self.warc_src_type)
 
+        results = []
         warc_list = warc_files.to_pylist()
-        results: list[list[dict[str, Any]] | None] = []
 
-        for path in warc_list:
+        for warc_input in warc_list:
             try:
-                if not path:
-                    results.append(None)
+                if self.warc_src_type == "warc_base64":
+                    from daft.las.functions.utils.common_utils import base64_to_byte
+
+                    warc_binary = base64_to_byte(warc_input)
+                    source_name = "[base64_input]"
+                elif self.warc_src_type == "warc_url":
+                    from daft.las.functions.utils.common_utils import path_to_byte
+
+                    warc_binary = run_on_local_path(warc_input, lambda path: path_to_byte(path))
+                    source_name = os.path.basename(warc_input) if isinstance(warc_input, str) else "[url_input]"
+                elif self.warc_src_type == "warc_binary":
+                    warc_binary = warc_input
+                    source_name = "[binary_input]"
                 else:
-                    results.append(self._process_warc_data(path))
-            except Exception:
-                logger.exception("Error processing WARC file: %s", path)
-                results.append(None)
+                    raise ValueError(f"Unsupported warc_src_type: {self.warc_src_type}")
+
+                extracted_content = self._process_warc_stream(BytesIO(warc_binary), source_name)
+                results.append(extracted_content)
+            except Exception as e:
+                logger.error("Failed to process WARC data: %s", str(e))
+                results.append([])
 
         return pa.array(results, type=self.__return_column_type__())
 
