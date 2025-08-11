@@ -6,11 +6,11 @@ requires = ["hatchling", "setuptools_scm"]
 authors = [{name = "Las Team, Volc corp."}]
 dependencies = []
 description = "The LAS Extension of Daft"
-dynamic = ["version"]
 license = {file = "LICENSE"}
 name = "ve-daft-las"
 readme = "README.rst"
 requires-python = ">=3.9"
+version = "1.0.0"
 
 [tool.hatch.build]
 targets.wheel.artifacts = ["daft"]

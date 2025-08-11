@@ -25,7 +25,7 @@ DIR="$(cd "`dirname "$0"`"/..; pwd)"
 # Initialize Environment
 # ========================
 
-NAME="daft"
+NAME="ve-daft"
 VERSION=""
 
 # Parse command-line arguments
@@ -199,8 +199,20 @@ case "$OS" in
 esac
 
 # ===============================================
-# Build Daft-libs Wheels - Platform Independent
+# Build Daft-las Wheels - Platform Independent
 # ===============================================
+
+# Patch name for LTS builds
+if [[ "$LTS" == "true" ]]; then
+    echo "Patching project name to '$NAME-las-lts' for LTS build"
+    tomlq -i -t ".project.name = \"$NAME-las-lts\"" las/pyproject.toml
+else
+    echo "Patching project name to '$NAME-las' for non-LTS build"
+    tomlq -i -t ".project.name = \"$NAME-las\"" las/pyproject.toml
+fi
+
+# Set the version of the ve-daft-las lib.
+tomlq -i -t ".project.version = \"$VERSION\"" las/pyproject.toml
 
 # Replace dependencies in ../las/pyproject.toml with that in ../pyproject.toml
 TEXT=$(tomlq '.project["optional-dependencies"].las' "$DIR/pyproject.toml")
