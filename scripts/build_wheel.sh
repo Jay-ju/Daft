@@ -222,7 +222,7 @@ if awk -v repl="$REPLACEMENT" '
     $0 == "dependencies = []" {found=1; print repl; next}
     {print}
     END {exit !found}
-' $DIR/pyproject.toml > tmp; then
+' $DIR/las/pyproject.toml > tmp; then
     mv tmp $DIR/las/pyproject.toml
     echo "replace dependencies success"
 else

@@ -12,13 +12,13 @@ readme = "README.rst"
 requires-python = ">=3.9"
 version = "1.0.0"
 
+[project.optional-dependencies]
+all = ["flash-attn"]
+flash-attn = ["wheel", "flash-attn~=2.8.0.post2"]
+
 [tool.hatch.build]
 targets.wheel.artifacts = ["daft"]
 targets.wheel.packages = ["daft"]
-
-[tool.hatch.version]
-path = "_version.py"
-source = "code"
 
 [tool.mypy]
 exclude = ['daft/pickle/*.py$']
