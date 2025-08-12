@@ -1,22 +1,79 @@
 from __future__ import annotations
 
+import dataclasses
+
 import pandas as pd
 import pytest
 
 import daft
-from daft.daft import IOConfig
+from daft.io import (
+    CreateLasDatasetOptions,
+    CsvReadOptions,
+    CsvWriteOptions,
+    IcebergReadOptions,
+    IcebergWriteOptions,
+    IOConfig,
+    JsonReadOptions,
+    JsonWriteOptions,
+    LanceReadOptions,
+    LanceWriteOptions,
+    ParquetReadOptions,
+    ParquetWriteOptions,
+    ReadOptions,
+    WriteOptions,
+)
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig
-from daft.las.io.tos import TOSConfig
+from daft.las.io import TOSConfig
 
-formats = ["CSV", "Parquet", "Lance"]
+# currently "json" is not supported by distributed runner
+formats = ["csv", "parquet", "lance"]
 
 data = {"name": ["Bush", "Obama", "Trump"], "age": [79, 64, 79]}
+dataframe: daft.DataFrame = daft.from_pydict(data)
 
-dataframe = daft.from_pydict(data)
+
+def _format_specified_options(
+    format: str, root_dir: str
+) -> tuple[ReadOptions, WriteOptions, WriteOptions, WriteOptions, WriteOptions]:
+    io_config = IOConfig(s3=TOSConfig.from_env().to_s3_config())
+    if format == "csv":
+        read_options = CsvReadOptions(io_config=io_config)
+        write_options = CsvWriteOptions(root_dir=root_dir, io_config=io_config)
+        write_options_root_dir = dataclasses.replace(write_options, root_dir="tos://another/dir")
+        write_options_append = dataclasses.replace(write_options)
+        write_options_overwrite = dataclasses.replace(write_options, write_mode="overwrite")
+    elif format == "parquet":
+        read_options = ParquetReadOptions(io_config=io_config)
+        write_options = ParquetWriteOptions(root_dir=root_dir, io_config=io_config)
+        write_options_root_dir = dataclasses.replace(write_options, root_dir="tos://another/dir")
+        write_options_append = dataclasses.replace(write_options)
+        write_options_overwrite = dataclasses.replace(write_options, write_mode="overwrite")
+    elif format == "lance":
+        read_options = LanceReadOptions(io_config=io_config)
+        write_options = LanceWriteOptions(uri=root_dir, io_config=io_config)
+        write_options_root_dir = dataclasses.replace(write_options, uri="tos://another/dir")
+        write_options_append = dataclasses.replace(write_options, mode="append")
+        write_options_overwrite = dataclasses.replace(write_options, mode="overwrite")
+    elif format == "json":
+        read_options = JsonReadOptions(io_config=io_config)
+        write_options = JsonWriteOptions(root_dir=root_dir, io_config=io_config)
+        write_options_root_dir = dataclasses.replace(write_options, root_dir="tos://another/dir")
+        write_options_append = dataclasses.replace(write_options)
+        write_options_overwrite = dataclasses.replace(write_options, write_mode="overwrite")
+    elif format == "iceberg":
+        # TODO: iceberg is not supported now
+        read_options = IcebergReadOptions(io_config=io_config, table="")
+        write_options = IcebergWriteOptions(io_config=io_config, table="")
+        write_options_root_dir = dataclasses.replace(write_options)
+        write_options_append = dataclasses.replace(write_options)
+        write_options_overwrite = dataclasses.replace(write_options)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    return read_options, write_options, write_options_root_dir, write_options_append, write_options_overwrite
 
 
 @pytest.mark.parametrize("format", formats)
-def test_las_dataset_basic(format, uuid_short, object_store_test_dir, monkeypatch):
+def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
     monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
 
     client = LasDatasetClient(LasDatasetConfig())
@@ -26,64 +83,56 @@ def test_las_dataset_basic(format, uuid_short, object_store_test_dir, monkeypatc
     root_dir = f"{object_store_test_dir}/{dataset_name}"
     io_config = IOConfig(s3=TOSConfig.from_env().to_s3_config())
 
-    assert client.dataset_exist(dataset_name) is False
-
-    dataframe.write_las_dataset(
-        name=dataset_name,
-        root_dir=root_dir,
-        io_config=io_config,
-        format=format,
-        nick_name=dataset_nickname,
-        privacy="PRIVATE",
-        description="This is test dataset",
+    read_options, write_options, write_options_root_dir, write_options_append, write_options_overwrite = (
+        _format_specified_options(format=format, root_dir=root_dir)
     )
-    assert client.dataset_exist(dataset_name) is True
 
-    actual = daft.read_las_dataset(name=dataset_name, io_config=io_config)
-    pd.testing.assert_frame_equal(dataframe.to_pandas(), actual.to_pandas())
-
-
-def test_append_data(uuid_short, object_store_test_dir, monkeypatch):
-    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
-
-    client = LasDatasetClient(LasDatasetConfig())
-
-    dataset_name = "dataset_" + uuid_short
-    dataset_nickname = dataset_name
-    root_dir = f"{object_store_test_dir}/{dataset_name}"
-    io_config = IOConfig(s3=TOSConfig.from_env().to_s3_config())
+    create_ds_options = CreateLasDatasetOptions(
+        nick_name=dataset_nickname, privacy="private", description="This is test dataset"
+    )
 
     # 1. confirm the dataset does not exist
     assert client.dataset_exist(dataset_name) is False
 
-    # 2. write dataset, but didn't provide root_dir
-    with pytest.raises(ValueError, match=r"You must specify the 'root_dir'*"):
-        dataframe.write_las_dataset(name=dataset_name, format="csv")
+    # 2. write non-exist dataset, but didn't provide create_ds_options
+    with pytest.raises(ValueError, match=r"Dataset not exist, and arg 'create_ds_options' is not provided"):
+        dataframe.write_las_dataset(name=dataset_name, format=format)
 
-    # 3. write the dataset and make sure it has been created
+    # 3. the write options mismatch with the format
+    with pytest.raises(ValueError, match=r"Miss match format and write_options.*"):
+        dataframe.write_las_dataset(name=dataset_name, format=format, write_options=WriteOptions(io_config=io_config))
+
+    # 4. write the dataset and make sure it has been created
     dataframe.write_las_dataset(
-        name=dataset_name,
-        root_dir=root_dir,
-        io_config=io_config,
-        format="csv",
-        nick_name=dataset_nickname,
-        privacy="PRIVATE",
-        description="This is test dataset",
+        name=dataset_name, format=format, write_options=write_options, create_ds_options=create_ds_options
     )
     assert client.dataset_exist(dataset_name) is True
 
-    # 4. read the dataset and check the result
-    actual = daft.read_las_dataset(name=dataset_name, io_config=io_config)
+    # 5. read the dataset and check the result
+    actual = daft.read_las_dataset(name=dataset_name, read_options=read_options)
     pd.testing.assert_frame_equal(dataframe.to_pandas(), actual.to_pandas())
 
-    # 5. write the existing dataset, but provide different root_dir
-    with pytest.raises(ValueError, match="already exists, but the data path it records"):
-        dataframe.write_las_dataset(name=dataset_name, root_dir="tos://another/non/exist/root_dir", format="csv")
+    # 6. write the existing dataset, but provide different root_dir
+    with pytest.raises(ValueError, match=r".*already exists, but the data path it records.*"):
+        dataframe.write_las_dataset(
+            name=dataset_name,
+            format=format,
+            write_options=write_options_root_dir,
+        )
 
-    # 6. write to the existing dataset
-    dataframe.write_las_dataset(name=dataset_name, io_config=io_config, format="csv")
+    # 7. write to the existing dataset (append)
+    dataframe.write_las_dataset(name=dataset_name, format=format, write_options=write_options_append)
 
-    # 7. read the dataset and check the result
-    actual = daft.read_las_dataset(name=dataset_name, io_config=io_config)
+    # 8. read the dataset and check the result
+    actual = daft.read_las_dataset(name=dataset_name, read_options=read_options)
     expected = pd.concat([dataframe.to_pandas(), dataframe.to_pandas()])
     pd.testing.assert_frame_equal(expected.reset_index(drop=True), actual.to_pandas())
+
+    # 9. overwrite is not supported for certain formats
+    if format in ["csv", "parquet", "json"]:
+        with pytest.raises(ValueError, match=r"Overwrite is not supported now.*"):
+            dataframe.write_las_dataset(
+                name=dataset_name,
+                format=format,
+                write_options=write_options_overwrite,
+            )

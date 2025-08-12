@@ -754,17 +754,15 @@ class DataFrame:
     # Write methods
     ###
 
+    from daft.dataframe.dataframe_las import CreateLasDatasetOptions, WriteOptions
+
     @DataframePublicAPI
-    def write_las_dataset(
+    def write_las_dataset(  # type: ignore[empty-body]
         self,
         name: str,
         format: Optional[str] = None,
-        root_dir: Union[str, pathlib.Path, None] = None,
-        io_config: Optional[IOConfig] = None,
-        nick_name: Optional[str] = None,
-        privacy: str = "Private",
-        description: str = "",
-        **kwargs: Any,
+        write_options: Optional[WriteOptions] = None,
+        create_ds_options: Optional[CreateLasDatasetOptions] = None,
     ) -> "DataFrame":
         """Writes the DataFrame to LAS dataset, returning a new DataFrame with paths to the files that were written.
 
@@ -774,14 +772,8 @@ class DataFrame:
         Args:
             name: Name of the dataset to be created.
             format: Format of the dataset (CSV, Parquet, Lance, or Iceberg).
-            root_dir: Root directory where the dataset files will be written.
-            io_config: Optional IO configuration for writing the dataset.
-            nick_name: Optional nickname for the dataset.
-            privacy: Privacy level of the dataset (Public or Private. default: Private).
-            description: Description of the dataset.
-            **kwargs: Additional format-specific arguments:
-                - For ICEBERG format: 'table' (required) - Name of the Iceberg table
-                - May accept additional writer options
+            write_options: The format specified write options. These options will be passed to correspond writing functions.
+            create_ds_options: The options used to create the dataset.
 
         Returns:
             DataFrame: A new DataFrame containing paths to the written files.
@@ -794,114 +786,14 @@ class DataFrame:
             >>> df.write_las_dataset(
             ...     name="my_dataset",
             ...     format="CSV",
-            ...     root_dir="tos://my_bucket/path/to/output",
-            ...     description="Sample dataset",
+            ...     write_options=CsvWriteOptions(root_dir="tos://path/to/my/csv/"),
             ... )
 
         Note:
             For iceberg format, the 'table' parameter must be provided in kwargs.
             The method automatically registers the dataset with the LAS service after writing files.
         """
-        from daft.las.infra.las_dataset import (
-            LasDatasetClient,
-            LasDatasetConfig,
-            LasDatasetInfo,
-            las_dataset_format,
-            las_dataset_privacy,
-        )
-        from daft.las.io.factory import rm
-
-        privacy = privacy.lower()
-        format = format.lower() if format is not None else None
-
-        if privacy not in las_dataset_privacy.keys():
-            raise ValueError("Invalid privacy value, only 'Private' or 'Public' allowed.")
-
-        if format not in las_dataset_format.keys():
-            raise ValueError(f"Invalid format value, {las_dataset_format.keys()} are allowed.")
-
-        # Check root_dir if it was set.
-        if root_dir is not None:
-            root_dir = str(root_dir)
-            if not root_dir.startswith("tos://") and not root_dir.startswith("s3://"):
-                raise ValueError("Only tos or s3 path is supported")
-            root_dir = root_dir.replace("s3://", "tos://")
-
-        # Create a las dataset client.
-        config = LasDatasetConfig.from_io_config(io_config)
-        client = LasDatasetClient(config)
-
-        # Check if the dataset exists.
-        dataset_exists = False
-        if client.dataset_exist(name=name):
-            dataset_exists = True
-
-            dataset_info = client.get_dataset(name=name)
-            format_from_las = dataset_info.format.lower()  # type: ignore
-            root_dir_from_las = dataset_info.data_path
-
-            if format is None:
-                format = format_from_las
-            if root_dir is None:
-                root_dir = root_dir_from_las
-
-            if format != format_from_las:
-                raise ValueError(
-                    f"The dataset {name} already exists, but the data format it records: "
-                    f"{format_from_las} is not consistent with that you specified: {format}"
-                )
-            if root_dir != root_dir_from_las:
-                raise ValueError(
-                    f"The dataset {name} already exists, but the data path it records: "
-                    f"{root_dir_from_las} is not consistent with the 'root_dir' you specified: {root_dir}"
-                )
-
-            mode = kwargs.get("mode")
-            if mode == "create" and format == "lance":
-                raise ValueError("'create' mode is not allowed for existing dataset with lance format")
-        else:
-            if root_dir is None:
-                raise ValueError("You must specify the 'root_dir' to write the data to")
-            if format is None:
-                format = "lance"
-
-        assert root_dir is not None
-        root_dir = root_dir.replace("tos://", "s3://")
-
-        if format == "csv":
-            result_df = self.write_csv(root_dir=root_dir, io_config=io_config, **kwargs)
-        elif format == "parquet":
-            result_df = self.write_parquet(root_dir=root_dir, io_config=io_config, **kwargs)
-        elif format == "lance":
-            result_df = self.write_lance(uri=root_dir, io_config=io_config, **kwargs)
-        elif format == "iceberg":
-            if kwargs.get("table") is None:
-                raise ValueError("Missing iceberg table")
-            result_df = self.write_iceberg(io_config=io_config, **kwargs)
-        else:
-            raise ValueError(f"Unsupported format: {format}")
-
-        # If the dataset already exists, just return
-        if dataset_exists:
-            return result_df
-
-        # Create new las dataset
-        dataset = LasDatasetInfo(
-            name=name,
-            format=las_dataset_format[format],
-            nick_name=nick_name,
-            storage="TOS",
-            data_path=root_dir.replace("s3://", "tos://"),
-            privacy=las_dataset_privacy[privacy],
-            description=description,
-        )
-        try:
-            client.create_dataset(dataset=dataset)
-        except Exception:
-            rm(root_dir)
-            raise
-
-        return result_df
+        pass
 
     @DataframePublicAPI
     def write_parquet(
@@ -4749,6 +4641,12 @@ class DataFrame:
             total_rows=dataframe_num_rows,
         )
         return df
+
+
+from daft.dataframe.dataframe_las import write_las_dataset
+
+# Add write_las_dataset to DataFrame class.
+DataFrame.write_las_dataset = write_las_dataset  # type: ignore[method-assign]
 
 
 @dataclass

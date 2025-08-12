@@ -17,7 +17,24 @@ from daft.io.hudi._hudi import read_hudi
 from daft.io.iceberg._iceberg import read_iceberg
 from daft.io.lance._lance import read_lance, merge_columns
 from daft.io._json import read_json
-from daft.io._las_dataset import read_las_dataset
+from daft.io._las_dataset import (
+    CsvReadOptions,
+    IcebergReadOptions,
+    JsonReadOptions,
+    LanceReadOptions,
+    ParquetReadOptions,
+    ReadOptions,
+    read_las_dataset,
+)
+from daft.dataframe.dataframe_las import (
+    CreateLasDatasetOptions,
+    CsvWriteOptions,
+    IcebergWriteOptions,
+    JsonWriteOptions,
+    LanceWriteOptions,
+    ParquetWriteOptions,
+    WriteOptions,
+)
 from daft.io._parquet import read_parquet
 from daft.io._sql import read_sql
 from daft.io._warc import read_warc
@@ -32,6 +49,9 @@ from daft.io.av import read_video_frames
 
 __all__ = [
     "AzureConfig",
+    "CreateLasDatasetOptions",
+    "CsvReadOptions",
+    "CsvWriteOptions",
     "DataCatalogTable",
     "DataCatalogType",
     "DataSink",
@@ -41,10 +61,20 @@ __all__ = [
     "HTTPConfig",
     "HuggingFaceConfig",
     "IOConfig",
+    "IcebergReadOptions",
+    "IcebergWriteOptions",
+    "JsonReadOptions",
+    "JsonWriteOptions",
+    "LanceReadOptions",
+    "LanceWriteOptions",
+    "ParquetReadOptions",
+    "ParquetWriteOptions",
+    "ReadOptions",
     "S3Config",
     "S3Credentials",
     "TosConfig",
     "UnityConfig",
+    "WriteOptions",
     "_range",
     "from_glob_path",
     "merge_columns",
