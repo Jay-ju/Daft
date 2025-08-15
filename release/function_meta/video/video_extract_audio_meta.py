@@ -28,19 +28,19 @@ def get_meta() -> OpMetaModel:
 
 
 def get_extra_meta() -> ExtraMetaModel:
-    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_extract_from_video/audio_extract_from_video.py"
+    code = f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_extract_audio/video_extract_audio.py"
     code_description = "下面的代码展示了如何使用 Daft（适用于分布式）运行算子对视频进行音频抽取。"
     before = [
         DataItem(
             Type=ValueType.Video.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_extract_from_video/sample.mp4",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_extract_audio/sample.mp4",
             Description="",
         )
     ]
     after = [
         DataItem(
             Type=ValueType.Audio.name,
-            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/audio_extract_from_video/sample/audio_stream_0.mp3",
+            Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_extract_audio/sample/audio_stream_0.mp3",
             Description="",
         ),
     ]
