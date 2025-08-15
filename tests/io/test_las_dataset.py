@@ -22,6 +22,7 @@ from daft.io import (
     ReadOptions,
     WriteOptions,
 )
+from daft.io._las_dataset import AudioFolderReadOptions
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig
 from daft.las.io import TOSConfig
 
@@ -136,3 +137,50 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
                 format=format,
                 write_options=write_options_overwrite,
             )
+
+
+def test_read_folder(monkeypatch):
+    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
+
+    expected_meta = {
+        "file_name": [
+            "02 - Sad But True.uncompressed_NotWorking.flac",
+            "When I Grow Up.flac",
+            "figaro.flac",
+            "file_doesnt_work.m4a",
+        ],
+        "size": [1000, 1000, 1000, 1000],
+    }
+
+    # 1. test read metadata
+    dataset_name = "daft_test_audio_folder"
+    df = daft.read_las_dataset(name=dataset_name)
+    assert df.to_pydict() == expected_meta
+
+    # 2. no metadata, read the file list, and read file as bytes
+    expected_meta = {
+        "bytes": [b"This is a mock audio"],
+        "num_rows": [None],
+        "path": ["s3://las-ci/daft/dataset/audio_without_meta/mock-audio.mp3"],
+        "size": [20],
+    }
+    dataset_name = "daft_test_audio_folder_without_meta"
+    read_options = AudioFolderReadOptions(
+        read_type="binary", io_config=IOConfig(s3=TOSConfig.from_env().to_s3_config())
+    )
+    df = daft.read_las_dataset(name=dataset_name, read_options=read_options)
+    assert df.to_pydict() == expected_meta
+
+    # 3. no metadata, read the file list, and read file as base64
+    expected_meta = {
+        "base64": ["VGhpcyBpcyBhIG1vY2sgYXVkaW8="],
+        "num_rows": [None],
+        "path": ["s3://las-ci/daft/dataset/audio_without_meta/mock-audio.mp3"],
+        "size": [20],
+    }
+    dataset_name = "daft_test_audio_folder_without_meta"
+    read_options = AudioFolderReadOptions(
+        read_type="base64", io_config=IOConfig(s3=TOSConfig.from_env().to_s3_config())
+    )
+    df = daft.read_las_dataset(name=dataset_name, read_options=read_options)
+    assert df.to_pydict() == expected_meta

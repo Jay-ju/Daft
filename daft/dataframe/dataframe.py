@@ -4646,7 +4646,7 @@ class DataFrame:
 from daft.dataframe.dataframe_las import write_las_dataset
 
 # Add write_las_dataset to DataFrame class.
-DataFrame.write_las_dataset = write_las_dataset  # type: ignore[method-assign]
+DataFrame.write_las_dataset = write_las_dataset  # type: ignore
 
 
 @dataclass

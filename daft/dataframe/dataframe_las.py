@@ -1,3 +1,5 @@
+# Copyright (c) Beijing Volcano Engine Technology Ltd.
+
 from __future__ import annotations
 
 from abc import ABC
@@ -5,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from daft.api_annotations import DataframePublicAPI
+from daft.daft import IOConfig
 from daft.las.infra.las_dataset import (
     LasDatasetClient,
     LasDatasetConfig,
@@ -12,6 +15,7 @@ from daft.las.infra.las_dataset import (
     las_dataset_format,
     las_dataset_privacy,
 )
+from daft.las.io import TOSConfig
 from daft.las.io.factory import rm
 
 if TYPE_CHECKING:
@@ -19,7 +23,6 @@ if TYPE_CHECKING:
 
     import pyiceberg
 
-    from daft.daft import IOConfig
     from daft.dataframe.dataframe import DataFrame
     from daft.schema import Schema
     from daft.utils import ColumnInputType
@@ -39,21 +42,21 @@ class WriteOptions(ABC):
 
 @dataclass
 class CsvWriteOptions(WriteOptions):
-    root_dir: str | pathlib.Path
+    root_dir: str | pathlib.Path | None = None
     write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append"
     partition_cols: list[ColumnInputType] | None = None
 
 
 @dataclass
 class JsonWriteOptions(WriteOptions):
-    root_dir: str | pathlib.Path
+    root_dir: str | pathlib.Path | None = None
     write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append"
     partition_cols: list[ColumnInputType] | None = None
 
 
 @dataclass
 class ParquetWriteOptions(WriteOptions):
-    root_dir: str | pathlib.Path
+    root_dir: str | pathlib.Path | None = None
     compression: str = "snappy"
     write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append"
     partition_cols: list[ColumnInputType] | None = None
@@ -61,30 +64,60 @@ class ParquetWriteOptions(WriteOptions):
 
 @dataclass
 class IcebergWriteOptions(WriteOptions):
-    table: pyiceberg.table.Table
+    table: pyiceberg.table.Table | None = None
     mode: str = "append"
 
 
 @dataclass
 class LanceWriteOptions(WriteOptions):
-    uri: str | pathlib.Path
+    uri: str | pathlib.Path | None = None
     mode: Literal["create", "append", "overwrite"] = "create"
     schema: Schema | None = None
 
 
-def _check_write_options(format: str | None = None, write_options: WriteOptions | None = None) -> None:
-    if format is None or write_options is None:
-        return
-    if (
-        (format == "csv" and not isinstance(write_options, CsvWriteOptions))
-        or (format == "parquet" and not isinstance(write_options, ParquetWriteOptions))
-        or (format == "iceberg" and not isinstance(write_options, IcebergWriteOptions))
-        or (format == "lance" and not isinstance(write_options, LanceWriteOptions))
-        or ((format == "json" or format == "jsonl") and not isinstance(write_options, JsonWriteOptions))
-    ):
-        raise ValueError(
-            f"Miss match format and write_options: format {format} but with write_options: {type(write_options)}"
+def _check_format_write_options(
+    format: str, expected: WriteOptions, actual: WriteOptions | None = None
+) -> WriteOptions:
+    if actual is None:
+        return expected
+    if not isinstance(actual, expected.__class__):
+        raise ValueError(f"Miss match format and write_options: format {format} but with write_options: {type(actual)}")
+    return actual
+
+
+def _check_write_options(format: str | None = None, write_options: WriteOptions | None = None) -> WriteOptions:
+    if format == "csv":
+        return _check_format_write_options(
+            format="csv",
+            expected=CsvWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
         )
+    if format == "parquet":
+        return _check_format_write_options(
+            format="parquet",
+            expected=ParquetWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
+        )
+    if format == "iceberg":
+        return _check_format_write_options(
+            format="iceberg",
+            expected=IcebergWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
+        )
+    if format == "lance":
+        return _check_format_write_options(
+            format="lance",
+            expected=LanceWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
+        )
+    if format == "json" or format == "jsonl":
+        return _check_format_write_options(
+            format="json",
+            expected=JsonWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
+        )
+
+    raise ValueError(f"Not supported format: {format}")
 
 
 def _extract_privacy(create_ds_options: CreateLasDatasetOptions | None = None) -> str:
@@ -122,14 +155,15 @@ def _extract_root_dir(write_options: WriteOptions | None) -> str | None:
     return root_dir
 
 
-def _extract_mode(write_options: WriteOptions | None = None) -> str | None:
+def _extract_mode(write_options: WriteOptions) -> str | None:
     import os
 
     # Overwrite is a non-safe operation for certain formats like csv, parquet, json.
     enable_overwrite_default = False
 
-    if write_options is None:
+    if not (hasattr(write_options, "mode") or hasattr(write_options, "write_mode")):
         return None
+
     if isinstance(write_options, LanceWriteOptions):
         mode = write_options.mode
         if mode not in ["create", "append", "overwrite"]:
@@ -200,17 +234,16 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         For iceberg format, the 'table' parameter must be provided in kwargs.
         The method automatically registers the dataset with the LAS service after writing files.
     """
-    _check_write_options(format, write_options)
+    write_options = _check_write_options(format, write_options)
 
     # Extract and check the parameters.
     privacy = _extract_privacy(create_ds_options)
-    format = _extract_format(format)
-    root_dir = _extract_root_dir(write_options)
-    mode = _extract_mode(write_options)
-    io_config = None if write_options is None else write_options.io_config
+    format = _extract_format(format=format)
+    root_dir = _extract_root_dir(write_options=write_options)
+    mode = _extract_mode(write_options=write_options)
 
     # Create a las dataset client.
-    config = LasDatasetConfig.from_io_config(io_config)
+    config = LasDatasetConfig.from_io_config(write_options.io_config)
     client = LasDatasetClient(config)
 
     # Check if the dataset exists.
@@ -251,9 +284,9 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
     root_dir = root_dir.replace("tos://", "s3://")
 
     if hasattr(write_options, "root_dir"):
-        write_options.root_dir = root_dir  # type: ignore[union-attr]
+        write_options.root_dir = root_dir
     elif hasattr(write_options, "uri"):
-        write_options.uri = root_dir  # type: ignore[union-attr]
+        write_options.uri = root_dir
 
     if format == "csv":
         result_df = self.write_csv(**vars(write_options))

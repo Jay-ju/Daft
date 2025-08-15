@@ -6,10 +6,11 @@ import logging
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
 
+from daft.daft import IOConfig
 from daft.las.infra.credentials import UrlCredentialsProvider
 from daft.las.infra.open_api import OpenAPIClient
+from daft.las.io import TOSConfig
 from daft.las.utils import (
     get_ak_sk,
     get_credentials_provider_url,
@@ -18,9 +19,6 @@ from daft.las.utils import (
     is_static_credential,
     not_blank,
 )
-
-if TYPE_CHECKING:
-    from daft.daft import IOConfig
 
 logger = logging.getLogger(__name__)
 
@@ -109,15 +107,12 @@ class LasDatasetConfig:
 
     @staticmethod
     def from_io_config(config: IOConfig | None) -> LasDatasetConfig:
-        return (
-            LasDatasetConfig()
-            if config is None
-            else LasDatasetConfig(
-                region=config.s3.region_name,
-                access_key=config.s3.key_id,
-                secret_key=config.s3.access_key,
-                session_token=config.s3.session_token,
-            )
+        config = config if config is not None else IOConfig(s3=TOSConfig.from_env().to_s3_config())
+        return LasDatasetConfig(
+            region=config.s3.region_name,
+            access_key=config.s3.key_id,
+            secret_key=config.s3.access_key,
+            session_token=config.s3.session_token,
         )
 
 
