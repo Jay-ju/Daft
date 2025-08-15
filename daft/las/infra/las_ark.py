@@ -118,7 +118,7 @@ class LasArkClient:
                 result = response.json()
 
                 status_code = result.get("code")
-                if status_code in [429, 500, 502, 503, 504]:
+                if status_code in [429, 500, 502, 503, 504, 499]:
                     logger.warning("Retryable error code: %s", status_code)
                     raise Exception(f"Retryable error: {result.get('message')}")
                 elif status_code != 200:

@@ -20,9 +20,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_RETRIES = 10
 DEFAULT_TIMEOUT = 30
 
-HOST = "open.volcengineapi.com"
+HOST = os.environ.get("VOLC_OPENAPI_HOST", "open.volcengineapi.com")
 PATH = "/"
-VERSION = "2024-06-30"
+VERSION = os.environ.get("VOLC_OPENAPI_VERSION", "2024-06-30")
 
 
 class OpenAPIClient:

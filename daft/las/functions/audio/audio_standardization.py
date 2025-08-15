@@ -8,9 +8,8 @@ from typing import Any
 
 from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
-from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.functions.utils.audio_utils import decode_audio_torchaudio, encode_audio
+from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
 

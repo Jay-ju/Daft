@@ -179,6 +179,7 @@ class ArkLLMGenerate(Operator):
         return self.process(messages)
 
     def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
+        logger.info("Start to process %s messages...", len(messages))
         try:
             requests = [{"messages": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
             results = asyncio.run(self._async_requests(requests))

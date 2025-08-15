@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import uuid
 from typing import Any
 
@@ -75,8 +76,11 @@ class AudioAsrDoubao(Operator):
         self.poll_interval = poll_interval
         self.num_coroutines = num_coroutines
         self.uid = uid
-        self.submit_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/submit"
-        self.query_url = "https://openspeech.bytedance.com/api/v3/auc/bigmodel/query"
+        openspeech_endpoint = (
+            os.environ.get("OPENSPEECH_ENDPOINT", "https://openspeech.bytedance.com").strip().rstrip("/")
+        )
+        self.submit_url = f"{openspeech_endpoint}/api/v3/auc/bigmodel/submit"
+        self.query_url = f"{openspeech_endpoint}/api/v3/auc/bigmodel/query"
 
         self.client = httpx.AsyncClient()
 
