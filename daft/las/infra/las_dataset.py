@@ -190,3 +190,13 @@ class LasDatasetClient:
             data_path=result.get("DataPath", None),
             table=table,
         )
+
+    def delete_dataset(self, name: str, delete_data: bool = False) -> None:
+        body = {"DatasetName": name, "DeleteData": delete_data}
+        self.api_client.call_api(
+            method="POST",
+            params={},
+            headers={},
+            action="DeleteDataset",
+            body=body,
+        )

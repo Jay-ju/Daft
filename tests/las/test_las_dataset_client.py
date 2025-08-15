@@ -36,3 +36,6 @@ def test_las_dataset_client(uuid_short, monkeypatch, object_store_test_dir):
     actual = client.get_dataset(ds_name)
 
     assert actual == expected
+
+    client.delete_dataset(ds_name)
+    assert client.dataset_exist(name=ds_name) is False
