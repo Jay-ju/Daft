@@ -6,6 +6,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any
 
+from httpx import HTTPStatusError
+
 from daft.las.infra.http.auth import VolcOpenApiAuthProvider
 from daft.las.infra.http.client import HttpClient
 from daft.las.infra.http.retry import RetryPolicy
@@ -66,5 +68,8 @@ class OpenAPIClient:
             json=body,
         )
 
-        response.raise_for_status()
+        if response.status_code >= 400:
+            response_meta = response.json().get("ResponseMetadata")
+            raise HTTPStatusError(message=str(response_meta), request=response.request, response=response)
+
         return response
