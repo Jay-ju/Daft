@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 import daft
+from daft.dataframe.dataframe_las import FolderWriteOptions
 from daft.io import (
     CreateLasDatasetOptions,
     CsvReadOptions,
@@ -25,6 +26,7 @@ from daft.io import (
 from daft.io._las_dataset import AudioFolderReadOptions
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig
 from daft.las.io import TOSConfig
+from daft.las.io.factory import rm
 
 # currently "json" is not supported by distributed runner
 formats = ["csv", "parquet", "lance"]
@@ -95,8 +97,8 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
     # 1. confirm the dataset does not exist
     assert client.dataset_exist(dataset_name) is False
 
-    # 2. write non-exist dataset, but didn't provide create_ds_options
-    with pytest.raises(ValueError, match=r"Dataset not exist, and arg 'create_ds_options' is not provided"):
+    # 2. write non-exist dataset, but didn't provide 'root_dir/url'
+    with pytest.raises(ValueError, match=r"You must specify arg 'root_dir'/'url' for writing data"):
         dataframe.write_las_dataset(name=dataset_name, format=format)
 
     # 3. the write options mismatch with the format
@@ -130,6 +132,8 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
     pd.testing.assert_frame_equal(expected.reset_index(drop=True), actual.to_pandas())
 
     # 9. overwrite is not supported for certain formats
+    monkeypatch.setenv("ENABLE_OVERWRITE_LAS_DATASET", "True")
+    write_options.write_mode = "overwrite"
     if format in ["csv", "parquet", "json"]:
         with pytest.raises(ValueError, match=r"Overwrite is not supported now.*"):
             dataframe.write_las_dataset(
@@ -137,6 +141,13 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
                 format=format,
                 write_options=write_options_overwrite,
             )
+
+    # 10. remove the las dataset
+    try:
+        client.delete_dataset(name=dataset_name)
+    except:  # noqa: E722
+        pass
+    assert client.dataset_exist(name=dataset_name) is False
 
 
 def test_read_folder(monkeypatch):
@@ -184,3 +195,60 @@ def test_read_folder(monkeypatch):
     )
     df = daft.read_las_dataset(name=dataset_name, read_options=read_options)
     assert df.to_pydict() == expected_meta
+
+
+def test_write_folder(uuid_short, monkeypatch):
+    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
+
+    metadata = [
+        {"file_name": "02 - Sad But True.uncompressed_NotWorking.flac", "size": 1000},
+        {"file_name": "When I Grow Up.flac", "size": 1000},
+        {"file_name": "figaro.flac", "size": 1000},
+        {"file_name": "file_doesnt_work.m4a", "size": 1000},
+    ]
+    df = daft.from_pylist(metadata)
+
+    client = LasDatasetClient(LasDatasetConfig())
+
+    dataset_name = "daft_test_write_audio_folder" + uuid_short
+    io_config = IOConfig(s3=TOSConfig.from_env().to_s3_config())
+    root_dir = "tos://las-ci/daft/dataset/audio_without_meta_for_write_test"
+    write_options = FolderWriteOptions(io_config=io_config)
+
+    # ensure there isn't metadata
+    rm("tos://las-ci/daft/dataset/audio_without_meta_for_write_test/metadata.jsonl")
+
+    # 1. write without root_dir
+    with pytest.raises(ValueError, match=r"You must specify arg 'root_dir'/'url' for writing data*"):
+        df.write_las_dataset(name="daft_write_folder_test", format="audio", write_options=write_options)
+
+    # 2. test write metadata and create audio dataset
+    write_options = FolderWriteOptions(io_config=io_config, root_dir=root_dir)
+    df.write_las_dataset(name=dataset_name, format="audio", write_options=write_options)
+
+    assert client.dataset_exist(dataset_name) is True
+
+    # 3. read the dataset
+    df = daft.read_las_dataset(name=dataset_name)
+    assert df.to_pylist() == metadata
+
+    # 4. check the dataset
+    assert client.dataset_exist(name=dataset_name) is True
+
+    # 5. overwrite is not supported
+    monkeypatch.setenv("ENABLE_OVERWRITE_LAS_DATASET", "True")
+    write_options.write_mode = "overwrite"
+    with pytest.raises(ValueError, match=r"Overwrite is not supported now.*"):
+        df.write_las_dataset(
+            name=dataset_name,
+            format="audio",
+            write_options=write_options,
+        )
+
+    # 6. clear the metadata and dataset created above
+    rm("tos://las-ci/daft/dataset/audio_without_meta_for_write_test/metadata.jsonl")
+    try:
+        client.delete_dataset(name=dataset_name)
+    except:  # noqa: E722
+        pass
+    assert client.dataset_exist(name=dataset_name) is False

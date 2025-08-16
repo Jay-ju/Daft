@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from abc import ABC
 from dataclasses import dataclass, field
 from functools import reduce
 from typing import TYPE_CHECKING, Literal
@@ -27,7 +26,7 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class ReadOptions(ABC):
+class ReadOptions:
     io_config: IOConfig
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC
+import tempfile
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
@@ -16,13 +16,14 @@ from daft.las.infra.las_dataset import (
     las_dataset_privacy,
 )
 from daft.las.io import TOSConfig
-from daft.las.io.factory import rm
+from daft.las.io.factory import rm, upload_file
 
 if TYPE_CHECKING:
     import pathlib
 
     import pyiceberg
 
+    import daft
     from daft.dataframe.dataframe import DataFrame
     from daft.schema import Schema
     from daft.utils import ColumnInputType
@@ -36,7 +37,7 @@ class CreateLasDatasetOptions:
 
 
 @dataclass
-class WriteOptions(ABC):
+class WriteOptions:
     io_config: IOConfig
 
 
@@ -85,6 +86,13 @@ def _check_format_write_options(
     return actual
 
 
+@dataclass
+class FolderWriteOptions(WriteOptions):
+    root_dir: str | None = None
+    write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append"
+    metadata_format: Literal["csv", "jsonl", "parquet"] = "jsonl"
+
+
 def _check_write_options(format: str | None = None, write_options: WriteOptions | None = None) -> WriteOptions:
     if format == "csv":
         return _check_format_write_options(
@@ -116,6 +124,12 @@ def _check_write_options(format: str | None = None, write_options: WriteOptions 
             expected=JsonWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
             actual=write_options,
         )
+    if format == "image" or format == "audio" or format == "video":
+        return _check_format_write_options(
+            format=format,
+            expected=FolderWriteOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config())),
+            actual=write_options,
+        )
 
     raise ValueError(f"Not supported format: {format}")
 
@@ -143,7 +157,7 @@ def _extract_root_dir(write_options: WriteOptions | None) -> str | None:
     else:
         if isinstance(write_options, LanceWriteOptions):
             root_dir = write_options.uri
-        elif isinstance(write_options, (ParquetWriteOptions, CsvWriteOptions, JsonWriteOptions)):
+        elif isinstance(write_options, (ParquetWriteOptions, CsvWriteOptions, JsonWriteOptions, FolderWriteOptions)):
             root_dir = write_options.root_dir
         else:
             root_dir = None
@@ -176,7 +190,7 @@ def _extract_mode(write_options: WriteOptions) -> str | None:
         if mode != "append":
             raise ValueError(f"Invalid mode: {mode}, only 'append' is allowed.")
 
-    elif isinstance(write_options, (CsvWriteOptions, ParquetWriteOptions, JsonWriteOptions)):
+    elif isinstance(write_options, (CsvWriteOptions, ParquetWriteOptions, JsonWriteOptions, FolderWriteOptions)):
         mode = write_options.write_mode  # type: ignore[assignment]
         if mode not in ["append", "overwrite", "overwrite-partitions"]:
             raise ValueError(f"Invalid mode: {mode}, 'append' 'overwrite' or 'overwrite-partitions' are allowed.")
@@ -184,8 +198,11 @@ def _extract_mode(write_options: WriteOptions) -> str | None:
     else:
         raise ValueError("Invalid write_options, only 'csv', 'json', 'iceberg', 'lance', 'parquet' are allowed.")
 
-    enable_overwrite = os.environ.get("ENABLE_OVERWRITE_LAS_DATASET", enable_overwrite_default)
-    if (not enable_overwrite) and (mode == "overwrite" or mode == "overwrite-partitions"):  # type: ignore[comparison-overlap]
+    enable_overwrite_str = os.environ.get("ENABLE_OVERWRITE_LAS_DATASET")
+    enable_overwrite = (
+        enable_overwrite_default if enable_overwrite_str is None else enable_overwrite_str.lower() in ["1", "true"]
+    )
+    if enable_overwrite and (mode == "overwrite" or mode == "overwrite-partitions"):  # type: ignore[comparison-overlap]
         raise ValueError("Overwrite is not supported now")
 
     return mode
@@ -231,10 +248,13 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         ... )
 
     Note:
-        For iceberg format, the 'table' parameter must be provided in kwargs.
+        For writing image/audio/video, this method just writes metadata. If your want to save file raw
+        data to image/audio/video file, you should create an udf to save the col manually, and delete
+        the raw data col, then save the rest of the dataframe as metadata.
         The method automatically registers the dataset with the LAS service after writing files.
     """
     write_options = _check_write_options(format, write_options)
+    assert write_options is not None
 
     # Extract and check the parameters.
     privacy = _extract_privacy(create_ds_options)
@@ -273,8 +293,6 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         if mode == "create" and format == "lance":
             raise ValueError("'create' mode is not allowed for existing dataset with lance format")
     else:
-        if create_ds_options is None:
-            raise ValueError("Dataset not exist, and arg 'create_ds_options' is not provided")
         if root_dir is None:
             raise ValueError("You must specify arg 'root_dir'/'url' for writing data")
         if format is None:
@@ -298,6 +316,11 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         raise NotImplementedError()
     elif format == "json" or format == "jsonl":
         result_df = self.write_json(**vars(write_options))
+    elif format == "image" or format == "audio" or format == "video":
+        metadata_format = write_options.metadata_format  # type: ignore
+        _process_file(df=self, format=metadata_format, remote_dir=root_dir)
+
+        result_df = self
     else:
         raise ValueError(f"Unsupported format: {format}")
 
@@ -306,14 +329,16 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         return result_df
 
     # Create new las dataset
+    if create_ds_options is None:
+        create_ds_options = CreateLasDatasetOptions()
     dataset = LasDatasetInfo(
         name=name,
         format=las_dataset_format[format],
-        nick_name=create_ds_options.nick_name,  # type: ignore[union-attr]
+        nick_name=create_ds_options.nick_name,
         storage="TOS",
         data_path=root_dir.replace("s3://", "tos://"),
         privacy=las_dataset_privacy[privacy],
-        description=create_ds_options.description,  # type: ignore[union-attr]
+        description=create_ds_options.description,
     )
     try:
         client.create_dataset(dataset=dataset)
@@ -322,3 +347,24 @@ def write_las_dataset(  # type: ignore[no-untyped-def]
         raise
 
     return result_df
+
+
+def _process_file(df: daft.DataFrame, format: str, remote_dir: str) -> None:
+    # WARN: in order to write a 'single' metadata file, we must collect all data
+    # and create a metadata file, then update it to tos. This may cause oom in case
+    # that the distributed dataset is large.
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        pdf = df.to_pandas()
+
+        if format == "csv":
+            local_file = tmp_dir + "/metadata.csv"
+            pdf.to_csv(local_file, index=False)
+        elif format == "parquet":
+            local_file = tmp_dir + "/metadata.parquet"
+            pdf.to_parquet(tmp_dir + "/metadata.parquet", engine="pyarrow")
+        elif format == "json" or format == "jsonl":
+            local_file = tmp_dir + "/metadata.jsonl"
+            pdf.to_json(local_file, orient="records", lines=True)
+
+        upload_file(local_file, remote_dir)
