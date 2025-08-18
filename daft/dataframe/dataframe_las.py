@@ -93,6 +93,21 @@ class FolderWriteOptions(WriteOptions):
     metadata_format: Literal["csv", "jsonl", "parquet"] = "jsonl"
 
 
+@dataclass
+class ImageFolderWriteOptions(FolderWriteOptions):
+    pass
+
+
+@dataclass
+class AudioFolderWriteOptions(FolderWriteOptions):
+    pass
+
+
+@dataclass
+class VideoFolderWriteOptions(FolderWriteOptions):
+    pass
+
+
 def _check_write_options(format: str | None = None, write_options: WriteOptions | None = None) -> WriteOptions:
     if format == "csv":
         return _check_format_write_options(

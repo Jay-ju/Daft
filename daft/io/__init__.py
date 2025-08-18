@@ -18,22 +18,30 @@ from daft.io.iceberg._iceberg import read_iceberg
 from daft.io.lance._lance import read_lance, merge_columns
 from daft.io._json import read_json
 from daft.io._las_dataset import (
+    AudioFolderReadOptions,
     CsvReadOptions,
+    FolderReadOptions,
     IcebergReadOptions,
+    ImageFolderReadOptions,
     JsonReadOptions,
     LanceReadOptions,
     ParquetReadOptions,
     ReadOptions,
+    VideoFolderReadOptions,
     read_las_dataset,
 )
 from daft.dataframe.dataframe_las import (
+    AudioFolderWriteOptions,
     CreateLasDatasetOptions,
     CsvWriteOptions,
+    FolderWriteOptions,
     IcebergWriteOptions,
+    ImageFolderWriteOptions,
     JsonWriteOptions,
     LanceWriteOptions,
     ParquetWriteOptions,
     WriteOptions,
+    VideoFolderWriteOptions,
 )
 from daft.io._parquet import read_parquet
 from daft.io._sql import read_sql
@@ -48,6 +56,8 @@ from daft.io.source import DataSource, DataSourceTask
 from daft.io.av import read_video_frames
 
 __all__ = [
+    "AudioFolderReadOptions",
+    "AudioFolderWriteOptions",
     "AzureConfig",
     "CreateLasDatasetOptions",
     "CsvReadOptions",
@@ -57,12 +67,16 @@ __all__ = [
     "DataSink",
     "DataSource",
     "DataSourceTask",
+    "FolderReadOptions",
+    "FolderWriteOptions",
     "GCSConfig",
     "HTTPConfig",
     "HuggingFaceConfig",
     "IOConfig",
     "IcebergReadOptions",
     "IcebergWriteOptions",
+    "ImageFolderReadOptions",
+    "ImageFolderWriteOptions",
     "JsonReadOptions",
     "JsonWriteOptions",
     "LanceReadOptions",
@@ -74,6 +88,8 @@ __all__ = [
     "S3Credentials",
     "TosConfig",
     "UnityConfig",
+    "VideoFolderReadOptions",
+    "VideoFolderWriteOptions",
     "WriteOptions",
     "_range",
     "from_glob_path",
