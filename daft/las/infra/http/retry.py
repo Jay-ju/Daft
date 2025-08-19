@@ -37,7 +37,7 @@ class RetryPolicy:
         jitter: float = 1,
         max_wait: float = sys.maxsize / 2,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[T], bool] | None = None,
+        retry_condition: Callable[[T | None, Exception | None], bool] | None = None,
     ):
         self.max_retries = max_retires
         self.max_retry_duration = max_retry_duration
@@ -60,19 +60,23 @@ class RetryPolicy:
 
         return max(0, min(result, self.max_wait))
 
+    def with_max_retries(self, max_retries: int) -> RetryPolicy:
+        self.max_retries = max_retries
+        return self
+
     @staticmethod
     def should_retry(
         resp: T | None,
         ex: Exception | None,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[T], bool] | None = None,
+        retry_condition: Callable[[T | None, Exception | None], bool] | None = None,
     ) -> bool:
         # 1. Retry if the exception is retryable.
         if ex is not None:
             return retry_on_exceptions is not None and any(isinstance(ex, e) for e in retry_on_exceptions)
 
         # 2. Retry if match the customized retry condition.
-        if resp is not None and retry_condition is not None and retry_condition(resp):
+        if retry_condition is not None and retry_condition(resp, ex):
             return True
 
         return False
@@ -83,7 +87,7 @@ class RetryPolicy:
         max_retries: int | None = None,
         max_retry_duration: float | None = None,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[T], bool] | None = None,
+        retry_condition: Callable[[T | None, Exception | None], bool] | None = None,
     ) -> T:
         max_retries = max_retries or self.max_retries
         max_retry_duration = max_retry_duration or self.max_retry_duration
@@ -130,7 +134,7 @@ class RetryPolicy:
         max_retries: int | None = None,
         max_retry_duration: float | None = None,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[T], bool] | None = None,
+        retry_condition: Callable[[T | None, Exception | None], bool] | None = None,
     ) -> T:
         max_retries = max_retries or self.max_retries
         max_retry_duration = max_retry_duration or self.max_retry_duration

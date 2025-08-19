@@ -19,14 +19,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def default_retry_condition(resp: Response) -> bool:
-    return 500 <= resp.status_code or resp.status_code == 429
+def _default_retry_condition(resp: Response | None, ex: Exception | None) -> bool:
+    if resp is not None:
+        return 500 <= resp.status_code or resp.status_code == 429
+
+    if ex is not None:
+        return "ConnectionTerminated" in str(ex)
+
+    return True
 
 
 DEFAULT_RETRYABLE_EXCEPTIONS = [TimeoutException, NetworkError, TooManyRedirects]
 DEFAULT_RETRY_POLICY = RetryPolicy(
     retry_on_exceptions=DEFAULT_RETRYABLE_EXCEPTIONS,
-    retry_condition=default_retry_condition,
+    retry_condition=_default_retry_condition,
 )
 
 
@@ -67,7 +73,7 @@ class HttpClient(BaseClient):
     def __init__(
         self,
         base_url: str,
-        max_connections: int = 50,
+        max_connections: int = 100,
         max_keepalive_connections: int = 20,
         connect_timeout: float | None = 5,
         read_timeout: float | None = None,
@@ -111,7 +117,7 @@ class HttpClient(BaseClient):
         max_retries: int | None = None,
         max_retry_duration: float | None = None,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[Response], bool] | None = None,
+        retry_condition: Callable[[Response | None, Exception | None], bool] | None = None,
         timeout: float | Timeout | None = None,
     ) -> Response:
         return self.retry_policy.retry_on(
@@ -202,7 +208,7 @@ class AsyncHttpClient(BaseClient):
         max_retries: int | None = None,
         max_retry_duration: float | None = None,
         retry_on_exceptions: Iterable[type[Exception]] | None = None,
-        retry_condition: Callable[[Response], bool] | None = None,
+        retry_condition: Callable[[Response | None, Exception | None], bool] | None = None,
         timeout: float | Timeout | None = None,
     ) -> Response:
         return await self.retry_policy.async_retry_on(

@@ -13,7 +13,7 @@ from daft.las.infra.http.client import (
     DEFAULT_RETRYABLE_EXCEPTIONS,
     AsyncHttpClient,
     HttpClient,
-    default_retry_condition,
+    _default_retry_condition,
 )
 from daft.las.infra.http.retry import MaxRetriesExceeded, RetryPolicy
 from daft.las.io.tos import TOSConfig
@@ -179,7 +179,7 @@ def test_retryable_client(mock_http_server):
         max_retires=1,
         max_wait=1,
         retry_on_exceptions=DEFAULT_RETRYABLE_EXCEPTIONS,
-        retry_condition=default_retry_condition,
+        retry_condition=_default_retry_condition,
     )
     client = mock_client(policy)
     client.client = mock_http_server.get_mock_client()
@@ -223,7 +223,7 @@ def test_retryable_client(mock_http_server):
     assert len(mock_http_server.requests) == 1
 
     # Assume 403 is a retryable error because it can be solved in background
-    def retry_condition(r):
+    def retry_condition(r, e):
         return r.status_code == 403
 
     mock_http_server.reset()

@@ -9,11 +9,12 @@ from typing import TYPE_CHECKING, Any
 from httpx import HTTPStatusError
 
 from daft.las.infra.http.auth import VolcOpenApiAuthProvider
-from daft.las.infra.http.client import HttpClient
-from daft.las.infra.http.retry import RetryPolicy
+from daft.las.infra.http.client import DEFAULT_RETRY_POLICY, HttpClient
 
 if TYPE_CHECKING:
     from httpx import Response
+
+    from daft.las.infra.http.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,15 @@ class OpenAPIClient:
         host: str = HOST,
         path: str = PATH,
         version: str = VERSION,
+        retry_config: RetryPolicy | None = None,
     ):
         self.host = host
         self.path = path
         self.version = version
+
+        retry_config = retry_config or DEFAULT_RETRY_POLICY.with_max_retries(
+            int(os.environ.get("LAS_MAX_RETRIES", DEFAULT_MAX_RETRIES))
+        )
 
         self.client = HttpClient(
             base_url=self.host,
@@ -54,7 +60,7 @@ class OpenAPIClient:
             ),
             read_timeout=DEFAULT_TIMEOUT,
             write_timeout=DEFAULT_TIMEOUT,
-            retry_config=RetryPolicy(max_retires=int(os.environ.get("LAS_MAX_RETRIES", DEFAULT_MAX_RETRIES))),
+            retry_config=retry_config,
         )
 
     def call_api(
