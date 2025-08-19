@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 from typing import Any
 
 from daft.las.io.factory import LasIO, register_io_client
@@ -28,7 +27,7 @@ class LocalIO(LasIO):
         normalize_local_path(path).mkdir(parents=True, exist_ok=True)
 
     def rm(self, path: str) -> None:
-        p = Path(path)
+        p = normalize_local_path(path)
         if p.exists():
             if p.is_dir():
                 shutil.rmtree(p)

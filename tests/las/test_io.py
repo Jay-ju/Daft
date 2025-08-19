@@ -10,7 +10,7 @@ import pandas as pd
 
 import daft
 from daft.daft import IOConfig
-from daft.las.io import download_file, exists, file_size, upload_file
+from daft.las.io import download_file, exists, file_size, rm, upload_file
 from daft.las.io.factory import LasIOFactory
 from daft.las.io.tos import TOSConfig
 from daft.las.io.utils import generate_temp_file, normalize_local_path
@@ -140,6 +140,10 @@ def _test_basic_io(remote_path: str, work_dir: str):
         download_file(remote_path, local_file, overwrite=False)
     except FileExistsError:
         assert True
+
+    # 9. Remove local file
+    rm(local_file)
+    assert not exists(local_file)
 
 
 def test_io_cache_cache():
