@@ -29,6 +29,7 @@ jobs:
       DAFT_ANALYTICS_ENABLED: '0'
       RUST_BACKTRACE: 1
       DAFT_RUNNER: native
+      DAFT_FLOTILLA: 0
     runs-on:
       cluster: "gpu"
       linux: {}

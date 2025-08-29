@@ -70,11 +70,11 @@ test: .venv build  ## Run tests
 	# You can set additional run parameters through EXTRA_ARGS, such as running a specific test case file or method:
 	# make test EXTRA_ARGS="-v tests/dataframe/test_select.py" # Run a single test file
 	# make test EXTRA_ARGS="-v tests/dataframe/test_select.py::test_select_dataframe" # Run a single test method
-	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) $(VENV_BIN)/pytest --hypothesis-seed=$(HYPOTHESIS_SEED) --ignore tests/integration $(EXTRA_ARGS)
+	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) PATH=$(VENV_BIN)/bin:$PATH $(VENV_BIN)/pytest --hypothesis-seed=$(HYPOTHESIS_SEED) --ignore tests/integration $(EXTRA_ARGS)
 
 .PHONY: ve-test
 ve-test: .venv build  ## Run tests
-	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) $(VENV_BIN)/pytest \
+	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) PATH=$(VENV_BIN)/bin:$PATH $(VENV_BIN)/pytest \
 	--hypothesis-seed=$(HYPOTHESIS_SEED) \
 	--tb=short \
 	--maxfail=1 \
@@ -86,7 +86,8 @@ ve-test: .venv build  ## Run tests
 	--ignore tests/io/hudi \
     --ignore tests/las \
 	--ignore tests/io/test_s3_credentials_refresh.py \
-	--ignore tests/io/test_las_dataset.py
+	--ignore tests/io/test_las_dataset.py \
+	--ignore tests/test_resource_requests.py
 
 .PHONY: test-las
 test-las: .venv build
