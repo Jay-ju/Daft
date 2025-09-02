@@ -13,6 +13,7 @@ import daft
 from daft import col
 from daft.las.functions.ark_llm.ark_llm_thinking_vision import ArkLLMThinkingVision
 from daft.las.functions.udf import las_udf
+from tests.conftest import get_tests_daft_runner_name
 from tests.las.functions import assert_dataframe_result
 
 INPUT_COLUMN_NAME = "image_path"
@@ -85,6 +86,7 @@ class MockArkLLMThinkingVision(ArkLLMThinkingVision):
         return await self.mock_callable(requests)
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_image_vision_without_text():
     ArkLLMThinkingVision._finish_reason_check = True
     mock_callable = AsyncMock(

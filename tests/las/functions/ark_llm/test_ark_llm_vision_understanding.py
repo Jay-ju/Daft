@@ -15,6 +15,7 @@ from daft import col
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.ark_llm_vision_understanding import ArkLLMVisionUnderstanding
 from daft.las.functions.udf import las_udf
+from tests.conftest import get_tests_daft_runner_name
 
 INPUT_COLUMN_NAME = "messages"
 OUTPUT_COLUMN_NAME = "llm_result"
@@ -128,6 +129,7 @@ def test_gen_message_video_with_tos_url():
     assert sign_url and sign_url.startswith("https") and "X-Tos-Expires=3600" in sign_url
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 class TestArkLLMImageUnderstandingBuildVideoMessage(unittest.TestCase):
     def setUp(self):
         self.model = "test_model"
@@ -274,6 +276,7 @@ class MockArkLLMTextGenerateTransform(ArkLLMVisionUnderstanding):
         return await self.mock_callable(requests)
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_process_normal_image_without_prompt():
     mock_callable = AsyncMock(
         return_value=[
@@ -303,6 +306,7 @@ def test_process_normal_image_without_prompt():
     assert result.to_pylist() == ["response1", None, None, None, "response5"]
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_process_video_with_prompt():
     ArkLLMGenerate._finish_reason_check = True
     mock_callable = AsyncMock(
@@ -349,6 +353,7 @@ def test_process_video_with_prompt():
     ArkLLMGenerate._finish_reason_check = False
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_binary_input():
     mock_callable = AsyncMock(return_value=[{"choices": [{"message": {"content": "response1"}}]}])
     mock_class = MockArkLLMTextGenerateTransform(
@@ -360,6 +365,7 @@ def test_binary_input():
     assert result.to_pylist() == ["response1"]
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_process_no_valid_indices():
     mock_callable = AsyncMock(return_value=[None, None])
 

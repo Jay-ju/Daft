@@ -12,6 +12,7 @@ import daft
 from daft import col
 from daft.las.functions.ark_llm.doubao_embedding_vision import DoubaoEmbeddingVision
 from daft.las.functions.udf import las_udf
+from tests.conftest import get_tests_daft_runner_name
 
 INPUT_COLUMN_NAME = "image_path"
 OUTPUT_COLUMN_NAME = "llm_result"
@@ -50,6 +51,7 @@ class TestDoubaoEmbeddingVision(DoubaoEmbeddingVision):
         return await self.mock_callable(requests)
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_image_embedding_without_text():
     """Test image embedding without text."""
     mock_callable = AsyncMock(return_value=[{"data": {"embedding": [0.1, 0.2, 0.3]}}] * 2)
@@ -68,6 +70,7 @@ def test_image_embedding_without_text():
     assert result_list[1].tolist() == approx([0.1, 0.2, 0.3])
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_video_embedding_with_text():
     """Test video embedding with text."""
     mock_callable = AsyncMock(return_value=[{"data": {"embedding": [0.1, 0.2, 0.3]}}] * 2)
@@ -110,6 +113,7 @@ def test_video_embedding_with_text():
     assert call_args == expected_list
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_error_handling():
     """Test error handling."""
     mock_callable = AsyncMock(return_value=[{"error": "Invalid input"}] * 2)
@@ -121,6 +125,7 @@ def test_error_handling():
     assert result.to_pylist() == [None, None]
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_binary_input():
     """Test binary input."""
     mock_callable = AsyncMock(return_value=[{"data": {"embedding": [0.1, 0.2, 0.3]}}] * 2)
@@ -145,6 +150,7 @@ def test_binary_input():
     assert call_args[0]["input"][0]["imageUrl"].startswith("data:image/jpeg;base64")
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_image_embedding_with_empty():
     """Test image embedding with empty."""
     mock_callable = AsyncMock(

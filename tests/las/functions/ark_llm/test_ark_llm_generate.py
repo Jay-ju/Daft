@@ -14,6 +14,7 @@ import daft
 from daft import col
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.udf import las_udf
+from tests.conftest import get_tests_daft_runner_name
 from tests.las.functions import assert_dataframe_result
 
 INPUT_COLUMN_NAME = "messages"
@@ -47,6 +48,7 @@ def sample_table():
     return df
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_normal_transform(mock_client, sample_table):
     future = asyncio.Future()
     future.set_result(
@@ -72,6 +74,7 @@ def test_normal_transform(mock_client, sample_table):
     assert_dataframe_result(ds.to_pandas(), expect_df, [INPUT_COLUMN_NAME, OUTPUT_COLUMN_NAME])
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_error_handling(mock_client, sample_table):
     """Test error handling in transform method."""
     future = asyncio.Future()
@@ -98,6 +101,7 @@ def test_error_handling(mock_client, sample_table):
     assert_dataframe_result(ds.to_pandas(), expect_df, [INPUT_COLUMN_NAME, OUTPUT_COLUMN_NAME])
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_service_unavailable(mock_client, sample_table):
     """Test transform method when service is unavailable."""
     loop = asyncio.new_event_loop()
@@ -122,6 +126,7 @@ def test_service_unavailable(mock_client, sample_table):
         loop.close()
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_with_finish_reason_check(mock_client, sample_table):
     ArkLLMGenerate._finish_reason_check = True
     future = asyncio.Future()
@@ -174,6 +179,7 @@ def test_no_valid_indices():
     assert_dataframe_result(ds.to_pandas(), expect_df, [INPUT_COLUMN_NAME, OUTPUT_COLUMN_NAME])
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 class TestArkLLMGenerateTransform:
     valid_messages = [[{"role": "user", "content": "你好"}], [{"role": "user", "content": "今天天气怎么样"}]]
     invalid_messages = [[], None]

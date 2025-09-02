@@ -6,9 +6,11 @@ from typing import Any
 from unittest.mock import AsyncMock
 
 import pyarrow as pa
+import pytest
 
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.ark_llm_text_generate import ArkLLMTextGenerate
+from tests.conftest import get_tests_daft_runner_name
 
 
 class MockArkLLMTextGenerateTransform(ArkLLMTextGenerate):
@@ -24,6 +26,7 @@ class MockArkLLMTextGenerateTransform(ArkLLMTextGenerate):
         return await self.mock_callable(requests)
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_process_normal_case():
     ArkLLMGenerate._finish_reason_check = False
     mock_callable = AsyncMock(
@@ -43,6 +46,7 @@ def test_process_normal_case():
     assert result.to_pylist() == ["response1", "response2", None, None, None]
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_process_empty_case():
     ArkLLMGenerate._finish_reason_check = False
     mock_callable = AsyncMock(return_value=[])
