@@ -31,10 +31,10 @@ ifeq ($(IS_M1), 1)
 	CFLAGS="${CFLAGS} -I /opt/homebrew/opt/openssl/include"	\
 	LDFLAGS="${LDFLAGS} -L /opt/homebrew/opt/openssl/lib" \
 	uv sync --no-install-project --all-extras --all-groups
-	uv pip install flash_attn==2.8.0.post2 --no-build-isolation
+	uv pip install flash_attn==2.8.3 --no-build-isolation
 else
 	uv sync --no-install-project --all-extras --all-groups
-	uv pip install flash_attn==2.8.0.post2 --no-build-isolation
+	uv pip install flash_attn==2.8.3 --no-build-isolation
 endif
 
 .PHONY: check-toolchain
@@ -74,6 +74,7 @@ test: .venv build  ## Run tests
 
 .PHONY: ve-test
 ve-test: .venv build  ## Run tests
+	# test_autoscaling.py will shutdown ray cluster, it will impact other test cases in running multiple pipeline in a single machine.
 	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) PATH=$(VENV_BIN)/bin:$PATH $(VENV_BIN)/pytest \
 	--hypothesis-seed=$(HYPOTHESIS_SEED) \
 	--tb=short \
@@ -87,7 +88,8 @@ ve-test: .venv build  ## Run tests
     --ignore tests/las \
 	--ignore tests/io/test_s3_credentials_refresh.py \
 	--ignore tests/io/test_las_dataset.py \
-	--ignore tests/test_resource_requests.py
+	--ignore tests/test_resource_requests.py \
+	--ignore tests/ray/test_autoscaling.py
 
 .PHONY: test-las
 test-las: .venv build

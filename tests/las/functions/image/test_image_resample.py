@@ -78,6 +78,7 @@ def test_image_resample(tos_test_data_dir, local_test_data_dir, http_test_data_d
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_path")),
     )
     actual_df = ds.to_pandas()
@@ -105,6 +106,7 @@ def test_image_resample_base64(tos_test_data_dir, local_test_data_dir, http_test
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_base64")),
     )
     actual_df = ds.to_pandas()
@@ -131,6 +133,7 @@ def test_image_resample_binary(tos_test_data_dir, local_test_data_dir, http_test
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_binary"), col("image_name")),
     )
     actual_df = ds.to_pandas()

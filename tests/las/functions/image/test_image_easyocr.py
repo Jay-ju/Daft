@@ -73,6 +73,7 @@ def test_easyocr(local_models_dir, tos_test_data_dir, local_test_data_dir, http_
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_path")),
     )
     actual_df = ds.to_pandas()
@@ -99,6 +100,7 @@ def test_easyocr_base64(local_models_dir, tos_test_data_dir, local_test_data_dir
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_base64")),
     )
 
@@ -125,6 +127,7 @@ def test_easyocr_binary(local_models_dir, tos_test_data_dir, local_test_data_dir
             },
             num_gpus=num_gpus,
             batch_size=1,
+            concurrency=1,
         )(col("image_binary")),
     )
 

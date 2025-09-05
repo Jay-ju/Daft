@@ -4,7 +4,6 @@ FROM ${BASE_IMAGE}
 ARG DAFT_WHEEL_URL
 ARG DAFT_NAME=daft
 ARG INDEX_URL=https://bytedpypi.byted.org/simple
-ARG INSTALL_FLASH_ATTN=true
 
 # pre-download tiktoken for langchain to avoid timeout issue.
 ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache_dir
@@ -19,11 +18,11 @@ RUN apt update -y \
 RUN pip config set global.index-url ${INDEX_URL} \
     && pip install --upgrade pip \
     && pip install "${DAFT_NAME}[las]@${DAFT_WHEEL_URL}"  --resume-retries 3 \
-    && if [ $INSTALL_FLASH_ATTN == true ]; then pip install "${DAFT_NAME}[flash-attn]@${DAFT_WHEEL_URL}" --resume-retries 3; fi \
     && pip cache purge
 
 # Used for adding some post logic, e.g. replace ray via ve-ray.
 ARG VE_RAY_OFFLINE_FILE
+ARG FLASH_ATTN_URL
 COPY post_hook.sh /tmp/post_hook.sh
 RUN chmod +x /tmp/post_hook.sh && /tmp/post_hook.sh
 

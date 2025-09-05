@@ -9,14 +9,13 @@ trigger:
 
 jobs:
   daft_on_ray:
-    name: Unit Test
     image: none
     working-directory: "/data00/codebase/daft/${{random_string(5)}}"
     envs:
       DAFT_ANALYTICS_ENABLED: '0'
       RUST_BACKTRACE: 1
       DAFT_RUNNER: ray
-      DAFT_FLOTILLA: 0
+      DAFT_FLOTILLA: 1
       NUM_GPUS: 8
       FORCE_QWENVL_VIDEO_READER: torchvision
     runs-on:
