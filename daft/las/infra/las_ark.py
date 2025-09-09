@@ -31,6 +31,7 @@ ENDPOINT_MAP = {
     "batch": os.environ.get("LAS_BATCH_CHAT_ENDPOINT", "/api/v1/batch/chat"),
     "embedding_multimodal": os.environ.get("LAS_EMBEDDING_MULTIMODAL_ENDPOINT", "/api/v1/embedding/multimodal"),
     "embedding": os.environ.get("LAS_EMBEDDING_TEXT_ENDPOINT", "/api/v1/embedding"),
+    "bots_chat": os.environ.get("LAS_BOT_CHAT_ENDPOINT", "/api/v1/bots/chat"),
 }
 
 logger = logging.getLogger(__name__)

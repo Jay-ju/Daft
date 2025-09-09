@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from typing import Any
@@ -20,6 +21,7 @@ from daft.las.infra.las_ark import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_LAS_LLM_FINISH_REASON_CHECK = os.getenv("LAS_LLM_FINISH_REASON_CHECK", "false").lower() == "true"
+DEFAULT_LAS_LLM_BOTS_REFERENCES = os.getenv("LAS_LLM_BOTS_REFERENCES", "false").lower() == "true"
 
 
 class ArkLLMGenerate(Operator):
@@ -36,6 +38,10 @@ class ArkLLMGenerate(Operator):
         - 文档链接：https://www.volcengine.com/docs/82379/1494384
     - 输出结构：
         - 默认模式：str类型生成结果
+        - 引用模式：设置环境变量 LAS_LLM_BOTS_REFERENCES=true，即借助联网能力生成结果。输出结果中，包括生成结果和引用信息、模型结果结束原因。
+            - llm_result：str类型，生成结果
+            - references：str类型，引用信息
+            - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
             - llm_result：str类型，生成结果
             - finish_reason：str类型，模型结果结束原因，取值范围：stop、length、content_filter
@@ -51,6 +57,7 @@ class ArkLLMGenerate(Operator):
     """  # noqa: D415
 
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK
+    _bots_references = DEFAULT_LAS_LLM_BOTS_REFERENCES
 
     def __init__(
         self,
@@ -155,6 +162,8 @@ class ArkLLMGenerate(Operator):
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:
+        if ArkLLMGenerate._bots_references:
+            return pa.struct({"llm_result": pa.string(), "finish_reason": pa.string(), "references": pa.string()})
         if ArkLLMGenerate._finish_reason_check:
             return pa.struct({"llm_result": pa.string(), "finish_reason": pa.string()})
         return pa.string()
@@ -174,6 +183,10 @@ class ArkLLMGenerate(Operator):
             当环境变量LAS_LLM_FINISH_REASON_CHECK=true时，返回字段类型为struct，包含以下字段：
                 - llm_result: 模型输出结果
                 - finish_reason: 模型输出结束原因
+            当环境变量LAS_LLM_BOTS_REFERENCES=true时，即借助联网能力生成结果。输出结果中，包括生成结果和引用信息、模型结果结束原因。输出结果中，包括生成结果和引用信息、模型结果结束原因。返回字段类型为struct，包含以下字段：
+                - llm_result: 模型输出结果
+                - finish_reason: 模型输出结束原因
+                - references: 模型输出引用
         """
         messages = messages.to_pylist()
         return self.process(messages)
@@ -195,6 +208,7 @@ class ArkLLMGenerate(Operator):
         # init output_data and finish_reason_data
         output_data = [None] * len(results)
         finish_reason_data: list[str | None] = [None] * len(results)
+        references_data: list[str | None] = [None] * len(results)
 
         for i, result in enumerate(results):
             if result is None:
@@ -204,13 +218,27 @@ class ArkLLMGenerate(Operator):
 
             output_data[i] = result.get("choices", [{}])[0].get("message", {}).get("content")
 
-            if ArkLLMGenerate._finish_reason_check:
+            if ArkLLMGenerate._bots_references:
+                finish_reason_data[i] = (
+                    result.get("error") if "error" in result else result.get("choices", [{}])[0].get("finish_reason")
+                )
+                references = result.get("references")
+                references_data[i] = json.dumps(references, ensure_ascii=False) if references is not None else None
+
+            elif ArkLLMGenerate._finish_reason_check:
                 if "error" in result:
                     finish_reason_data[i] = result.get("error")
                 else:
                     finish_reason_data[i] = result.get("choices", [{}])[0].get("finish_reason")
 
         output_array = pa.array(output_data, type=pa.string())
+
+        if ArkLLMGenerate._bots_references:
+            finish_reason_array = pa.array(finish_reason_data, type=pa.string())
+            references_array = pa.array(references_data, type=pa.string())
+            return pa.StructArray.from_arrays(
+                [output_array, finish_reason_array, references_array], ["llm_result", "finish_reason", "references"]
+            )
 
         if ArkLLMGenerate._finish_reason_check:
             finish_reason_array = pa.array(finish_reason_data, type=pa.string())

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from typing import Any
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_LAS_LLM_FINISH_REASON_CHECK = os.getenv("LAS_LLM_FINISH_REASON_CHECK", "false").lower() == "true"
+DEFAULT_LAS_LLM_BOTS_REFERENCES = os.getenv("LAS_LLM_BOTS_REFERENCES", "false").lower() == "true"
 
 
 class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
@@ -31,7 +33,7 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
         - 图片/视频数据/文本数据：string类型，支持base64编码/url地址
         - （可选）用户提示词：string类型，当需要为每条数据指定不同提示词时传入，未传入时使用类初始化参数中的prompt
     - 输出格式：
-        - 默认模式：struct类型包含 llm_result（生成结果）和 reasoning_content（思维链内容）
+        - 默认模式：struct类型包含 llm_result（生成结果）、reasoning_content（思维链内容）和 finish_reason（模型结果结束原因）
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，额外返回 finish_reason 字段：
             - finish_reason：模型结果结束原因，取值范围：stop（正常终止）、length（超出token限制）、content_filter（内容过滤）
 
@@ -42,6 +44,7 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
     """  # noqa: D415
 
     _finish_reason_check = DEFAULT_LAS_LLM_FINISH_REASON_CHECK
+    _bots_references = DEFAULT_LAS_LLM_BOTS_REFERENCES
 
     def __init__(
         self,
@@ -176,6 +179,15 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:
+        if ArkLLMThinkingVision._bots_references:
+            return pa.struct(
+                {
+                    "llm_result": pa.string(),
+                    "references": pa.string(),
+                    "finish_reason": pa.string(),
+                    "reasoning_content": pa.string(),
+                }
+            )
         if ArkLLMThinkingVision._finish_reason_check:
             return pa.struct(
                 {"llm_result": pa.string(), "finish_reason": pa.string(), "reasoning_content": pa.string()}
@@ -188,6 +200,7 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
         output_data = [None] * len(results)
         finish_reason_data: list[str | None] = [None] * len(results)
         reasoning_content_data = [None] * len(results)
+        references_data: list[str | None] = [None] * len(results)
 
         for i, result in enumerate(results):
             if result is None:
@@ -199,7 +212,11 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
             output_data[i] = result.get("choices", [{}])[0].get("message", {}).get("content")
             reasoning_content_data[i] = result.get("choices", [{}])[0].get("message", {}).get("reasoning_content")
 
-            if ArkLLMThinkingVision._finish_reason_check:
+            if ArkLLMThinkingVision._bots_references:
+                references = result.get("references")
+                references_data[i] = json.dumps(references, ensure_ascii=False) if references is not None else None
+                reasoning_content_data[i] = result.get("choices", [{}])[0].get("message", {}).get("reasoning_content")
+            elif ArkLLMThinkingVision._finish_reason_check:
                 if "error" in result:
                     finish_reason_data[i] = result.get("error")
                 else:
@@ -207,6 +224,14 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
 
         output_array = pa.array(output_data, type=pa.string())
         reasoning_content_array = pa.array(reasoning_content_data, type=pa.string())
+
+        if ArkLLMThinkingVision._bots_references:
+            finish_reason_array = pa.array(finish_reason_data, type=pa.string())
+            references_array = pa.array(references_data, type=pa.string())
+            return pa.StructArray.from_arrays(
+                [output_array, references_array, finish_reason_array, reasoning_content_array],
+                ["llm_result", "references", "finish_reason", "reasoning_content"],
+            )
 
         if ArkLLMThinkingVision._finish_reason_check:
             finish_reason_array = pa.array(finish_reason_data, type=pa.string())
