@@ -36,6 +36,7 @@ jobs:
       - export OPENSPEECH_APPID=${{OPENSPEECH_APPID}}
       - export OPENSPEECH_TOKEN=${{OPENSPEECH_TOKEN}}
       - export LAS_API_KEY=${{LAS_API_KEY}}
+      - export TEST_OBJECT_BUCKET=${{TEST_OBJECT_BUCKET}}
       - make test-las
 
     - name: clean resources

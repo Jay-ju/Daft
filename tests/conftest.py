@@ -246,7 +246,7 @@ def uuid_short():
 @pytest.fixture
 def object_store_test_dir(request, uuid_short):
     scheme = os.getenv("TEST_OBJECT_SCHEME", "tos")
-    bucket = os.getenv("TEST_OBJECT_BUCKET", "las-ci")
+    bucket = os.getenv("TEST_OBJECT_BUCKET", "daft-ci")
     temp_dir = f"{scheme}://{bucket}/object-store/test-{uuid_short}"
 
     def clean_temp_data():

@@ -150,6 +150,7 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
     assert client.dataset_exist(name=dataset_name) is False
 
 
+@pytest.mark.skip(reason="Enable after creating new dataset in new account")
 def test_read_folder(monkeypatch):
     monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
 
@@ -197,6 +198,7 @@ def test_read_folder(monkeypatch):
     assert df.to_pydict() == expected_meta
 
 
+@pytest.mark.skip(reason="Enable after creating new dataset in new account")
 def test_write_folder(uuid_short, monkeypatch):
     monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
 

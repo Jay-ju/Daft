@@ -125,7 +125,7 @@ def test_openapi():
         headers={
             "Content-Type": "application/json",
         },
-        action="ExistsDataset",
+        action="CheckDatasetExists",
         body={"DatasetName": "non_exist_ds"},
     )
     assert response.json()["Result"]["Exists"] is False

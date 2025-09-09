@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=las-ai-cn-beijing.cr.volces.com/las/las-base:cu12.9.1-py3.11-ubuntu24.04-20250731
+ARG BASE_IMAGE=las-ai-qa-cn-beijing.cr.volces.com/las/las-base:cu12.9.1-py3.11-ubuntu24.04-20250731
 FROM ${BASE_IMAGE}
 
 ARG DAFT_WHEEL_URL
@@ -8,7 +8,7 @@ ARG INDEX_URL=https://bytedpypi.byted.org/simple
 # pre-download tiktoken for langchain to avoid timeout issue.
 ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache_dir
 RUN mkdir -p ${TIKTOKEN_CACHE_DIR}  \
-    && wget https://las-ai-cn-beijing.tos-cn-beijing.volces.com/qa/whl/cl100k_base.tiktoken -O ${TIKTOKEN_CACHE_DIR}/9b5ad71b2ce5302211f9c61530b329a4922fc6a4
+    && wget https://las-ai-qa-online.tos-cn-beijing.volces.com/qa/whl/cl100k_base.tiktoken -O ${TIKTOKEN_CACHE_DIR}/9b5ad71b2ce5302211f9c61530b329a4922fc6a4
 
 RUN apt update -y \
     && apt install -y libgl1 libglx-mesa0 iputils-ping telnet imagemagick libreoffice poppler-utils libmagic-dev ffmpeg \
