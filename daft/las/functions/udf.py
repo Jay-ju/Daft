@@ -24,6 +24,7 @@ def las_udf(
     memory_bytes: int | None = None,
     batch_size: int | None = None,
     concurrency: int | None = None,
+    use_process: bool = False,
 ) -> UDF:
     if hasattr(operator, "transform"):
         operator.__call__ = overwrite_method_signature(operator.__call__, operator.transform)  # type: ignore[method-assign]
@@ -41,6 +42,7 @@ def las_udf(
         memory_bytes=memory_bytes,
         batch_size=batch_size,
         concurrency=concurrency,
+        use_process=use_process
     )(operator).with_init_args(**init_args)
 
 
