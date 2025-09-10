@@ -95,6 +95,13 @@ class TosClient:
             str: The pre-signed URL.
         """
         expires = expires or int(os.getenv("TOS_PRE_SIGN_URL_EXPIRES", 3600 * 24))
+        if expires > 2592000:
+            logger.warning("Expires is too large, set to 2592000")
+            expires = 2592000
+        if expires < 1:
+            logger.warning("Expires is too small, set to 1")
+            expires = 1
+
         parsed_url = urlparse(url)
         bucket_name = parsed_url.netloc
         object_name = parsed_url.path.lstrip("/")

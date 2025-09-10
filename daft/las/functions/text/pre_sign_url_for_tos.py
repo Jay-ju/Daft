@@ -53,6 +53,12 @@ class PreSignUrlForTos(Operator):
         """
         super().__init__(**kwargs)
         self.expires = expires or 3600
+        if self.expires > 2592000:
+            logger.warning("Expires is too large, set to 2592000")
+            self.expires = 2592000
+        if self.expires < 1:
+            logger.warning("Expires is too small, set to 1")
+            self.expires = 1
 
         tosconfig = TOSConfig.from_env()
         self.tos_client = tos.TosClientV2(
