@@ -223,7 +223,7 @@ class VideoFolderReadOptions(FolderReadOptions):
 
 
 def _check_read_options(format: str | None = None, read_options: ReadOptions | None = None) -> ReadOptions:
-    if read_options is None and format in ["csv", "parquet", "iceberg", "lance", "json"]:
+    if read_options is None and format in ["csv", "parquet", "iceberg", "lance", "json", "jsonl"]:
         return ReadOptions(IOConfig(s3=TOSConfig.from_env().to_s3_config()))
 
     if read_options is None and format in ["image", "audio", "video"]:
@@ -240,7 +240,7 @@ def _check_read_options(format: str | None = None, read_options: ReadOptions | N
         or (format == "video" and not isinstance(read_options, VideoFolderReadOptions))
     ):
         raise ValueError(
-            f"Miss match format and read_options: format: {format} but with write_options: {type(read_options)}"
+            f"Miss match format and read_options: format: {format} but with read_options: {type(read_options)}"
         )
 
     return read_options  # type: ignore[return-value]
