@@ -12,8 +12,6 @@ from daft.las.io.tos import TOSConfig
 
 
 def test_las_dataset_client(uuid_short, monkeypatch, object_store_test_dir):
-    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
-
     config: LasDatasetConfig = LasDatasetConfig()
     client: LasDatasetClient = LasDatasetClient(config)
 

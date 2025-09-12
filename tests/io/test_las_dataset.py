@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import os
 
 import pandas as pd
 import pytest
@@ -77,8 +78,6 @@ def _format_specified_options(
 
 @pytest.mark.parametrize("format", formats)
 def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
-    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
-
     client = LasDatasetClient(LasDatasetConfig())
 
     dataset_name = "dataset_" + uuid_short
@@ -150,10 +149,7 @@ def test_las_dataset(format, uuid_short, object_store_test_dir, monkeypatch):
     assert client.dataset_exist(name=dataset_name) is False
 
 
-@pytest.mark.skip(reason="Enable after creating new dataset in new account")
-def test_read_folder(monkeypatch):
-    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
-
+def test_read_folder():
     expected_meta = {
         "file_name": [
             "02 - Sad But True.uncompressed_NotWorking.flac",
@@ -173,7 +169,7 @@ def test_read_folder(monkeypatch):
     expected_meta = {
         "bytes": [b"This is a mock audio"],
         "num_rows": [None],
-        "path": ["s3://las-ci/daft/dataset/audio_without_meta/mock-audio.mp3"],
+        "path": [f"s3://{os.getenv('TEST_OBJECT_BUCKET', 'daft-ci')}/las-dataset/audio_without_meta/mock-audio.mp3"],
         "size": [20],
     }
     dataset_name = "daft_test_audio_folder_without_meta"
@@ -187,7 +183,7 @@ def test_read_folder(monkeypatch):
     expected_meta = {
         "base64": ["VGhpcyBpcyBhIG1vY2sgYXVkaW8="],
         "num_rows": [None],
-        "path": ["s3://las-ci/daft/dataset/audio_without_meta/mock-audio.mp3"],
+        "path": [f"s3://{os.getenv('TEST_OBJECT_BUCKET', 'daft-ci')}/las-dataset/audio_without_meta/mock-audio.mp3"],
         "size": [20],
     }
     dataset_name = "daft_test_audio_folder_without_meta"
@@ -198,10 +194,7 @@ def test_read_folder(monkeypatch):
     assert df.to_pydict() == expected_meta
 
 
-@pytest.mark.skip(reason="Enable after creating new dataset in new account")
 def test_write_folder(uuid_short, monkeypatch):
-    monkeypatch.setenv("LAS_SERVICE_NAME", "las_ai_qa")
-
     metadata = [
         {"file_name": "02 - Sad But True.uncompressed_NotWorking.flac", "size": 1000},
         {"file_name": "When I Grow Up.flac", "size": 1000},
@@ -214,11 +207,13 @@ def test_write_folder(uuid_short, monkeypatch):
 
     dataset_name = "daft_test_write_audio_folder" + uuid_short
     io_config = IOConfig(s3=TOSConfig.from_env().to_s3_config())
-    root_dir = "tos://las-ci/daft/dataset/audio_without_meta_for_write_test"
+    root_dir = f"tos://{os.getenv('TEST_OBJECT_BUCKET', 'daft-ci')}/las-dataset/audio_without_meta_for_write_test"
     write_options = FolderWriteOptions(io_config=io_config)
 
     # ensure there isn't metadata
-    rm("tos://las-ci/daft/dataset/audio_without_meta_for_write_test/metadata.jsonl")
+    rm(
+        f"tos://{os.getenv('TEST_OBJECT_BUCKET', 'daft-ci')}/las-dataset/audio_without_meta_for_write_test/metadata.jsonl"
+    )
 
     # 1. write without root_dir
     with pytest.raises(ValueError, match=r"You must specify arg 'root_dir'/'url' for writing data*"):
@@ -248,7 +243,9 @@ def test_write_folder(uuid_short, monkeypatch):
         )
 
     # 6. clear the metadata and dataset created above
-    rm("tos://las-ci/daft/dataset/audio_without_meta_for_write_test/metadata.jsonl")
+    rm(
+        f"tos://{os.getenv('TEST_OBJECT_BUCKET', 'daft-ci')}/las-dataset/audio_without_meta_for_write_test/metadata.jsonl"
+    )
     try:
         client.delete_dataset(name=dataset_name)
     except:  # noqa: E722
