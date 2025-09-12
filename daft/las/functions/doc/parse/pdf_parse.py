@@ -256,6 +256,10 @@ class PDFParse(Operator):
         pattern = r"!\[fig_.*?\]\([^\)]*\)[\n| ]*"
         return re.sub(pattern, "", markdown)
 
+    def _extract_image_filename(self, markdown: str) -> list[str]:
+        pattern = re.compile(r"!\[fig_\d+]\(([^)]+)\)")
+        return [match.group(1) for match in pattern.finditer(markdown)]
+
     async def _async_transform_md(self, markdown: str, output_parsed_file_name: str) -> tuple[str, dict[str, Any], str]:
         download_report: dict[str, Any] = {"total": 0, "success": 0, "failed": [], "duplicates": 0}
 
@@ -319,6 +323,7 @@ class PDFParse(Operator):
             "parsed_plain_text": markdown_plain_text,
             "parsed_detail": detail_list,
             "parsed_file_path": "",
+            "parsed_image_filenames": [],
         }
 
         if self.output_tos_path:
@@ -328,8 +333,9 @@ class PDFParse(Operator):
                 else f"{int(time.time())}_{random.randint(1, 100000)}.txt"
             )
             try:
-                _, _, tos_path = await self._async_transform_md(markdown, output_name)
+                markdown_final, _, tos_path = await self._async_transform_md(markdown, output_name)
                 result["parsed_file_path"] = tos_path
+                result["parsed_image_filenames"] = self._extract_image_filename(markdown_final)
             except Exception:
                 logger.exception("Failed to transform and upload markdown")
 
@@ -355,6 +361,7 @@ class PDFParse(Operator):
                 - parsed_plain_text: 移除图片链接后的纯文本。
                 - parsed_detail: JSON 格式的详细解析信息。
                 - parsed_file_path: 解析结果在 TOS 上的存储路径。
+                - parsed_image_filenames: 解析结果中图片文件名列表。
         """  # noqa: D415
         if self.input_type == "url":
             urls = data_col.to_pylist()
@@ -376,6 +383,7 @@ class PDFParse(Operator):
                     "parsed_plain_text": results.get("parsed_plain_text", ""),
                     "parsed_detail": json.dumps(results.get("parsed_detail", []), ensure_ascii=False),
                     "parsed_file_path": results.get("parsed_file_path", ""),
+                    "parsed_image_filenames": results.get("parsed_image_filenames", []),
                 }
             except Exception:
                 logger.exception("PDF processing failed for index %d", index)
@@ -384,6 +392,7 @@ class PDFParse(Operator):
                     "parsed_plain_text": "",
                     "parsed_detail": "[]",
                     "parsed_file_path": "",
+                    "parsed_image_filenames": [],
                 }
 
         async def process_all_rows() -> list[dict[str, Any]]:
@@ -404,5 +413,6 @@ class PDFParse(Operator):
                 pa.field("parsed_plain_text", pa.string()),
                 pa.field("parsed_detail", pa.string()),
                 pa.field("parsed_file_path", pa.string()),
+                pa.field("parsed_image_filenames", pa.list_(pa.string())),
             ]
         )

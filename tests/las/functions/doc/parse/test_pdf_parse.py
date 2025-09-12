@@ -45,10 +45,21 @@ def test_pdf_parse(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     df = df.with_column("plain_text", col("result").struct.get("parsed_plain_text"))
     df = df.with_column("detail", col("result").struct.get("parsed_detail"))
     df = df.with_column("file_path", col("result").struct.get("parsed_file_path"))
+    df = df.with_column("parsed_image_filenames", col("result").struct.get("parsed_image_filenames"))
 
-    output_pd_df = df.select("input_url", "filename", "parsed_text", "plain_text", "detail", "file_path").to_pandas()
+    output_pd_df = df.select(
+        "input_url", "filename", "parsed_text", "plain_text", "detail", "file_path", "parsed_image_filenames"
+    ).to_pandas()
 
-    expect_columns = ["input_url", "filename", "parsed_text", "plain_text", "detail", "file_path"]
+    expect_columns = [
+        "input_url",
+        "filename",
+        "parsed_text",
+        "plain_text",
+        "detail",
+        "file_path",
+        "parsed_image_filenames",
+    ]
     expect_row_num = len(input_pd_df)
 
     assert_dataframe_result(

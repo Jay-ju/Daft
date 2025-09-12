@@ -28,10 +28,12 @@ if __name__ == "__main__":
     df = df.with_column("parsed_text", col("parsed_result").struct.get("parsed_origin_text"))
 
     df.show()
+
     # ╭────────────────────────────────┬────────────┬────────────────────────────────────────────────────────────────────────────────────────────────────────┬────────────────────────────────╮
     # │ input_url                      ┆ filename   ┆ parsed_result                                                                                          ┆ parsed_text                    │
     # │ ---                            ┆ ---        ┆ ---                                                                                                    ┆ ---                            │
-    # │ Utf8                           ┆ Utf8       ┆ Struct[parsed_origin_text: Utf8, parsed_plain_text: Utf8, parsed_detail: Utf8, parsed_file_path: Utf8] ┆ Utf8                           │
+    # │ Utf8                           ┆ Utf8       ┆ Struct[parsed_origin_text: Utf8, parsed_plain_text: Utf8, parsed_detail: Utf8, parsed_file_path: Utf8, ┆ Utf8                           │
+    # │                                ┆            ┆ parsed_image_filenames: List[Utf8]]                                                                    ┆                                │
     # ╞════════════════════════════════╪════════════╪════════════════════════════════════════════════════════════════════════════════════════════════════════╪════════════════════════════════╡
-    # │ https://tos_bucket/pdf_parse/… ┆ sample.pdf ┆ {parsed_origin_text: ![fig_75…                                                                         ┆ ![fig_75456](https://pdf-buck… │
+    # │ https://tos_bucket/pdf_parse/… ┆ sample.pdf ┆ {parsed_origin_text: ![fig_94…                                                                         ┆ ![fig_94052](https://pdf-buck… │
     # ╰────────────────────────────────┴────────────┴────────────────────────────────────────────────────────────────────────────────────────────────────────┴────────────────────────────────╯
