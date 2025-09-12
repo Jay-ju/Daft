@@ -200,3 +200,13 @@ class LasDatasetClient:
             action="DeleteDataset",
             body=body,
         )
+
+    def refresh_dataset(self, name: str) -> None:
+        body = {"DatasetName": name}
+        self.api_client.call_api(
+            method="POST",
+            params={},
+            headers={},
+            action="RefreshDatasetMetadata",
+            body=body,
+        )
