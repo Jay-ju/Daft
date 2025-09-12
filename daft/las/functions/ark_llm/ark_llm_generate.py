@@ -191,11 +191,30 @@ class ArkLLMGenerate(Operator):
         messages = messages.to_pylist()
         return self.process(messages)
 
+    def get_loop(self) -> asyncio.AbstractEventLoop:
+        old_loop = None
+        try:
+            old_loop = asyncio.get_event_loop()
+        except RuntimeError:
+            pass
+
+        if old_loop and old_loop.is_running():
+            raise RuntimeError("There is a running event loop, so cannot create a new or use the existing one")
+
+        if old_loop is None or old_loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        else:
+            loop = old_loop
+
+        return loop
+
     def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
         logger.info("Start to process %s messages...", len(messages))
         try:
             requests = [{"messages": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
-            results = asyncio.run(self._async_requests(requests))
+            loop = self.get_loop()
+            results = loop.run_until_complete(self._async_requests(requests))
             return self._update_array_with_results(results)
         except Exception:
             logger.exception("Error in transform.")

@@ -131,6 +131,7 @@ class LasArkClient:
                 logger.exception(err_msg)
                 return {"error": err_msg}
             except Exception:
+                logger.exception("Request failed")
                 raise
 
     async def batch_process(self, requests: list[dict[str, Any] | None]) -> list[dict[str, Any] | None]:
