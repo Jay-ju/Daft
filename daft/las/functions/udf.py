@@ -42,7 +42,7 @@ def las_udf(
         memory_bytes=memory_bytes,
         batch_size=batch_size,
         concurrency=concurrency,
-        use_process=use_process
+        use_process=use_process,
     )(operator).with_init_args(**init_args)
 
 

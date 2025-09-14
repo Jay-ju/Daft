@@ -60,8 +60,9 @@ class RetryPolicy:
 
         return max(0, min(result, self.max_wait))
 
-    def with_max_retries(self, max_retries: int) -> RetryPolicy:
-        self.max_retries = max_retries
+    def with_max_retries(self, max_retries: int | None) -> RetryPolicy:
+        if max_retries:
+            self.max_retries = max_retries
         return self
 
     @staticmethod
@@ -168,7 +169,7 @@ class RetryPolicy:
                     last_exception = exc
                     continue
 
-                raise
+                raise exc
 
         if last_exception:
             raise MaxRetriesExceeded(f"Retry times exceeded: {max_retries}", last_exception) from last_exception

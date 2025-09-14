@@ -41,7 +41,7 @@ class ApiKeyAuthProvider(AuthProvider):
         self.api_key = api_key
 
     def authentication(self, req: Request) -> Request:
-        req.headers.update({"Authorization": f"ApiKey {self.api_key}"})
+        req.headers.update({"Authorization": f"Bearer {self.api_key}"})
         return req
 
 

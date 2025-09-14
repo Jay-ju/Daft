@@ -19,20 +19,20 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _default_retry_condition(resp: Response | None, ex: Exception | None) -> bool:
+def default_retry_condition(resp: Response | None, ex: Exception | None) -> bool:
     if resp is not None:
         return 500 <= resp.status_code or resp.status_code == 429
 
     if ex is not None:
         return "ConnectionTerminated" in str(ex)
 
-    return True
+    return False
 
 
 DEFAULT_RETRYABLE_EXCEPTIONS = [TimeoutException, NetworkError, TooManyRedirects]
 DEFAULT_RETRY_POLICY = RetryPolicy(
     retry_on_exceptions=DEFAULT_RETRYABLE_EXCEPTIONS,
-    retry_condition=_default_retry_condition,
+    retry_condition=default_retry_condition,
 )
 
 
@@ -157,6 +157,8 @@ class HttpClient(BaseClient):
             elapsed = (datetime.now() - start).total_seconds()
             logger.info("Attempt: %d - %s %s -> %d (%.2fms)", attempt, method, url, resp.status_code, elapsed * 1000)
 
+            resp_headers = resp.headers
+            resp_headers.update({"attempt_num": str(attempt)})
             return resp
 
 
@@ -246,6 +248,15 @@ class AsyncHttpClient(BaseClient):
                 auth=self.auth,
             )
             elapsed = (datetime.now() - start).total_seconds()
-            logger.info("Attempt: %d - %s %s -> %d (%.2fms)", attempt, method, url, resp.status_code, elapsed * 1000)
+            if attempt > 0 and resp.status_code != 200:
+                logger.info(
+                    "Attempt: %d - %s %s -> %d (%.2fms)", attempt, method, url, resp.status_code, elapsed * 1000
+                )
+            else:
+                logger.debug(
+                    "Attempt: %d - %s %s -> %d (%.2fms)", attempt, method, url, resp.status_code, elapsed * 1000
+                )
 
+            resp_headers = resp.headers
+            resp_headers.update({"attempt_num": str(attempt)})
             return resp

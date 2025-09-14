@@ -10,10 +10,11 @@ import pytest
 
 from daft.las.infra.http.auth import VolcOpenApiAuthProvider
 from daft.las.infra.http.client import (
+    DEFAULT_RETRY_POLICY,
     DEFAULT_RETRYABLE_EXCEPTIONS,
     AsyncHttpClient,
     HttpClient,
-    _default_retry_condition,
+    default_retry_condition,
 )
 from daft.las.infra.http.retry import MaxRetriesExceeded, RetryPolicy
 from daft.las.io.tos import TOSConfig
@@ -37,6 +38,7 @@ async def test_tos_http_client(object_store_test_dir):
             date_key="x-tos-date",
             content_hash_key="x-tos-content-sha256",
         ),
+        "retry_config": DEFAULT_RETRY_POLICY,
     }
     with HttpClient(**client_args) as client:
         data = "hello world"
@@ -118,6 +120,7 @@ def mock_http_server(monkeypatch):
 
                 response = MagicMock(spec=httpx.Response)
                 response.status_code = status_code
+                response.headers = {}
                 if content:
                     response.text = content
                     response.content = content.encode()
@@ -145,6 +148,7 @@ def mock_http_server(monkeypatch):
 
                 response = MagicMock(spec=httpx.Response)
                 response.status_code = status_code
+                response.headers = {}
                 if content:
                     response.text = content
                     response.content = content.encode()
@@ -179,7 +183,7 @@ def test_retryable_client(mock_http_server):
         max_retires=1,
         max_wait=1,
         retry_on_exceptions=DEFAULT_RETRYABLE_EXCEPTIONS,
-        retry_condition=_default_retry_condition,
+        retry_condition=default_retry_condition,
     )
     client = mock_client(policy)
     client.client = mock_http_server.get_mock_client()
