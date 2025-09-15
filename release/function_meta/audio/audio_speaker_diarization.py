@@ -11,6 +11,7 @@ if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
     model_path = os.getenv("MODEL_PATH", "./models")
     samples = {"audio_path": [f"tos://{TOS_TEST_DIR}/audio_speaker_diarization/sample.wav"]}
+
     rank = 0
     df = daft.from_pydict(samples)
     df = df.with_column(
@@ -25,6 +26,7 @@ if __name__ == "__main__":
     )
 
     df.show()
+
     # ╭────────────────────────────────┬───────────────────────────────────────────────────────────╮
     # │ audio_path                     ┆ audio_speak_diarize                                       │
     # │ ---                            ┆ ---                                                       │
