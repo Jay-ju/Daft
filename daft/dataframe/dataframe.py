@@ -1472,6 +1472,8 @@ class DataFrame:
         mode: Literal["create", "append", "overwrite"] = "create",
         io_config: Optional[IOConfig] = None,
         schema: Optional[Schema] = None,
+        batch_size: int = 1,
+        max_batch_rows: int = 100000,
         **kwargs: Any,
     ) -> "DataFrame":
         """Writes the DataFrame to a Lance table.
@@ -1480,6 +1482,12 @@ class DataFrame:
           uri: The URI of the Lance table to write to
           mode: The write mode. One of "create", "append", or "overwrite"
           io_config (IOConfig, optional): configurations to use when interacting with remote storage.
+          schema: Schema to write. Defaults to the current schema.
+          batch_size: Number of micropartitions to batch together before writing.
+                     Default is 1 (no batching) for backward compatibility.
+          max_batch_rows: Maximum number of rows per batch. If exceeded,
+                         the batch will be written even if batch_size is not reached.
+                         Default is 100,000 rows.
           **kwargs: Additional keyword arguments to pass to the Lance writer.
 
         Note:
@@ -1487,7 +1495,8 @@ class DataFrame:
             This call is **blocking** and will execute the DataFrame when called
 
         Returns:
-            DataFrame: A DataFrame containing metadata about the written Lance table, such as number of fragments, number of deleted rows, number of small files, and version.
+            DataFrame: A DataFrame containing metadata about the written Lance table, such as number of
+                fragments, number of deleted rows, number of small files, and version.
 
         Examples:
             >>> import daft
@@ -1530,12 +1539,19 @@ class DataFrame:
             ╰───────────────┴──────────────────┴─────────────────┴─────────╯
             <BLANKLINE>
             (Showing first 1 of 1 rows)
+            >>> # Use batching to combine multiple micropartitions for better performance
+            >>> df.write_lance(
+            ...     "/tmp/lance/my_table.lance", 
+            ...     mode="overwrite", 
+            ...     batch_size=5, 
+            ...     max_batch_rows=50000
+            ... )  # doctest: +SKIP
         """
         from daft.io.lance.lance_data_sink import LanceDataSink
 
         if schema is None:
             schema = self.schema()
-        sink = LanceDataSink(uri, schema, mode, io_config, **kwargs)
+        sink = LanceDataSink(uri, schema, mode, io_config, batch_size=batch_size, max_batch_rows=max_batch_rows, **kwargs)
         return self.write_sink(sink)
 
     @DataframePublicAPI
