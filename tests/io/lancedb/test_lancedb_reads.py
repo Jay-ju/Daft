@@ -100,6 +100,72 @@ def test_lancedb_read_limit_large_dataset(large_lance_dataset_path, limit_size, 
     assert result["big_int"] == expected_big_ints
 
 
+@pytest.mark.parametrize(
+    "parallelism,expected_scan_tasks",
+    [
+        # No parallelism (default behavior)
+        (None, 10),
+        # Parallelism equals fragment count
+        (10, 10),
+        # Parallelism less than fragment count
+        (5, 5),
+        (3, 3),
+        (1, 1),
+        # Parallelism greater than fragment count (should create 10 tasks)
+        (15, 10),
+    ],
+)
+def test_lancedb_read_parallelism(large_lance_dataset_path, parallelism, expected_scan_tasks):
+    """Test parallelism parameter controls the number of scan tasks."""
+    import io
+
+    df = daft.read_lance(large_lance_dataset_path, parallelism=parallelism)
+    df = df.select("vector", "big_int")
+
+    # Capture the explain output
+    string_io = io.StringIO()
+    df.explain(True, file=string_io)
+    explain_output = string_io.getvalue()
+
+    # Assert that we have the expected number of scan tasks
+    assert f"Num Scan Tasks = {expected_scan_tasks}" in explain_output
+
+    result = df.to_pydict()
+
+    # Verify we got all the data
+    assert len(result["vector"]) == 10000
+    assert len(result["big_int"]) == 10000
+
+    # Verify the data is complete and correct
+    expected_big_ints = list(range(10000))
+    assert sorted(result["big_int"]) == expected_big_ints
+
+
+def test_lancedb_read_fragment_group_size_deprecation_warning(large_lance_dataset_path):
+    """Test that fragment_group_size parameter raises deprecation warning."""
+    import warnings
+    
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        df = daft.read_lance(large_lance_dataset_path, fragment_group_size=5)
+        
+        # Check that a deprecation warning was issued
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
+        assert "fragment_group_size" in str(w[0].message)
+        assert "parallelism" in str(w[0].message)
+    
+    # Verify functionality still works
+    result = df.to_pydict()
+    assert len(result["vector"]) == 10000
+
+
+def test_lancedb_read_both_parameters_error(large_lance_dataset_path):
+    """Test that specifying both parallelism and fragment_group_size raises an error."""
+    with pytest.raises(ValueError, match="Cannot specify both 'parallelism' and 'fragment_group_size'"):
+        daft.read_lance(large_lance_dataset_path, parallelism=5, fragment_group_size=3)
+
+
 def test_lancedb_with_version(lance_dataset_path):
     df = daft.read_lance(lance_dataset_path, version=1)
     assert df.to_pydict() == data

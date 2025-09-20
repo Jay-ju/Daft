@@ -1,7 +1,10 @@
+
 # ruff: noqa: I002
 # isort: dont-add-import: from __future__ import annotations
 
 import logging
+import warnings
+from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -18,6 +21,108 @@ if TYPE_CHECKING:
     import lance
 
 logger = logging.getLogger(__name__)
+
+
+# Scan Strategy Abstract Base Classes
+class ScanStrategy(ABC):
+    """Abstract base class for different Lance scan strategies."""
+    
+    @abstractmethod
+    def create_scan_tasks(
+        self,
+        operator: 'LanceDBScanOperator',
+        pushdowns: PyPushdowns,
+        required_columns: Optional[list[str]]
+    ) -> Iterator[ScanTask]:
+        """Create scan tasks using this strategy."""
+        pass
+
+
+class SingleFragmentStrategy(ScanStrategy):
+    """Strategy for processing each fragment individually."""
+    
+    def create_scan_tasks(
+        self,
+        operator: 'LanceDBScanOperator',
+        pushdowns: PyPushdowns,
+        required_columns: Optional[list[str]]
+    ) -> Iterator[ScanTask]:
+        fragments = operator._ds.get_fragments()
+        pushed_expr = operator._combine_filters_to_arrow()
+        
+        for fragment in fragments:
+            yield operator._create_scan_task(
+                fragment_ids=[fragment.fragment_id],
+                required_columns=required_columns,
+                pushdowns=pushdowns,
+                filter_expr=pushed_expr,
+                limit=pushdowns.limit
+            )
+
+
+class GroupedFragmentStrategy(ScanStrategy):
+    """Strategy for processing fragments in groups for better parallelism."""
+    
+    def __init__(self, parallelism: int):
+        self.parallelism = parallelism
+    
+    def create_scan_tasks(
+        self,
+        operator: 'LanceDBScanOperator',
+        pushdowns: PyPushdowns,
+        required_columns: Optional[list[str]]
+    ) -> Iterator[ScanTask]:
+        fragments = operator._ds.get_fragments()
+        fragment_groups = operator._group_fragments(fragments, self.parallelism)
+        pushed_expr = operator._combine_filters_to_arrow()
+        
+        for fragment_group in fragment_groups:
+            fragment_ids = [fragment.fragment_id for fragment in fragment_group]
+            yield operator._create_scan_task(
+                fragment_ids=fragment_ids,
+                required_columns=required_columns,
+                pushdowns=pushdowns,
+                filter_expr=pushed_expr,
+                limit=pushdowns.limit
+            )
+
+
+class LimitOptimizedStrategy(ScanStrategy):
+    """Strategy optimized for limit pushdown with no filters."""
+    
+    def create_scan_tasks(
+        self,
+        operator: 'LanceDBScanOperator',
+        pushdowns: PyPushdowns,
+        required_columns: Optional[list[str]]
+    ) -> Iterator[ScanTask]:
+        assert operator._pushed_filters is None, "Expected no filters when using limit optimized strategy"
+        assert pushdowns.limit is not None, "Expected a limit when using limit optimized strategy"
+        
+        fragments = operator._ds.get_fragments()
+        remaining_limit = pushdowns.limit
+        
+        for fragment in fragments:
+            if remaining_limit <= 0:
+                break
+            
+            # Calculate effective rows using fragment.count_rows()
+            # This is not expensive because count_rows simply checks physical_rows - num_deletions when there are no filters
+            # https://github.com/lancedb/lance/blob/v0.34.0/rust/lance/src/dataset/fragment.rs#L1049-L1055
+            effective_rows = fragment.count_rows()
+            
+            if effective_rows > 0:
+                rows_to_scan = min(remaining_limit, effective_rows)
+                remaining_limit -= rows_to_scan
+                
+                yield operator._create_scan_task(
+                    fragment_ids=[fragment.fragment_id],
+                    required_columns=required_columns,
+                    pushdowns=pushdowns,
+                    filter_expr=None,
+                    limit=rows_to_scan,
+                    num_rows=rows_to_scan
+                )
 
 
 # TODO support fts and fast_search
@@ -52,9 +157,35 @@ def _lancedb_count_result_function(
 
 
 class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
-    def __init__(self, ds: "lance.LanceDataset"):
+    def __init__(self, ds: "lance.LanceDataset", parallelism: Optional[int] = None, fragment_group_size: Optional[int] = None):
+        """Initialize LanceDB scan operator.
+        
+        Args:
+            ds: Lance dataset to scan
+            parallelism: Number of fragments to group together in a single scan task.
+                        If None or <= 1, each fragment will be processed individually.
+            fragment_group_size: Deprecated parameter name for parallelism.
+                               Use 'parallelism' instead.
+        """
         self._ds = ds
         self._pushed_filters: Union[list[PyExpr], None] = None
+        
+        # Handle parameter naming with backward compatibility
+        if fragment_group_size is not None and parallelism is not None:
+            raise ValueError("Cannot specify both 'parallelism' and 'fragment_group_size'. Use 'parallelism' only.")
+        
+        if fragment_group_size is not None:
+            warnings.warn(
+                "Parameter 'fragment_group_size' is deprecated. Use 'parallelism' instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            self._parallelism = fragment_group_size
+        else:
+            self._parallelism = parallelism
+        
+        # Keep the old attribute for backward compatibility
+        self._fragment_group_size = self._parallelism
 
     def name(self) -> str:
         return "LanceDBScanOperator"
@@ -112,7 +243,93 @@ class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
 
         return pushed, remaining
 
+    def _create_scan_task(
+        self,
+        fragment_ids: list[int],
+        required_columns: Optional[list[str]],
+        pushdowns: PyPushdowns,
+        num_rows: Optional[int] = None,
+        filter_expr: Optional["pa.compute.Expression"] = None,
+        limit: Optional[int] = None
+    ) -> ScanTask:
+        """Unified ScanTask creation function to eliminate code duplication.
+        
+        Args:
+            fragment_ids: List of fragment IDs to include in this scan task
+            required_columns: Columns to read from the fragments
+            pushdowns: Pushdown operations to apply
+            num_rows: Number of rows expected (for metadata)
+            filter_expr: Arrow filter expression to apply
+            limit: Row limit for this specific task
+        
+        Returns:
+            Configured ScanTask for the given fragments
+        """
+        return ScanTask.python_factory_func_scan_task(
+            module=_lancedb_table_factory_function.__module__,
+            func_name=_lancedb_table_factory_function.__name__,
+            func_args=(self._ds, fragment_ids, required_columns, filter_expr, limit),
+            schema=self.schema()._schema,
+            num_rows=num_rows,
+            size_bytes=None,
+            pushdowns=pushdowns,
+            stats=None,
+        )
+
+    def _group_fragments(self, fragments: list, parallelism: int) -> list[list]:
+        """Group fragments into batches for parallel processing.
+        
+        Args:
+            fragments: List of fragments to group
+            parallelism: Number of fragments per group
+        
+        Returns:
+            List of fragment groups
+        """
+        if parallelism <= 1:
+            return [[fragment] for fragment in fragments]
+        
+        groups = []
+        current_group = []
+        
+        for fragment in fragments:
+            current_group.append(fragment)
+            if len(current_group) >= parallelism:
+                groups.append(current_group)
+                current_group = []
+        
+        # Add the last group if it has any fragments
+        if current_group:
+            groups.append(current_group)
+        
+        return groups
+
+    def _get_scan_strategy(self, pushdowns: PyPushdowns) -> ScanStrategy:
+        """Select the appropriate scan strategy based on pushdowns and configuration.
+        
+        Args:
+            pushdowns: Pushdown operations to consider
+        
+        Returns:
+            Appropriate ScanStrategy instance
+        """
+        # Use limit optimized strategy for limit pushdown with no filters
+        if pushdowns.limit is not None and self._pushed_filters is None:
+            return LimitOptimizedStrategy()
+        
+        # Use grouped strategy if parallelism is configured
+        if self._parallelism is not None and self._parallelism > 1:
+            return GroupedFragmentStrategy(self._parallelism)
+        
+        # Default to single fragment strategy
+        return SingleFragmentStrategy()
+
     def to_scan_tasks(self, pushdowns: PyPushdowns) -> Iterator[ScanTask]:
+        """Generate scan tasks using the appropriate strategy.
+        
+        This method has been refactored to use the strategy pattern,
+        eliminating complex conditional logic and code duplication.
+        """
         required_columns: Optional[list[str]]
         if pushdowns.columns is None:
             required_columns = None
@@ -137,10 +354,11 @@ class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
 
             if count_mode not in self.supported_count_modes():
                 logger.warning(
-                    "Count mode %s is not supported for pushdown, falling back to original logic",
+                    "Count mode %s is not supported for pushdown, falling back to regular scan strategy",
                     count_mode,
                 )
-                yield from self._create_regular_scan_tasks(pushdowns, required_columns)
+                strategy = self._get_scan_strategy(pushdowns)
+                yield from strategy.create_scan_tasks(self, pushdowns, required_columns)
                 return
 
             filters = self._combine_filters_to_arrow()
@@ -156,79 +374,46 @@ class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
                 pushdowns=pushdowns,
                 stats=None,
             )
-        # Check if there is a limit pushdown and no filters
-        elif pushdowns.limit is not None and self._pushed_filters is None:
-            yield from self._create_scan_tasks_with_limit_and_no_filters(pushdowns, required_columns)
         else:
-            yield from self._create_regular_scan_tasks(pushdowns, required_columns)
+            # Use strategy pattern to determine the appropriate scan approach
+            strategy = self._get_scan_strategy(pushdowns)
+            yield from strategy.create_scan_tasks(self, pushdowns, required_columns)
 
+    # Legacy methods kept for backward compatibility
+    # These methods are now deprecated and replaced by the strategy pattern
+    
     def _create_scan_tasks_with_limit_and_no_filters(
         self, pushdowns: PyPushdowns, required_columns: Optional[list[str]]
     ) -> Iterator[ScanTask]:
-        """Create scan tasks optimized for limit pushdown with no filters."""
-        assert self._pushed_filters is None, "Expected no filters when creating scan tasks with limit and no filters"
-        assert pushdowns.limit is not None, "Expected a limit when creating scan tasks with limit and no filters"
-
-        fragments = self._ds.get_fragments()
-        remaining_limit = pushdowns.limit
-
-        for fragment in fragments:
-            if remaining_limit <= 0:
-                # No more rows needed, stop creating scan tasks
-                break
-
-            # Calculate effective rows using fragment.count_rows()
-            # This is not expensive because count_rows simply checks physical_rows - num_deletions when there are no filters
-            # https://github.com/lancedb/lance/blob/v0.34.0/rust/lance/src/dataset/fragment.rs#L1049-L1055
-            effective_rows = fragment.count_rows()
-
-            if effective_rows > 0:
-                # Determine how many rows this fragment should contribute
-                rows_to_scan = min(remaining_limit, effective_rows)
-                remaining_limit -= rows_to_scan
-
-                yield ScanTask.python_factory_func_scan_task(
-                    module=_lancedb_table_factory_function.__module__,
-                    func_name=_lancedb_table_factory_function.__name__,
-                    func_args=(self._ds, [fragment.fragment_id], required_columns, None, rows_to_scan),
-                    schema=self.schema()._schema,
-                    num_rows=rows_to_scan,
-                    size_bytes=None,
-                    pushdowns=pushdowns,
-                    stats=None,
-                )
+        """Deprecated: Use LimitOptimizedStrategy instead."""
+        warnings.warn(
+            "_create_scan_tasks_with_limit_and_no_filters is deprecated. "
+            "The method now uses LimitOptimizedStrategy internally.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        strategy = LimitOptimizedStrategy()
+        yield from strategy.create_scan_tasks(self, pushdowns, required_columns)
 
     def _create_regular_scan_tasks(
         self, pushdowns: PyPushdowns, required_columns: Optional[list[str]]
     ) -> Iterator[ScanTask]:
-        """Create regular scan tasks without count pushdown."""
-        fragments = self._ds.get_fragments()
-        for fragment in fragments:
-            # TODO: figure out how if we can get this metadata from LanceDB fragments cheaply
-            size_bytes = None
-            stats = None
-
-            # NOTE: `fragment.count_rows()` should result in 1 IO call for the data file
-            # (1 fragment = 1 data file) and 1 more IO call for the deletion file (if present).
-            # This could potentially be expensive to perform serially if there are thousands of files.
-            # Given that num_rows isn't leveraged for much at the moment, and without statistics
-            # we will probably end up materializing the data anyways for any operations, we leave this
-            # as None.
-            num_rows = None
-            pushed_expr = self._combine_filters_to_arrow()
-
-            yield ScanTask.python_factory_func_scan_task(
-                module=_lancedb_table_factory_function.__module__,
-                func_name=_lancedb_table_factory_function.__name__,
-                func_args=(self._ds, [fragment.fragment_id], required_columns, pushed_expr, pushdowns.limit),
-                schema=self.schema()._schema,
-                num_rows=num_rows,
-                size_bytes=size_bytes,
-                pushdowns=pushdowns,
-                stats=stats,
-            )
+        """Deprecated: Use appropriate strategy instead."""
+        warnings.warn(
+            "_create_regular_scan_tasks is deprecated. "
+            "The method now uses strategy pattern internally.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        strategy = self._get_scan_strategy(pushdowns)
+        yield from strategy.create_scan_tasks(self, pushdowns, required_columns)
 
     def _combine_filters_to_arrow(self) -> Optional["pa.compute.Expression"]:
+        """Combine pushed filters into a single Arrow expression.
+        
+        Returns:
+            Combined Arrow filter expression or None if no filters
+        """
         if self._pushed_filters is not None:
             combined_filter = self._pushed_filters[0]
             for filter_expr in self._pushed_filters[1:]:
