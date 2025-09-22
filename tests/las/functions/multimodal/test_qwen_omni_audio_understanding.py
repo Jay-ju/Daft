@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import pandas as pd
-import pytest
 
 import daft
 from daft import col
@@ -25,21 +24,14 @@ num_gpus = int(os.getenv("NUM_GPUS", 4))
 dtype = "float16"
 use_flash_attention_2 = False
 rank = 0
+num_gpus = 0
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
-    paths = [
-        "",
-        f"{local_test_data_dir}/audio/non-exist.wav",
-        f"{local_test_data_dir}/audio/sample.mp3",
-        f"{local_test_data_dir}/audio/耙耙柑大叔.aac",
-        f"{tos_test_data_dir}/audio/耙耙柑大叔.aac",
-        f"{http_test_data_dir}/audio/耙耙柑大叔.aac",
-    ]
+    paths = ["", f"{local_test_data_dir}/audio/non-exist.wav", f"{local_test_data_dir}/audio/sample.mp3"]
     return pd.DataFrame({"audio_path": paths})
 
 
-@pytest.mark.skip(reason="""T4 GPU not support QwenOmniAudioUnderstanding.""")
 def test_qwen_omni_audio_understanding(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

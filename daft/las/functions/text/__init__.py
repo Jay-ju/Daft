@@ -26,6 +26,7 @@ from .text_safety_scorer import TextSafetyScorer
 from .url_ratio_calculator import UrlRatioCalculator
 from .whitespace_normalizer import WhitespaceNormalizer
 from .word_repetition_calculator import WordRepetitionCalculator
+from .multilingual_text_translate import MultilingualTextTranslate
 
 __all__ = [
     "AlphanumericRatioCalculator",
@@ -42,6 +43,7 @@ __all__ = [
     "MaximumWordLengthCalculator",
     "Md5Calculator",
     "MultilingualTextQualityScorer",
+    "MultilingualTextTranslate",
     "PerplexityCalculator",
     "PreSignUrlForTos",
     "RegexReplacer",
