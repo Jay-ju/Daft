@@ -118,7 +118,7 @@ def test_get_ak_sk(service, monkeypatch):
 
 def test_openapi():
     access_key, secret_key = get_ak_sk("las")
-    client = OpenAPIClient(service="las_ai_qa", region="cn-beijing", access_key=access_key, secret_key=secret_key)
+    client = OpenAPIClient(service="las", region="cn-beijing", access_key=access_key, secret_key=secret_key)
     response = client.call_api(
         method="POST",
         params={},

@@ -120,7 +120,6 @@ class LasDatasetClient:
     """Client that /create/get las datasets."""
 
     def __init__(self, config: LasDatasetConfig):
-        # In debug mode, set LAS_SERVICE_NAME to las_ai_qa
         service = os.environ.get("LAS_SERVICE_NAME", "las")
         self.api_client = OpenAPIClient(
             service=service,
