@@ -157,7 +157,7 @@ def _lancedb_count_result_function(
 
 
 class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
-    def __init__(self, ds: "lance.LanceDataset", parallelism: Optional[int] = None, fragment_group_size: Optional[int] = None):
+    def __init__(self, ds: "lance.LanceDataset", parallelism: Optional[int] = None):
         """Initialize LanceDB scan operator.
         
         Args:
@@ -169,23 +169,8 @@ class LanceDBScanOperator(ScanOperator, SupportsPushdownFilters):
         """
         self._ds = ds
         self._pushed_filters: Union[list[PyExpr], None] = None
+        self._parallelism = parallelism
         
-        # Handle parameter naming with backward compatibility
-        if fragment_group_size is not None and parallelism is not None:
-            raise ValueError("Cannot specify both 'parallelism' and 'fragment_group_size'. Use 'parallelism' only.")
-        
-        if fragment_group_size is not None:
-            warnings.warn(
-                "Parameter 'fragment_group_size' is deprecated. Use 'parallelism' instead.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-            self._parallelism = fragment_group_size
-        else:
-            self._parallelism = parallelism
-        
-        # Keep the old attribute for backward compatibility
-        self._fragment_group_size = self._parallelism
 
     def name(self) -> str:
         return "LanceDBScanOperator"

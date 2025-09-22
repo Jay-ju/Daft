@@ -37,7 +37,6 @@ def read_lance(
     default_scan_options: Optional[dict[str, str]] = None,
     metadata_cache_size_bytes: Optional[int] = None,
     parallelism: Optional[int] = None,
-    fragment_group_size: Optional[int] = None,
 ) -> DataFrame:
     """Create a DataFrame from a LanceDB table.
 
@@ -88,10 +87,6 @@ def read_lance(
             be grouped to ensure the total number of scan tasks does not exceed this value.
             This helps control resource usage and task scheduling overhead. If None, defaults
             to the number of fragments (no grouping).
-        fragment_group_size : optional, int
-            **Deprecated**: Use 'parallelism' parameter instead. Number of fragments to group
-            together in a single scan task. If None or <= 1, each fragment will be processed
-            individually (default behavior).
 
     Returns:
         DataFrame: a DataFrame with the schema converted from the specified LanceDB table
@@ -118,9 +113,6 @@ def read_lance(
         >>> df = daft.read_lance("s3://my-lancedb-bucket/data/", parallelism=5)
         >>> df.show()
         
-        Read a local LanceDB table with deprecated fragment_group_size (use parallelism instead):
-        >>> df = daft.read_lance("s3://my-lancedb-bucket/data/", fragment_group_size=5)
-        >>> df.show()
     """
     try:
         import lance
@@ -143,7 +135,7 @@ def read_lance(
         default_scan_options=default_scan_options,
         metadata_cache_size_bytes=metadata_cache_size_bytes,
     )
-    lance_operator = LanceDBScanOperator(ds, parallelism=parallelism, fragment_group_size=fragment_group_size)
+    lance_operator = LanceDBScanOperator(ds, parallelism=parallelism)
 
     handle = ScanOperatorHandle.from_python_scan_operator(lance_operator)
     builder = LogicalPlanBuilder.from_tabular_scan(scan_operator=handle)
