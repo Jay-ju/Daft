@@ -23,7 +23,7 @@ def get_meta() -> OpMetaModel:
         Clazz=QwenOmniAudioUnderstanding,
         Category=Category.MULTI_MODAL,
         SubCategory=SubCategory.AUDIO_TO_TEXT,
-        Tags=["音频理解", "多模态理解"],
+        Tags=["音频理解"],
     )
 
 
@@ -32,7 +32,7 @@ def get_extra_meta() -> ExtraMetaModel:
     code_description = "下面的代码展示了如何使用 daft 运行算子理解音频内容，并按照指令生成描述。"
     before = [
         DataItem(
-            Type=ValueType.Picture.name,
+            Type=ValueType.Audio.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/qwen_omni_audio_understanding/sample.mp3",
             Description="",
         ),
