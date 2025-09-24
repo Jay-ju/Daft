@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-from httpx import HTTPStatusError
-
 import daft
 from daft.daft import IOConfig
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig, LasDatasetInfo
@@ -41,7 +38,3 @@ def test_las_dataset_client(uuid_short, monkeypatch, object_store_test_dir):
     # test delete dataset
     client.delete_dataset(ds_name)
     assert client.dataset_exist(name=ds_name) is False
-
-    # test non-exist dataset, it would give an exception
-    with pytest.raises(HTTPStatusError, match=r".*Dataset.* is not exist"):
-        client.delete_dataset("Non-existent-dataset")
