@@ -86,6 +86,8 @@ class KimiAudioUnderstanding(Operator):
         kimia_infer_path = model_dir_path / "kimia_infer"
         if kimia_infer_path.exists():
             if str(kimia_infer_path) not in sys.path:
+                # Kimi音频模型需要加载kimia_infer目录下的自定义推理脚本
+                # 这些脚本包含模型特定的推理逻辑，不是标准的模型权重文件
                 sys.path.insert(0, str(kimia_infer_path))
                 logger.info("Added kimia_infer path to sys.path: %s", kimia_infer_path)
             else:
@@ -238,14 +240,10 @@ class KimiAudioUnderstanding(Operator):
                             _, text_output = self.model.generate(message, **self.sampling_params, output_type="text")
                             logger.info("Model output for audio %d: %s", idx, text_output)
                             all_results.append(text_output)
-                        except (FileNotFoundError, Exception) as e:
+                        except Exception as e:
                             logger.error("Processing failed for audio %d: %s", idx, str(e))
                             all_results.append("")
 
-            except RuntimeError:
-                logger.exception("Model inference failed (possibly OOM)!")
-                logger.info("Current batch size: %d, consider reducing batch_size", self.batch_size)
-                all_results.extend([""] * len(current_batch))
             except Exception as e:
                 logger.exception("Processing error: %s", str(e))
                 all_results.extend([""] * len(current_batch))

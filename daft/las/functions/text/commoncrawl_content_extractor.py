@@ -204,18 +204,21 @@ class CommonCrawlContentExtractor(Operator):
 
                     warc_binary = base64_to_byte(warc_input)
                     source_name = "[base64_input]"
+                    extracted_content = self._process_warc_stream(BytesIO(warc_binary), source_name)
                 elif self.warc_src_type == "warc_url":
-                    from daft.las.functions.utils.common_utils import path_to_byte
-
-                    warc_binary = run_on_local_path(warc_input, lambda path: path_to_byte(path))
                     source_name = os.path.basename(warc_input) if isinstance(warc_input, str) else "[url_input]"
+
+                    def process_file_directly(local_path: str) -> list[dict[str, Any]]:
+                        with open(local_path, "rb") as file:
+                            return self._process_warc_stream(file, source_name)
+
+                    extracted_content = run_on_local_path(warc_input, process_file_directly)
                 elif self.warc_src_type == "warc_binary":
                     warc_binary = warc_input
                     source_name = "[binary_input]"
+                    extracted_content = self._process_warc_stream(BytesIO(warc_binary), source_name)
                 else:
                     raise ValueError(f"Unsupported warc_src_type: {self.warc_src_type}")
-
-                extracted_content = self._process_warc_stream(BytesIO(warc_binary), source_name)
                 results.append(extracted_content)
             except Exception as e:
                 logger.error("Failed to process WARC data: %s", str(e))
