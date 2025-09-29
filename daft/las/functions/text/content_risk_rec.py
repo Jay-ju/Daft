@@ -41,10 +41,10 @@ class ContentRiskRec(Operator):
     **性能说明：**
     - 支持批量处理，建议根据服务QPS配置并发量
 
-    Notes:
+    Notes
     -----
     算子使用前置条件：开通业务风险识别产品-文本风险识别，产品链接见：https://www.volcengine.com/product/business-security
-    """  # noqa: D415
+    """  # noqa: D415, D416
 
     def __init__(
         self,
