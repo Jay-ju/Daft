@@ -68,6 +68,8 @@ def _collect_all_metas(root_dir: str) -> dict[str, tuple[OpMetaModel, ExtraMetaM
 
         if hasattr(module, "get_meta") and hasattr(module, "get_extra_meta"):
             op_meta = module.get_meta()
+            if op_meta.IsDeprecated:
+                continue
             op_meta.Description = op_meta.Clazz.__doc__
             results[module_name] = (op_meta, module.get_extra_meta())
 

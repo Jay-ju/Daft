@@ -44,6 +44,10 @@ class QwenVLImageUnderstanding(Operator):
         max_caption_length: int = 256,
         resized_height: int | None = None,
         resized_width: int | None = None,
+        do_sample: bool = False,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 1.0,
         rank: int | None = None,
         **kwargs: Any,
     ) -> None:
@@ -79,6 +83,14 @@ class QwenVLImageUnderstanding(Operator):
                 默认值：None
             resized_width: 预处理时统一缩放图像的宽度（像素单位），空值保留原始尺寸。建议与resized_height配合使用
                 默认值：None
+            do_sample: 是否启用采样生成。为True时，模型会以概率方式采样下一个token，生成结果更具多样性；为False时，采用贪心或束搜索，生成结果更确定。
+                默认值：False
+            temperature: 采样温度，控制生成内容的随机性。值越高，生成越多样化；值越低，生成越保守。
+                默认值：1.0
+            top_k: 采样时仅从概率最高的前k个token中选取下一个token。较小的k值可提升生成的相关性，较大的k值增加多样性。
+                默认值：50
+            top_p: nucleus采样的累计概率阈值。仅从累计概率大于top_p的token集合中采样，控制生成内容的多样性。值越小生成越保守，值越大生成越多样。
+                默认值：1.0
             rank: 指定使用的GPU设备编号（多卡环境有效）。例如：0表示第一张GPU，1表示第二张GPU
                 默认值：None
         """
@@ -95,6 +107,10 @@ class QwenVLImageUnderstanding(Operator):
         self.resized_height = resized_height
         self.resized_width = resized_width
         self.rank = rank
+        self.do_sample = do_sample
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
 
         # These packages are heavy, so we import them lazily.
         import torch
@@ -163,13 +179,13 @@ class QwenVLImageUnderstanding(Operator):
                     {run_on_local_path(img_data, lambda path: path_to_base64(path))}"
         raise ValueError(f"Unsupported image type: {self.image_src_type}")
 
-    def _build_message_template(self, image_base64: str) -> list[dict[str, Any]]:
+    def _build_message_template(self, image_base64: str, prompt: str) -> list[dict[str, Any]]:
         message: list[dict[str, Any]] = [
             {
                 "role": "user",
                 "content": [
                     {"type": "image", "image": image_base64},
-                    {"type": "text", "text": self.prompt},
+                    {"type": "text", "text": prompt},
                 ],
             }
         ]
@@ -198,7 +214,7 @@ class QwenVLImageUnderstanding(Operator):
         trimmed_ids = [out[len(inp) :] for inp, out in zip(inputs.input_ids, generated_ids)]
         return self.processor.batch_decode(trimmed_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
-    def transform(self, images: pa.Array) -> pa.Array:
+    def transform(self, images: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
         """对输入的图像数组进行批量处理，生成包含视觉理解结果的文本描述。
 
         Args:
@@ -216,10 +232,13 @@ class QwenVLImageUnderstanding(Operator):
 
         all_captions = []
         total_images = len(images)
+        prompts_list = user_prompts.to_pylist() if user_prompts else [self.prompt] * total_images
+
         total_batches = (total_images + self.batch_size - 1) // self.batch_size
         for batch_idx in range(0, total_images, self.batch_size):
             sub_images = images.slice(batch_idx, self.batch_size)
             current_batch = sub_images.to_pylist()
+            sub_prompts = prompts_list[batch_idx * self.batch_size : (batch_idx + 1) * self.batch_size]
             logger.debug("Processing batch %.2f with %d images", (batch_idx + 1) / total_batches, len(current_batch))
 
             if not current_batch:
@@ -227,12 +246,19 @@ class QwenVLImageUnderstanding(Operator):
             batch_messages = []
 
             try:
-                for img_data in current_batch:
+                for img_data, prompt in zip(current_batch, sub_prompts):
                     image_base64 = self._process_image_data(img_data)
-                    message = self._build_message_template(image_base64)
+                    message = self._build_message_template(image_base64, prompt)
                     batch_messages.append(message)
                 inputs = self._prepare_model_inputs(batch_messages)
-                generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_caption_length)
+                generated_ids = self.model.generate(
+                    **inputs,
+                    max_new_tokens=self.max_caption_length,
+                    do_sample=self.do_sample,
+                    temperature=self.temperature,
+                    top_k=self.top_k,
+                    top_p=self.top_p,
+                )
                 batch_captions = self._decode_generated_text(inputs, generated_ids)
                 all_captions.extend(batch_captions)
             except RuntimeError:

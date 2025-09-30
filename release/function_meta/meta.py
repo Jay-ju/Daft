@@ -171,6 +171,7 @@ class OpMetaModel:
     SubCategory: SubCategory
     Description: str | None = None
     Tags: list[str] | None = None
+    IsDeprecated: bool = False
 
 
 @dataclass

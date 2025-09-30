@@ -24,6 +24,7 @@ def get_meta() -> OpMetaModel:
         Category=Category.TEXT,
         SubCategory=SubCategory.TEXT_TRANSLATION,
         Tags=["文本翻译", "多语言", "Doubao"],
+        IsDeprecated=False,
     )
 
 

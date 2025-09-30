@@ -134,7 +134,7 @@ class QwenOmniAudioUnderstanding(Operator):
         self.processor = Qwen2_5OmniProcessor.from_pretrained(str(model_dir), trust_remote_code=True)
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
-    def _build_message_template(self, content: str) -> list[dict[str, Any]]:
+    def _build_message_template(self, content: str, prompt: str) -> list[dict[str, Any]]:
         message: list[dict[str, Any]] = [
             {
                 "role": "system",
@@ -149,7 +149,7 @@ class QwenOmniAudioUnderstanding(Operator):
                 "role": "user",
                 "content": [
                     {"type": "audio", "audio": content},
-                    {"type": "text", "text": self.prompt},
+                    {"type": "text", "text": prompt},
                 ],
             },
         ]
@@ -179,7 +179,7 @@ class QwenOmniAudioUnderstanding(Operator):
 
         return inputs
 
-    def transform(self, contents: pa.Array) -> pa.Array:
+    def transform(self, contents: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
         """对输入的音频内容数组进行批量处理，生成包含音频理解结果的文本描述.
 
         Args:
@@ -197,11 +197,14 @@ class QwenOmniAudioUnderstanding(Operator):
 
         all_captions = []
         total_content = len(contents)
+        prompts_list = user_prompts.to_pylist() if user_prompts else [self.prompt] * total_content
+
         total_batches = (total_content + self.batch_size - 1) // self.batch_size
         with tempfile.TemporaryDirectory() as temp_dir:
             for batch_idx in range(0, total_content, self.batch_size):
                 sub_contents = contents.slice(batch_idx, self.batch_size)
                 current_batch = sub_contents.to_pylist()
+                sub_prompts = prompts_list[batch_idx * self.batch_size : (batch_idx + 1) * self.batch_size]
                 logger.debug(
                     "Processing batch %.2f with %d audio files", (batch_idx + 1) / total_batches, len(current_batch)
                 )
@@ -211,14 +214,14 @@ class QwenOmniAudioUnderstanding(Operator):
                 batch_messages = []
 
                 try:
-                    for path in current_batch:
+                    for path, prompt in zip(current_batch, sub_prompts):
                         if path.startswith(("tos://", "s3://", "http://", "https://")):
                             temp_file_path = str(Path(temp_dir, Path(path).name))
                             download_file(path, temp_file_path)
 
                         else:
                             temp_file_path = path
-                        message = self._build_message_template(temp_file_path)
+                        message = self._build_message_template(temp_file_path, prompt)
                         batch_messages.append(message)
                     inputs = self._prepare_model_inputs(batch_messages)
 

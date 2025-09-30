@@ -45,6 +45,10 @@ class QwenVLVideoUnderstanding(Operator):
         min_pixels: int | None = None,
         max_pixels: int | None = None,
         fps: float | None = None,
+        do_sample: bool = False,
+        temperature: float = 1.0,
+        top_k: int = 50,
+        top_p: float = 1.0,
         rank: int | None = None,
         **kwargs: Any,
     ) -> None:
@@ -82,6 +86,14 @@ class QwenVLVideoUnderstanding(Operator):
                 默认值：None
             fps: 视频帧率，不设置时，默认使用视频的原帧率。视频帧率越高，GPU显存占用越高。
                 默认值：None
+            do_sample: 是否启用采样生成。为True时，模型会以概率方式采样下一个token，生成结果更具多样性；为False时，采用贪心或束搜索，生成结果更确定。
+                默认值：False
+            temperature: 采样温度，控制生成内容的随机性。值越高，生成越多样化；值越低，生成越保守。
+                默认值：1.0
+            top_k: 采样时仅从概率最高的前k个token中选取下一个token。较小的k值可提升生成的相关性，较大的k值增加多样性。
+                默认值：50
+            top_p: nucleus采样的累计概率阈值。仅从累计概率大于top_p的token集合中采样，控制生成内容的多样性。值越小生成越保守，值越大生成越多样。
+                默认值：1.0
             rank: 指定使用的GPU设备编号（多卡环境有效）。例如：0表示第一张GPU，1表示第二张GPU
                 默认值：None
         """
@@ -99,6 +111,10 @@ class QwenVLVideoUnderstanding(Operator):
         self.max_pixels = max_pixels
         self.fps = fps
         self.rank = rank
+        self.do_sample = do_sample
+        self.temperature = temperature
+        self.top_k = top_k
+        self.top_p = top_p
 
         # These packages are heavy, so we import them lazily.
         import torch
@@ -158,13 +174,13 @@ class QwenVLVideoUnderstanding(Operator):
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=self.model_name)
 
-    def _build_message_template(self, tmp_file_name: str) -> list[dict[str, Any]]:
+    def _build_message_template(self, tmp_file_name: str, prompt: str) -> list[dict[str, Any]]:
         message: list[dict[str, Any]] = [
             {
                 "role": "user",
                 "content": [
                     {"type": "video", "video": tmp_file_name},
-                    {"type": "text", "text": self.prompt},
+                    {"type": "text", "text": prompt},
                 ],
             }
         ]
@@ -196,7 +212,7 @@ class QwenVLVideoUnderstanding(Operator):
         trimmed_ids = [out[len(inp) :] for inp, out in zip(inputs.input_ids, generated_ids)]
         return self.processor.batch_decode(trimmed_ids, skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
-    def transform(self, videos: pa.Array) -> pa.Array:
+    def transform(self, videos: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
         """对输入的视频数组进行批量处理，生成包含视觉理解结果的文本描述
 
         Args:
@@ -214,10 +230,13 @@ class QwenVLVideoUnderstanding(Operator):
 
         all_captions = []
         total_videos = len(videos)
+        prompts_list = user_prompts.to_pylist() if user_prompts else [self.prompt] * total_videos
+
         total_batches = (total_videos + self.batch_size - 1) // self.batch_size
         for batch_idx in range(0, total_videos, self.batch_size):
             sub_videos = videos.slice(batch_idx, self.batch_size)
             current_batch = sub_videos.to_pylist()
+            sub_prompts = prompts_list[batch_idx * self.batch_size : (batch_idx + 1) * self.batch_size]
             logger.debug("Processing batch %.2f with %d videos", (batch_idx + 1) / total_batches, len(current_batch))
 
             if not current_batch:
@@ -244,11 +263,19 @@ class QwenVLVideoUnderstanding(Operator):
                         if not Path(tmp_file_name).exists():
                             raise FileNotFoundError(tmp_file_name)
 
-                        message = self._build_message_template(tmp_file_name)
+                        prompt = sub_prompts[idx]
+                        message = self._build_message_template(tmp_file_name, prompt)
                         batch_messages.append(message)
 
                     inputs = self._prepare_model_inputs(batch_messages)
-                    generated_ids = self.model.generate(**inputs, max_new_tokens=self.max_caption_length)
+                    generated_ids = self.model.generate(
+                        **inputs,
+                        max_new_tokens=self.max_caption_length,
+                        do_sample=self.do_sample,
+                        temperature=self.temperature,
+                        top_k=self.top_k,
+                        top_p=self.top_p,
+                    )
                     batch_captions = self._decode_generated_text(inputs, generated_ids)
                     all_captions.extend(batch_captions)
             except FileNotFoundError:

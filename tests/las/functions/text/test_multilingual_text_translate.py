@@ -25,11 +25,6 @@ batch_size = 1
 dtype = "bfloat16"
 seed = 42
 
-tensor_parallel_size = 8
-enable_prefix_caching = False
-gpu_memory_utilization = 0.9
-dtype = "float32"
-
 
 @pytest.mark.skip(reason="""T4 GPU not support Flash Attention 2.""")
 def test_multilingual_text_translate(local_models_dir):

@@ -6,6 +6,7 @@ import base64
 import logging
 import os
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Callable, TypeVar
 
@@ -229,3 +230,17 @@ usage_tracking_logger = _init_tracking_logger()
 
 def tracking_usage(op: str, model_service_or_lib: str | None = None) -> None:
     usage_tracking_logger.info("Operator calling info: {op: %s, model_or_lib: %s}", op, model_service_or_lib)
+
+
+def generate_filename_base_input(src_data: str, src_type: str, file_type: str, batch_idx: int, idx: int) -> str:
+    if src_type == "video_url":
+        if src_data and src_data.startswith(("tos://", "s3://")):
+            file_name = f"{src_type.split('_')[0]}_{batch_idx}_{idx}.{src_data.split('.')[-1]}"
+        elif src_data and src_data.startswith(("https://", "http://")):
+            file_name = f"{int(time.time())!s}_{idx}.{file_type}"
+        else:
+            file_name = ""
+    else:
+        file_name = f"video_binary.{file_type}"
+
+    return file_name
