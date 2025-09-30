@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from abc import ABC, abstractmethod
+from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from daft import Series
 
 if TYPE_CHECKING:
-    import pyarrow as pa
+    from logging import Logger
 
+    import pyarrow as pa
 
 NUM_CPUS = "num_cpus"
 NUM_GPUS = "num_gpus"
@@ -40,3 +44,67 @@ class Operator(ABC):
     @staticmethod
     @abstractmethod
     def __return_column_type__() -> pa.DataType: ...
+
+
+class AsyncOperatorStats:
+    def __init__(self, logger: Logger) -> None:
+        self._lock = asyncio.Lock()
+        self._stats: Counter[str] = Counter()
+        self.logger = logger
+
+    async def _inc(self, key: str, value: int = 1) -> None:
+        async with self._lock:
+            self._stats[key] += value
+
+    async def log_accept(self, num: int = 1) -> None:
+        await self._inc("accepted", num)
+
+    async def log_submit(self) -> None:
+        await self._inc("submitted")
+
+    async def log_succeed(self) -> None:
+        await self._inc("succeed")
+
+    async def log_failed(self) -> None:
+        await self._inc("failed")
+
+    async def reset(self) -> None:
+        async with self._lock:
+            self._stats.clear()
+
+    async def log_process(self) -> None:
+        async with self._lock:
+            accepted = self._stats["accepted"]
+            submitted = self._stats["submitted"]
+            succeed = self._stats["succeed"]
+            failed = self._stats["failed"]
+            finished = succeed + failed
+            running = submitted - finished
+            pending = accepted - submitted
+
+        self.logger.info(
+            "%d running, %d pending, accepted/submitted/finished/succeed/failed: %d/%d/%d/%d/%d",
+            running,
+            pending,
+            accepted,
+            submitted,
+            finished,
+            succeed,
+            failed,
+        )
+
+
+class EventLooper:
+    def __init__(self) -> None:
+        self._local = threading.local()
+
+    def _get_event_loop(self) -> asyncio.AbstractEventLoop:
+        if not hasattr(self._local, "loop"):
+            self._local.loop = asyncio.new_event_loop()
+        return self._local.loop
+
+    def run(self, func: Any) -> Any:
+        loop = self._get_event_loop()
+        if loop.is_running():
+            return asyncio.run_coroutine_threadsafe(func, loop).result()
+        return loop.run_until_complete(func)
