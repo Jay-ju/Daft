@@ -34,14 +34,14 @@ def get_extra_meta() -> ExtraMetaModel:
         DataItem(
             Type=ValueType.Video.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_resize_resolution/sample.mp4",
-            Description="待调整的原始视频",
+            Description="当前视频的分辨率是1024x576",
         )
     ]
     after = [
         DataItem(
             Type=ValueType.Video.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_resize_resolution/sample_resized.mp4",
-            Description="分辨率调整后的视频",
+            Description="调整后的视频分辨率是1280x720",
         ),
     ]
 

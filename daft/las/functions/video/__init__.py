@@ -7,6 +7,7 @@ from .video_extract_audio import VideoExtractAudio
 from .video_split_by_duration import VideoSplitByDuration
 from .video_watermark_detect import VideoWatermarkDetect
 from .video_resize_resolution import VideoResizeResolution
+from .video_sttn_inpaint import VideoSttnInpaint
 
 __all__ = [
     "VideoAdaptiveCompress",
@@ -15,5 +16,6 @@ __all__ = [
     "VideoResizeResolution",
     "VideoSplitByDuration",
     "VideoSplitByKeyframes",
+    "VideoSttnInpaint",
     "VideoWatermarkDetect",
 ]

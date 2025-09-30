@@ -34,14 +34,14 @@ def get_extra_meta() -> ExtraMetaModel:
         DataItem(
             Type=ValueType.Video.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_adaptive_compress/sample.mp4",
-            Description="待压缩的原始视频",
+            Description="待压缩的原始视频，体积约为280MB",
         )
     ]
     after = [
         DataItem(
             Type=ValueType.Video.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_adaptive_compress/sample_compressed.mp4",
-            Description="自适应压缩后的视频",
+            Description="自适应压缩后的视频，体积降至50MB以下",
         ),
     ]
 

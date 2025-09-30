@@ -34,7 +34,7 @@ def get_extra_meta() -> ExtraMetaModel:
         DataItem(
             Type=ValueType.Video.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_watermark_detect/sample.mp4",
-            Description="",
+            Description="带有水印的原始视频",
         )
     ]
     after = [
