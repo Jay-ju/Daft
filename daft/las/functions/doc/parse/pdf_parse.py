@@ -20,6 +20,7 @@ from urllib.parse import urlparse
 
 import httpx
 import pdfplumber
+from aiolimiter import AsyncLimiter
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
@@ -46,7 +47,7 @@ class PDFParse(Operator):
 
     Notes
     -----
-    算子使用前置条件：开通视觉智能产品-文字识别-智能文档解析服务，产品链接见：https://www.volcengine.com/docs/6790/117690
+    算子使用前置条件：开通视觉智能产品-文字识别-智能文档解析服务，产品链接见：https://www.volcengine.com/docs/86081/1804813
     """  # noqa: D415, D416
 
     def __init__(
@@ -128,11 +129,14 @@ class PDFParse(Operator):
         if self.output_tos_path:
             self.output_image_tos_path = self.output_tos_path + "/images"
             self.output_md_tos_path = self.output_tos_path + "/txt"
+            self.output_detail_tos_path = self.output_tos_path + "/detail"
             mkdirs(self.output_image_tos_path)
             mkdirs(self.output_md_tos_path)
+            mkdirs(self.output_detail_tos_path)
 
         self.base_delay = 1.5
         self._visual_service = get_visual_service(VisualServiceConfig.from_env())
+        self.qps_limiter = AsyncLimiter(self.qps, 1)
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="visual service")
 
@@ -159,9 +163,9 @@ class PDFParse(Operator):
                 return page_count
 
         except httpx.RequestError:
-            logger.exception("Network request failed")
+            logger.exception("Network request failed for url: %s", url)
         except Exception:
-            logger.exception("Error processing PDF")
+            logger.exception("Error processing PDF for url: %s", url)
         return 0
 
     def get_pdf_page_count(self, base64_str: str | None, url_str: str | None) -> int:
@@ -174,18 +178,65 @@ class PDFParse(Operator):
     async def async_ocr_pdf(self, detector: Any, req: dict[str, Any]) -> Any:
         for attempt in range(1, self.max_retries + 1):
             try:
-                loop = asyncio.get_running_loop()
-                return await loop.run_in_executor(None, partial(detector.ocr_pdf, req))
+                async with self.qps_limiter:
+                    loop = asyncio.get_running_loop()
+                    result = await loop.run_in_executor(None, partial(detector.ocr_pdf, req))
+
+                if not isinstance(result, dict):
+                    raise RuntimeError(f"OCR service returned non-dict response: {result}")
+
+                code = result.get("code")
+                msg = result.get("message", "")
+                data = result.get("data") or {}
+                markdown = data.get("markdown") if isinstance(data, dict) else None
+
+                # Success conditions: explicit success code or message + markdown present
+                if code == 10000 or (msg == "Success" and markdown not in (None, "")):
+                    return result
+
+                # Retryable conditions: known retryable codes or empty markdown indicating transient/QPS issues
+                if self._is_retryable_error(code) or (markdown in (None, "") and code in (None, 50429, 50500, 50501)):
+                    logger.warning(
+                        "Transient OCR error (code=%s, msg=%s, attempt=%d/%d, req=%s)",
+                        code,
+                        msg,
+                        attempt,
+                        self.max_retries,
+                        self._summarize_req(req),
+                    )
+                    if attempt == self.max_retries:
+                        raise RuntimeError(f"OCR service error after retries: code={code}, message={msg}")
+                    await asyncio.sleep(self.base_delay * (2**attempt))
+                    self._refresh_service()
+                    continue
+
+                # Non-retryable: authentication/args/decode/size etc.
+                logger.error("Non-retryable OCR error (code=%s, msg=%s, req=%s)", code, msg, self._summarize_req(req))
+                raise RuntimeError(f"OCR service error code={code}, message={msg}")
+
             except (TimeoutError, ConnectionError) as e:
-                logger.warning("PDF parse attempt %d failed: %s", attempt, e)
+                logger.warning(
+                    "Network/timeout in OCR (attempt %d/%d, req=%s): %s",
+                    attempt,
+                    self.max_retries,
+                    self._summarize_req(req),
+                    e,
+                )
                 if attempt == self.max_retries:
                     raise
                 await asyncio.sleep(self.base_delay * (2**attempt))
                 self._refresh_service()
             except Exception as e:
-                # Handle rate limiting/slowdown errors
-                if "slowdown" in str(e).lower() or "rate limit" in str(e).lower():
-                    logger.warning("Rate limit/slowdown error on attempt %d: %s", attempt, e)
+                # Handle rate limiting/slowdown hints
+                emsg = str(e).lower()
+                if "slowdown" in emsg or "rate limit" in emsg or "429" in emsg:
+                    logger.warning(
+                        "Rate limit/slowdown in OCR (attempt %d/%d, req=%s): %s",
+                        attempt,
+                        self.max_retries,
+                        self._summarize_req(req),
+                        e,
+                    )
                     if attempt == self.max_retries:
                         raise
                     await asyncio.sleep(self.base_delay * (2**attempt))
@@ -218,10 +269,16 @@ class PDFParse(Operator):
             page_batch = 300
             logger.info("Get page number: 0. Set page_number:%d; page_batch:%d", page_number, page_batch)
 
-        page_end = 0
-        while page_end < page_number:
+        # Respect page_start and compute batches with correct remaining page_num
+        effective_start = max(0, self.page_start)
+        # When page_parsed_num == -1, parse_limit is total pages; otherwise parse pages starting from effective_start
+        parse_limit = page_number if self.page_parsed_num == -1 else effective_start + page_number
+        page_end = effective_start
+        while page_end < parse_limit:
             page_begin = page_end
-            page_end = page_end + page_batch
+            remaining = parse_limit - page_begin
+            current_batch = min(page_batch, remaining)
+            page_end = page_end + current_batch
             params: dict[str, str] = {}
             if base64_str is not None:
                 params["image_base64"] = str(base64_str)
@@ -230,7 +287,7 @@ class PDFParse(Operator):
             params.update(
                 {
                     "page_start": str(page_begin),
-                    "page_num": str(page_batch),
+                    "page_num": str(current_batch),
                     "version": str(self.version),
                     "file_type": str(self.file_type),
                     "parse_mode": str(self.parse_mode),
@@ -240,15 +297,12 @@ class PDFParse(Operator):
             )
             parameters_list.append(params)
 
-        results_total = []
-        for turn in range(0, len(parameters_list), self.qps):
-            batch = parameters_list[turn : turn + self.qps]
-            tasks = [
-                asyncio.wait_for(self.async_ocr_pdf(self._visual_service, params), timeout=self.timeout)
-                for params in batch
-            ]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            results_total.extend(results)
+        # Dispatch all page requests; AsyncLimiter enforces QPS across tasks
+        tasks = [
+            asyncio.wait_for(self.async_ocr_pdf(self._visual_service, params), timeout=self.timeout)
+            for params in parameters_list
+        ]
+        results_total = await asyncio.gather(*tasks, return_exceptions=True)
 
         return await self._process_results(results_total, file_name_str)
 
@@ -306,8 +360,10 @@ class PDFParse(Operator):
                 markdown_list.append("")
                 continue
             try:
-                if res.get("message") == "Success":
-                    data = res.get("data", {})
+                code = res.get("code")
+                msg = res.get("message")
+                if code == 10000 or msg == "Success":
+                    data = res.get("data", {}) or {}
                     markdown_list.append(data.get("markdown", ""))
                     if data.get("detail"):
                         detail_list.extend(json.loads(data["detail"]))
@@ -336,13 +392,42 @@ class PDFParse(Operator):
                 markdown_final, _, tos_path = await self._async_transform_md(markdown, output_name)
                 result["parsed_file_path"] = tos_path
                 result["parsed_image_filenames"] = self._extract_image_filename(markdown_final)
+                # Also persist detail JSON to TOS
+                with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
+                    detail_filename = f"{Path(output_name).stem}.detail.json"
+                    tmp_detail_file = Path(temp_sub_dir) / detail_filename
+                    with tmp_detail_file.open("w") as f:
+                        json.dump(detail_list, f, ensure_ascii=False)
+                    upload_file(str(tmp_detail_file), f"{self.output_detail_tos_path}/{detail_filename}")
             except Exception:
-                logger.exception("Failed to transform and upload markdown")
+                logger.exception("Failed to transform and upload markdown or detail JSON")
 
         return markdown, result
 
     def _refresh_service(self) -> None:
         self._visual_service = get_visual_service(VisualServiceConfig.from_env())
+
+    def _is_retryable_error(self, code: int | None) -> bool:
+        """Classify retryable error codes according to service docs."""
+        return code in {50429, 50500, 50501}
+
+    def _summarize_req(self, req: dict[str, Any]) -> str:
+        """Summarize request for logging without dumping large payloads."""
+        try:
+            src = "base64" if "image_base64" in req else "url" if "image_url" in req else "unknown"
+            summary = {
+                "src": src,
+                "image_url": req.get("image_url"),  # log the pdf url if present to identify problematic files
+                "page_start": req.get("page_start"),
+                "page_num": req.get("page_num"),
+                "parse_mode": req.get("parse_mode"),
+                "table_mode": req.get("table_mode"),
+                "version": req.get("version"),
+                "file_type": req.get("file_type"),
+            }
+            return json.dumps(summary, ensure_ascii=False)
+        except Exception:
+            return "{log_summarize_error}"
 
     def transform(
         self,
