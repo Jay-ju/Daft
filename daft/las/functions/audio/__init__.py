@@ -16,6 +16,7 @@ from .audio_vad_fsmn import AudioVadFsmn
 from .audio_split_by_duration import AudioSplitByDuration
 from .audio_speaker_verification_eres2net import AudioSpeakerVerificationEres2net
 from .audio_risk_rec import AudioRiskRec
+from .audio_vad_silero import AudioVadSilero
 
 __all__ = [
     "AudioAsrDoubao",
@@ -32,4 +33,5 @@ __all__ = [
     "AudioStandardization",
     "AudioTtsDoubao",
     "AudioVadFsmn",
+    "AudioVadSilero",
 ]
