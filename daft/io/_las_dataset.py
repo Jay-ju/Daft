@@ -43,7 +43,6 @@ class CsvReadOptions(ReadOptions):
     allow_variable_columns: bool = False
     file_path_column: str | None = None
     hive_partitioning: bool = False
-    schema_hints: dict[str, DataType] | None = None
     _buffer_size: int | None = None
     _chunk_size: int | None = None
 
@@ -54,7 +53,6 @@ class JsonReadOptions(ReadOptions):
     schema: dict[str, DataType] | None = None
     file_path_column: str | None = None
     hive_partitioning: bool = False
-    schema_hints: dict[str, DataType] | None = None
     _buffer_size: int | None = None
     _chunk_size: int | None = None
 
@@ -67,7 +65,6 @@ class ParquetReadOptions(ReadOptions):
     file_path_column: str | None = None
     hive_partitioning: bool = False
     coerce_int96_timestamp_unit: str | TimeUnit | None = None
-    schema_hints: dict[str, DataType] | None = None
     _multithreaded_io: bool | None = None
     _chunk_size: int | None = None
 

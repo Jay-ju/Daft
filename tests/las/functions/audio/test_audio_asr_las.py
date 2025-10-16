@@ -23,8 +23,9 @@ def generate_test_data(http_test_data_dir):
     ]
 
 
-@pytest.mark.skipif(not os.getenv("LAS_SERVICE_ENDPOINT", "").startswith("http"),
-                    reason="Waiting for set the endpoint of las service.")
+@pytest.mark.skipif(
+    not os.getenv("LAS_SERVICE_ENDPOINT", "").startswith("http"), reason="Waiting for set the endpoint of las service."
+)
 def test_audio_asr_las(http_test_data_dir):
     api_key = os.getenv("LAS_API_KEY")
     endpoint = os.getenv("LAS_SERVICE_ENDPOINT")

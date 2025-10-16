@@ -35,7 +35,6 @@ aws = ["boto3"]
 azure = []
 clickhouse = ["clickhouse_connect"]
 deltalake = ["deltalake", "packaging"]
-flash-attn = ["wheel", "flash-attn~=2.8.3"]
 gcp = []
 hudi = ["pyarrow >= 8.0.0"]
 huggingface = ["huggingface-hub"]
@@ -44,6 +43,24 @@ huggingface = ["huggingface-hub"]
 # See https://github.com/Eventual-Inc/Daft/issues/4868.
 iceberg = ["pyiceberg >= 0.7.0, < 0.9.1"]
 lance = ["pylance"]
+numpy = ["numpy"]
+openai = ["openai"]
+pandas = ["pandas"]
+ray = [
+  # Inherit existing Ray version. Get the "default" extra for the Ray dashboard.
+  # TODO: we temporarily limit ray<2.48.0 because https://github.com/Eventual-Inc/Daft/issues/5027
+  've-ray[data, client]>=2.0.0, <2.48.0 ; platform_system != "Windows"',
+  've-ray[data, client]>=2.10.0, <2.48.0 ; platform_system == "Windows"',  # ray 2.10 has the pyarrow upper pin removed
+  # Explicitly install packaging. See issue: https://github.com/ray-project/ray/issues/34806
+  "packaging"
+]
+sentence-transformers = ["sentence-transformers"]
+transformers = ["transformers", "torch", "torchvision"]
+spark = ["googleapis-common-protos >= 1.56.4", "grpcio >= 1.48", "grpcio-status >= 1.48", "numpy >= 1.15", "pandas >= 1.0.5", "py4j >= 0.10.9.7", "pyspark == 3.5.5"]
+sql = ["connectorx", "sqlalchemy", "sqlglot"]
+turbopuffer = ["turbopuffer"]
+unity = ["httpx <= 0.27.2", "unitycatalog"]
+viz = []
 las = [
   "python-dotenv>=1.1.1",
   "pyiceberg>=0.7.0",
@@ -52,7 +69,7 @@ las = [
   "memray~=1.17.2",
   "py-spy",
   "httpx[http2] >= 0.27.2",
-  "ray[default, data, client]==2.46.0.0",
+  "ve-ray[default, data, client]==2.46.0.0",
   "tosfs>=2025.6.0",
   "volcengine>=1.0.153",
   "volcengine-python-sdk[ark]>=1.0.102",
@@ -87,9 +104,6 @@ las = [
   "datasets==2.19.0",
   "pdfplumber>=0.11.5",
   "simplejson==3.20.1",
-  "mcap==1.3.0",
-  "mcap-ros2-support==0.5.5",
-  "mcap-protobuf-support==0.5.3",
   "justext==3.0.2",
   "trafilatura==2.0.0",
   "goose3==3.1.19",
@@ -190,8 +204,12 @@ dev = [
   "jax>=0.4.30",
   "jaxtyping>=0.2.36",
   # Pyarrow
-  "pyarrow==20.0.0",
-  "pyarrow-stubs==19.4",
+  # "pyarrow==20.0.0",  because pyarrow==20.0.0 is unsatisfiable when ray==2.46.0
+  "pyarrow==20.0.0; sys_platform == 'linux'",
+  "pyarrow > 8.0.0; sys_platform != 'linux'",
+  "pyarrow-stubs==19.4; sys_platform == 'linux'",
+  "pyarrow-stubs; sys_platform != 'linux'",
+  "pyarrow-stubs",
   # Ray
   "ray[data, client]==2.48.0; python_version >= '3.13' or platform_system != \"Linux\" or platform_machine != \"x86_64\"",
   "ray[data, client]==2.34.0; python_version < '3.13' and platform_system == \"Linux\" and platform_machine == \"x86_64\"",
@@ -231,7 +249,8 @@ dev = [
   # Daft connect testing
   "pyspark==3.5.5",
   "grpcio==1.68.1",
-  "grpcio-status==1.67.0",
+  # grpcio-status==1.67.0 depends on protobuf>=5.26.1,<6.0.dev0 and daft:dev depends on grpcio-status==1.67.0, we can conclude that daft:dev and daft[las] are incompatible.
+  "grpcio-status",
   # AI
   "vllm>=0.5.0; platform_system == \"Linux\" and platform_machine == \"x86_64\"",
   "vllm==0.11.0; platform_system != \"Linux\" or platform_machine != \"x86_64\"",
@@ -243,7 +262,7 @@ dev = [
   # mcap
   "mcap==1.3.0",
   "mcap-ros2-support==0.5.5",
-  "mcap-protobuf-support==0.5.3",
+  # "mcap-protobuf-support==0.5.3" this is incompatible with las about protobuf
   # BigTable
   "google-cloud-bigtable>=2.33.0"
 ]

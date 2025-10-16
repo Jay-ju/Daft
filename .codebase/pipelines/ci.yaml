@@ -41,7 +41,9 @@ jobs:
 
     - name: Build library and Test with pytest (Linux)
       commands:
-      - make ve-test
+      # Set HF_ENDPOINT to use a mirror to speed up the test when connecting to HuggingFace
+      # Set http_proxy, https_proxy, no_proxy to empty to avoid using proxy when running the openai tests
+      - export HF_ENDPOINT=https://hf-mirror.com && unset http_proxy https_proxy no_proxy && make ve-test
 
     - name: clean resources
       if: "${{always()}}"
