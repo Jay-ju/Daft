@@ -16,7 +16,6 @@ jobs:
       RUST_BACKTRACE: 1
       DAFT_RUNNER: ray
       DAFT_FLOTILLA: 1
-      NUM_GPUS: 8
       FORCE_QWENVL_VIDEO_READER: torchvision
     runs-on:
       cluster: "gpu"
@@ -37,6 +36,7 @@ jobs:
       - export OPENSPEECH_TOKEN=${{OPENSPEECH_TOKEN}}
       - export LAS_API_KEY=${{LAS_API_KEY}}
       - export TEST_OBJECT_BUCKET=${{TEST_OBJECT_BUCKET}}
+      - export NUM_GPUS=${{NUM_GPUS}}
       - make test-las
 
     - name: clean resources

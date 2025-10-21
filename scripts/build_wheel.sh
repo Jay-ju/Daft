@@ -81,7 +81,9 @@ echo "========================================"
 echo "Setting up Python $PYTHON_VERSION..."
 uv venv --seed -p "$PYTHON_VERSION"
 source .venv/bin/activate
-uv pip install -r $DIR/requirements-dev.txt
+uv sync --no-install-project --all-extras --all-groups
+uv pip install flash_attn==2.8.3 --no-build-isolation
+
 
 # Install Bun and required tools
 if [[ "$RELEASE_DASHBOARD" == "true" ]]; then

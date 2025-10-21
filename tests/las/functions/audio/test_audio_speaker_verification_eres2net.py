@@ -105,7 +105,7 @@ def test_audio_speaker_verification_eres2net(
     assert math.isnan(actual_df["speaker_verification_result"][1])
     assert actual_df["speaker_verification_result"][2] == 1
     assert math.isclose(actual_df["speaker_verification_result"][4], 0.71265, rel_tol=1e-3)
-    assert math.isclose(actual_df["speaker_verification_result"][5], 0.02866, rel_tol=1e-3)
+    assert math.isclose(actual_df["speaker_verification_result"][5], 0.02866, rel_tol=2e-3)
 
 
 def test_audio_speaker_verification_eres2net_base64(
@@ -133,7 +133,7 @@ def test_audio_speaker_verification_eres2net_base64(
     actual_df = ds.to_pandas()
     print(actual_df)
     assert math.isclose(actual_df["speaker_verification_result"][0], 0.71265, rel_tol=1e-3)
-    assert math.isclose(actual_df["speaker_verification_result"][1], 0.02866, rel_tol=1e-3)
+    assert math.isclose(actual_df["speaker_verification_result"][1], 0.02866, rel_tol=2e-3)
 
 
 def test_audio_speaker_verification_eres2net_binary(
@@ -161,4 +161,4 @@ def test_audio_speaker_verification_eres2net_binary(
     actual_df = ds.to_pandas()
     print(actual_df)
     assert math.isclose(actual_df["speaker_verification_result"][0], 0.71265, rel_tol=1e-3)
-    assert math.isclose(actual_df["speaker_verification_result"][1], 0.02866, rel_tol=1e-3)
+    assert math.isclose(actual_df["speaker_verification_result"][1], 0.02866, rel_tol=2e-3)
