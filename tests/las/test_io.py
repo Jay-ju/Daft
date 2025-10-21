@@ -12,6 +12,7 @@ import daft
 from daft.daft import IOConfig
 from daft.las.io import download_file, exists, file_size, rm, upload_file
 from daft.las.io.factory import LasIOFactory
+from daft.las.io.http import HttpIO
 from daft.las.io.tos import TOSConfig
 from daft.las.io.utils import generate_temp_file, normalize_local_path
 
@@ -149,6 +150,13 @@ def _test_basic_io(remote_path: str, work_dir: str):
 def test_io_cache_cache():
     client = LasIOFactory.get().get_client("/a/b/c")
     assert LasIOFactory.get().get_client("/a/b/c") == client
+
+def test_http_io():
+    client = LasIOFactory.get().get_client("http://a/b/c", headers={"Authorization": "Bearer 123456"}, max_retries=3, backoff=1)
+    assert isinstance(client, HttpIO)
+    assert client.headers == {"Authorization": "Bearer 123456"}
+    assert client.max_retries == 3
+    assert client.backoff == 1
 
 
 def test_daft_io_config_consistency(object_store_test_dir):

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import shutil
 import urllib.request
 from pathlib import Path
@@ -16,8 +18,10 @@ from daft.las.io.utils import generate_temp_file, normalize_local_path
 class HttpIO(LasIO):
     """The HttpIO provides downloading file from remote services."""
 
-    def __init__(self, **kwargs: Any) -> None:
-        pass
+    def __init__(self, headers: dict[str, str] = None,  max_retries=3, backoff=1, **kwargs: Any) -> None:
+        self.headers = headers
+        self.max_retries = max_retries
+        self.backoff = backoff
 
     @classmethod
     def scheme(cls) -> str:
@@ -40,8 +44,7 @@ class HttpIO(LasIO):
 
         temp_file = Path(generate_temp_file(str(local_file)))
         try:
-            # TODO consider retry the download operation via a http client.
-            urllib.request.urlretrieve(quote(remote, safe="/:?="), str(temp_file))
+            urlretrieve_with_retry(quote(remote, safe="/:?_=&%"), temp_file, self.headers, self.max_retries, self.backoff)
 
             # delete the existing file or dir after downloading file instead of deleting at
             # first to avoid loss the existing data as much as possible.
@@ -54,6 +57,31 @@ class HttpIO(LasIO):
             temp_file.rename(local_file)
         finally:
             temp_file.unlink(missing_ok=True)
+
+def urlretrieve_with_retry(url, filename=None, headers=None, max_retries=3, backoff=1):
+    headers = headers or {}
+    logging.info(f"urlretrieve_with_retry: url : {url} , headers: {headers}")
+    req = urllib.request.Request(url, headers=headers)
+
+    if filename is None:
+        filename = os.path.basename(url) or "download"
+
+    for attempt in range(max_retries + 1):
+        try:
+            with urllib.request.urlopen(req) as response:
+                with open(filename, "wb") as f:
+                    f.write(response.read())
+                return filename, response.msg
+        except urllib.error.HTTPError as e:
+            if e.code >= 400 and attempt == max_retries:
+                raise
+        except urllib.error.URLError:
+            if attempt == max_retries:
+                raise
+        if attempt < max_retries:
+            time.sleep(backoff * (2**attempt))
+
+    raise RuntimeError(f"Failed to download {url} to {filename} after {max_retries} retries.")
 
 
 @register_io_client(scheme="https")
