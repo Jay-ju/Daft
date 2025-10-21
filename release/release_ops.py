@@ -90,14 +90,22 @@ def _collect_all_examples(root_dir: str) -> dict[str, str]:
     return results
 
 
-def _extract_precondition(clazz: type) -> str | None:
+def _extract_precondition(clazz: type) -> tuple[str | None, str]:
     doc = clazz.__doc__
+    if not doc:
+        return None, ""
+
     pattern = r"Notes\s*\n\s*-+\s*\n(.*?)(?=\n\s*\w+:|$)"
     match = re.search(pattern, doc, re.DOTALL)
+
     if match:
-        # remove indent
-        return textwrap.dedent(match.group(1)).strip()
-    return None
+        precondition = textwrap.dedent(match.group(1)).strip()
+        remaining_doc = doc[: match.start()] + doc[match.end() :]
+        remaining_doc = textwrap.dedent(remaining_doc).strip()
+
+        return precondition, remaining_doc
+
+    return None, textwrap.dedent(doc).strip()
 
 
 def _get_type_name(type_hint):
@@ -183,7 +191,7 @@ def _collect_ops() -> list[Any]:
     for name, meta in ops.items():
         op_meta = meta[0]
         extra_meta = meta[1]
-        precondition = _extract_precondition(op_meta.Clazz)
+        precondition, remaining_doc = _extract_precondition(op_meta.Clazz)
         parameters, _ = _extract_fn_info(op_meta.Clazz.__init__)
         input, output = _extract_input_output(op_meta.Clazz)
 
@@ -199,7 +207,7 @@ def _collect_ops() -> list[Any]:
             op = ComposedModel(
                 Name=op_meta.Name,
                 OperatorId=f"{module}.{qualname}.{module_name}",
-                Description=op_meta.Description,
+                Description=remaining_doc,
                 FunctionCategory=op_meta.Category.value,
                 SubFunctionCategory=op_meta.SubCategory.value,
                 Tags=op_meta.Tags,
@@ -213,7 +221,7 @@ def _collect_ops() -> list[Any]:
             op = ComposedModel(
                 Name=op_meta.Name,
                 OperatorId=f"{module}.{qualname}",
-                Description=op_meta.Description,
+                Description=remaining_doc,
                 FunctionCategory=op_meta.Category.value,
                 SubFunctionCategory=op_meta.SubCategory.value,
                 Tags=op_meta.Tags,
