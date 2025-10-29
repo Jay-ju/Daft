@@ -8,9 +8,11 @@ from .video_split_by_duration import VideoSplitByDuration
 from .video_watermark_detect import VideoWatermarkDetect
 from .video_resize_resolution import VideoResizeResolution
 from .video_sttn_inpaint import VideoSttnInpaint
+from .video_convert_to_mp4 import VideoConvertToMp4
 
 __all__ = [
     "VideoAdaptiveCompress",
+    "VideoConvertToMp4",
     "VideoExtractAudio",
     "VideoKeyframes",
     "VideoResizeResolution",

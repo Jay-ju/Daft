@@ -19,15 +19,23 @@ from .audio_speaker_verification_eres2net import AudioSpeakerVerificationEres2ne
 from .audio_risk_rec import AudioRiskRec
 from .audio_vad_silero import AudioVadSilero
 from .audio_asr_firered import AudioAsrFireRed
+from .audio_convert import AudioConvert
+from .audio_convert_to_mp3 import AudioConvertToMp3
+from .audio_silence_detection import AudioSilenceDetection
+from .audio_quality_score import AudioQualityScore
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrFireRed",
     "AudioAsrWhisper",
+    "AudioConvert",
+    "AudioConvertToMp3",
     "AudioDuration",
     "AudioLidWhisper",
+    "AudioQualityScore",
     "AudioRiskRec",
     "AudioSNR",
+    "AudioSilenceDetection",
     "AudioSize",
     "AudioSourceSeparation",
     "AudioSpeakerDiarization",
