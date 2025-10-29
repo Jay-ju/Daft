@@ -467,7 +467,7 @@ pub fn parse_url(input: &str) -> Result<(SourceType, Cow<'_, str>)> {
             Some("huggingface.co") => Ok((SourceType::HF, fixed_input)),
             _ => Ok((SourceType::Http, fixed_input)),
         },
-        "s3" | "s3a" | "s3n" => Ok((SourceType::S3, fixed_input)),
+        "s3" | "s3a" | "s3n" | "tos" => Ok((SourceType::S3, fixed_input)),
         "az" | "abfs" | "abfss" => Ok((SourceType::AzureBlob, fixed_input)),
         "gcs" | "gs" => Ok((SourceType::GCS, fixed_input)),
         "hf" => Ok((SourceType::HF, fixed_input)),
