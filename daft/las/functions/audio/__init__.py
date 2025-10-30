@@ -5,6 +5,7 @@ from __future__ import annotations
 from .audio_asr_whisper import AudioAsrWhisper
 from .audio_duration import AudioDuration
 from .audio_size import AudioSize
+from .audio_snr import AudioSNR
 from .audio_split_by_timestamps import AudioSplitByTimestamps
 from .audio_speaker_diarization import AudioSpeakerDiarization
 from .audio_asr_doubao import AudioAsrDoubao
@@ -24,6 +25,7 @@ __all__ = [
     "AudioDuration",
     "AudioLidWhisper",
     "AudioRiskRec",
+    "AudioSNR",
     "AudioSize",
     "AudioSourceSeparation",
     "AudioSpeakerDiarization",
