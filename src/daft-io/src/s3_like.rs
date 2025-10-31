@@ -1195,19 +1195,41 @@ impl S3LikeSource {
         let completed_multipart_upload = s3::types::CompletedMultipartUpload::builder()
             .set_parts(Some(completed_parts))
             .build();
-        client
+        let response = client
             .complete_multipart_upload()
             .multipart_upload(completed_multipart_upload)
             .bucket(bucket.clone())
             .key(key.clone())
             .upload_id(upload_id.clone())
             .send()
-            .await
-            .context(UnableToCompleteMultipartUploadSnafu { bucket, key })?;
+            .await;
 
-        log::debug!("S3 complete multipart upload completed. upload_id :{upload_id}");
-
-        Ok(())
+        match response {
+            Ok(_) => {
+                log::debug!("S3 complete multipart upload completed. upload_id :{upload_id}");
+                Ok(())
+            }
+            Err(SdkError::ServiceError(err)) if err.err().to_string().contains("NoSuchUpload") => {
+                if client
+                    .head_object()
+                    .bucket(bucket.clone())
+                    .key(key.clone())
+                    .send()
+                    .await
+                    .is_ok()
+                {
+                    log::warn!("Ignore NoSuchUpload error since it's a retryable operation and the MPU completed. Ignored err :{err:?}");
+                    Ok(())
+                } else {
+                    Err(UnableToCompleteMultipartUploadSnafu { bucket, key }
+                        .into_error(SdkError::ServiceError(err))
+                        .into())
+                }
+            }
+            Err(err) => Err(UnableToCompleteMultipartUploadSnafu { bucket, key }
+                .into_error(err)
+                .into()),
+        }
     }
 
     /// Upload a single part to an existing multipart upload.
