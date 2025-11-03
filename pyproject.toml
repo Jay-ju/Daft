@@ -70,7 +70,7 @@ las = [
   "py-spy",
   "httpx[http2] >= 0.27.2",
   "aiolimiter==1.2.1",
-  "ray[default, data, client]==2.46.0.0",
+  "ve-ray[default, data, client]==2.46.0.0",
   "tosfs>=2025.6.0",
   "volcengine>=1.0.153",
   "volcengine-python-sdk[ark]>=1.0.102",
