@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 
 def not_blank(string: str | None) -> bool:
@@ -52,6 +53,10 @@ def get_session_token(service: str) -> str | None:
 
 def get_region(service: str) -> str | None:
     return os.getenv(f"{service.upper()}_REGION") or os.getenv("REGION")
+
+
+def get_env(env: str, default: Any | None = None) -> Any | None:
+    return os.getenv(env) or default
 
 
 def get_credentials_provider_url(service: str) -> str | None:

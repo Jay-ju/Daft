@@ -23,6 +23,7 @@ from daft.las.io.utils import generate_temp_file, normalize_local_path
 from daft.las.utils import (
     get_ak_sk,
     get_credentials_provider_url,
+    get_env,
     get_region,
     get_session_token,
     is_static_credential,
@@ -86,6 +87,10 @@ class TOSConfig:
     secret_key: str | None
     credentials_provider: Callable[[], TosCredentials] | None
     credentials_provider_url: str | None
+    max_retry_num: int
+    max_connections: int
+    connection_timeout: int
+    socket_timeout: int
 
     def __init__(
         self,
@@ -96,6 +101,10 @@ class TOSConfig:
         session_token: str | None = None,
         credentials_provider: Callable[[], TosCredentials] | None = None,
         credentials_provider_url: str | None = None,
+        max_retry_num: int = 20,
+        max_connections: int = 1024,
+        connection_timeout: int = 180,
+        socket_timeout: int = 180,
     ):
         self.endpoint, self.region = self._parse_endpoint(endpoint, region)
         self.access_key = access_key
@@ -105,6 +114,11 @@ class TOSConfig:
         self.credentials_provider_url = credentials_provider_url
 
         self._check_credential_info()
+
+        self.max_retry_num = max_retry_num
+        self.max_connections = max_connections
+        self.connection_timeout = connection_timeout
+        self.socket_timeout = socket_timeout
 
     def _check_credential_info(self) -> None:
         if (
@@ -142,6 +156,10 @@ class TOSConfig:
             secret_key=secret_key,
             session_token=get_session_token("tos"),
             credentials_provider_url=get_credentials_provider_url("tos"),
+            max_retry_num=int(get_env("TOS_MAX_RETRY_NUM", 20)),  # type: ignore[arg-type]
+            max_connections=int(get_env("TOS_MAX_CONNECTIONS", 1024)),  # type: ignore[arg-type]
+            connection_timeout=int(get_env("TOS_CONNECTION_TIMEOUT", 180)),  # type: ignore[arg-type]
+            socket_timeout=int(get_env("TOS_SOCKET_TIMEOUT", 180)),  # type: ignore[arg-type]
         )
 
     @staticmethod
@@ -158,6 +176,9 @@ class TOSConfig:
             access_key=s3_config.key_id,
             secret_key=s3_config.access_key,
             session_token=s3_config.session_token,
+            connection_timeout=int(s3_config.connect_timeout_ms / 1000),
+            socket_timeout=int(s3_config.read_timeout_ms / 1000),
+            max_retry_num=s3_config.num_tries,
         )
 
         credentials_provider = s3_config.credentials_provider
@@ -181,6 +202,9 @@ class TOSConfig:
             session_token=self.session_token,
             credentials_provider=provider if self.credentials_provider else None,
             force_virtual_addressing=True,
+            connect_timeout_ms=self.connection_timeout * 1000,
+            read_timeout_ms=self.socket_timeout * 1000,
+            num_tries=self.max_retry_num,
         )
 
     def virtual_host_endpoint(self, bucket: str) -> str:
@@ -318,7 +342,7 @@ class TosIO(LasIO):
             raise FileExistsError(f"The destination file: {remote} already exists.")
 
         try:
-            self._fs.put_file(local, remote)
+            super(self._fs.__class__, self._fs).put_file(local, remote)
         except (ValueError, TosfsError):
             if self._fs.isdir(remote):
                 # The culprit might be the directory bucket doesn't allow overwrote
