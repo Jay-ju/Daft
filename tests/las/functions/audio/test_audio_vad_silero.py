@@ -18,6 +18,7 @@ model_name = "silero-vad"
 use_onnx_model = True
 onnx_model_revision = 16
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):

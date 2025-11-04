@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
+
+import ray
 
 import daft
 from daft import col
@@ -8,14 +11,34 @@ from daft.las.functions.multimodal.qwen_vl_image_understanding_vllm import QwenV
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
-    TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
+    os.environ["DAFT_RUNNER"] = "ray"
+
+    def configure_logging():
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S.%s".format(),
+        )
+        logging.getLogger("tracing.span").setLevel(logging.WARNING)
+        logging.getLogger("daft_io.stats").setLevel(logging.WARNING)
+        logging.getLogger("DaftStatisticsManager").setLevel(logging.WARNING)
+        logging.getLogger("DaftFlotillaScheduler").setLevel(logging.WARNING)
+        logging.getLogger("DaftFlotillaDispatcher").setLevel(logging.WARNING)
+
+    ray.init(dashboard_host="0.0.0.0", runtime_env={"worker_process_setup_hook": configure_logging})
+    daft.context.set_runner_ray()
+    daft.set_execution_config(actor_udf_ready_timeout=600)
+    daft.set_execution_config(min_cpu_per_task=0)
+
     samples = {
-        "image_path": [f"tos://{TOS_TEST_DIR}/qwen_vl_image_understanding_vllm/cat_ip_adapter.jpeg"],
+        "image_path": [
+            "https://las-ai-qa-online.tos-cn-beijing.volces.com/operator_cards_serving/public/qa/shared_image_dataset/cat_ip_adapter.jpeg"
+        ],
         "prompt": ["请给出图片的详细描述。"],
     }
 
     image_src_type = "image_url"
-    model_path = os.getenv("MODEL_PATH", "./models")
+    model_path = os.getenv("MODEL_PATH", "/opt/las/models")
     model_name = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-VL-7B-Instruct")
     dtype = "bfloat16"
     default_prompt = None
@@ -67,5 +90,5 @@ if __name__ == "__main__":
     # │ ---                            ┆ ---                     ┆ ---                                                         │
     # │ Utf8                           ┆ Utf8                    ┆ Utf8                                                        │
     # ╞════════════════════════════════╪═════════════════════════╪═════════════════════════════════════════════════════════════╡
-    # │ tos://tos_bucket/qwen_vl_imag… ┆ 请给出图片的详细描述。…     ┆ 这张图片展示了一只拟人化的猫，它穿着一套复古风格的服装，，包括一件蓝色… │
+    # │ https://las-ai-qa-online.tos-… ┆ 请给出图片的详细描述。…     ┆ 这张图片展示了一只拟人化的猫，它穿着一套复古风格的服装，，包括一件蓝色… │
     # ╰────────────────────────────────┴─────────────────────────┴─────────────────────────────────────────────────────────────╯

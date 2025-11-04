@@ -16,6 +16,7 @@ from daft.las.functions.udf import las_udf
 model_name = "iic/speech_whisper-large_lid_multilingual_pytorch"
 model_version = "v2.0.4"
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 rank = random.randint(0, num_gpus - 1)
 
 

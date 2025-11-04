@@ -27,6 +27,8 @@ class QwenOmniAudioUnderstanding(Operator):
       - 支持多种计算精度选择（bfloat16、float16、float32），适配不同性能需求
       - 集成FlashAttention2加速技术，显著提升推理效率
       - 支持自动或手动设备分配，完美适配单卡/多卡环境
+    - 资源使用
+      - 推荐使用48G及以上显存的GPU
 
     **场景优化**
     - 广泛适用于音频内容分析、智能音频描述、多媒体内容理解等应用场景

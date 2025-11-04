@@ -63,7 +63,7 @@ class ChineseTextConverter(Operator):
             texts: 包含待转换文本的列，元素类型为字符串。
 
         Returns:
-            pyarrow.Array: 转换后的文本列，元素类型为字符串。
+            转换后的文本列，元素类型为字符串。
 
         """  # noqa: D415
         if not self._converter:

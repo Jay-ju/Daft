@@ -6,11 +6,14 @@ import os
 
 import pandas as pd
 import pytest
+import torch
 
 import daft
 from daft import col
 from daft.las.functions.multimodal.qwen_vl_video_understanding_vllm import QwenVLVideoUnderstandingVLLM
 from daft.las.functions.udf import las_udf
+
+daft.set_execution_config(actor_udf_ready_timeout=600)
 
 video_src_type = "video_url"
 model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
@@ -24,10 +27,18 @@ batch_size = 1
 seed = 42
 max_model_len = 128000
 max_num_seqs = 128
-tensor_parallel_size = int(os.getenv("NUM_GPUS", 8))
+tensor_parallel_size = 1
 enable_prefix_caching = True
-gpu_memory_utilization = 0.95
+gpu_memory_utilization = 0.9
 enforce_eager = True
+
+num_gpus = torch.cuda.device_count()
+if num_gpus == 1:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+else:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+enable_prefix_caching = False
+gpu_memory_utilization = 0.7
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
@@ -41,7 +52,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return pd.DataFrame({"video_path": paths})
 
 
-@pytest.mark.skip(reason="""T4 GPU not support Flash Attention 2.""")
+@pytest.mark.gpu
 def test_qwen_vl_video_understanding(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

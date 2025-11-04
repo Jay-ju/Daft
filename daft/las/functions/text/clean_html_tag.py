@@ -56,7 +56,7 @@ class CleanHtmlTag(Operator):
             texts: 包含HTML内容的文本数组，元素类型为字符串
 
         Returns:
-            pyarrow.Array: 清理后的文本数组，元素类型为字符串
+            清理后的文本数组，元素类型为字符串
         """
         total_texts = len(texts)
         logger.debug("Processing %d HTML documents", total_texts)

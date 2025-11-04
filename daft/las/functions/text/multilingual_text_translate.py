@@ -16,17 +16,20 @@ logger = logging.getLogger(__name__)
 
 
 class MultilingualTextTranslate(Operator):
-    """**Seed-X-Instruct-7B 多语言文本翻译模型 - 跨语言文本翻译 核心功能**
+    """**Seed-X 多语言文本翻译模型 - 跨语言文本翻译 核心功能**
 
     **核心功能**
     - 多语言智能翻译
       - 支持多种语言间的文本转换，可通过source_language和target_language参数自定义源语言和目标语言
-      - 基于Seed-X-Instruct-7B模型，提供高质量翻译结果
+      - 基于Seed-X-Instruct-7B/Seed-X-PPO-7B模型，提供高质量翻译结果
       - 支持语种请参考: https://huggingface.co/ByteDance-Seed/Seed-X-Instruct-7B
+      - 一般场景中，推荐使用Seed-X-PPO-7B模型，其在翻译质量上效果更佳
     - 灵活配置与优化
       - 支持多种计算精度选择（bfloat16等），适配不同性能需求
       - 集成张量并行处理和前缀缓存技术，显著提升推理效率
       - 支持自动或手动设备分配，完美适配单卡/多卡环境
+    - 资源使用
+      - 推荐使用24G以上显存的GPU
 
     **场景优化**
     - 广泛适用于跨语言内容转换、多语言文档处理、国际化应用开发等场景
@@ -37,7 +40,7 @@ class MultilingualTextTranslate(Operator):
     def __init__(
         self,
         model_path: str = "/opt/las/models",
-        model_name: str = "Seed-X-Instruct-7B",
+        model_name: str = "Seed-X-PPO-7B",
         dtype: str = "bfloat16",
         max_model_len: int = 32768,
         max_num_seqs: int = 128,
@@ -57,8 +60,9 @@ class MultilingualTextTranslate(Operator):
         Args:
             model_path: 本地模型文件存储的绝对路径，默认为容器内预置路径。当使用自定义模型时需修改此路径
                 默认值："/opt/las/models"
-            model_name: 支持的多语言模型名称，当前支持Seed-X-Instruct系列模型
-                默认值："Seed-X-Instruct-7B"
+            model_name: 支持的多语言模型名称，当前支持Seed-X-Instruct-7B/Seed-X-PPO-7B系列模型
+                可选值：["Seed-X-Instruct-7B", "Seed-X-PPO-7B"]
+                默认值："Seed-X-PPO-7B"
             dtype: 模型推理精度选择
                 默认值："bfloat16"
             max_model_len: 模型支持的最大序列长度

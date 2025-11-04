@@ -19,6 +19,7 @@ batch_size_s = 3600
 model_name = "iic/speech_fsmn_vad_zh-cn-16k-common-pytorch"
 model_revision = "v2.0.4"
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 rank = random.randint(0, num_gpus - 1)
 
 

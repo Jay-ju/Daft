@@ -24,6 +24,7 @@ class QwenVLImageUnderstandingVLLM(Operator):
         - 多模态时序建模：支持三种图像输入格式（URL、Base64编码、二进制流），灵活适配不同数据源。
         - 对话式提示支持：通过 `prompt` 参数自定义生成方向，满足多样化业务需求。
         - 高效推理：集成VLLM推理引擎，支持 `bfloat16`、`float16`、`float32` 三种精度，充分利用GPU算力。
+        - 推荐使用48G及以上显存的GPU
 
     **适用场景**
         - 图像内容理解与摘要

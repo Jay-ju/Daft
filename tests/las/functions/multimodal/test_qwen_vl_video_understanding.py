@@ -15,7 +15,7 @@ from daft.las.functions.udf import las_udf
 video_src_type = "video_url"
 model_name = "Qwen/Qwen2.5-VL-3B-Instruct"
 dtype = "float16"
-use_flash_attention_2 = False
+use_flash_attention_2 = True
 prompt = "请给出该视频的详细描述。"
 max_caption_length = 256
 min_pixels = 320 * 160
@@ -24,6 +24,7 @@ fps = 1
 batch_size = 1
 rank = None
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):

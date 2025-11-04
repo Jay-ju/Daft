@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-import os
-
 import pandas as pd
-import pytest
 
 import daft
 from daft import col
 from daft.las.functions.multimodal.qwen_omni_audio_understanding import QwenOmniAudioUnderstanding
 from daft.las.functions.udf import las_udf
+
+daft.set_execution_config(actor_udf_ready_timeout=600)
 
 model_name = "Qwen/Qwen2.5-Omni-7B"
 
@@ -20,7 +19,7 @@ prompt = "请给出这个音频的详细描述。"
 max_caption_length = 256
 batch_size = 1
 rank = None
-num_gpus = int(os.getenv("NUM_GPUS", 4))
+num_gpus = 1
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir):
@@ -28,7 +27,6 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return pd.DataFrame({"audio_path": paths})
 
 
-@pytest.mark.skip(reason="""T4 memory not enough.""")
 def test_qwen_omni_audio_understanding(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

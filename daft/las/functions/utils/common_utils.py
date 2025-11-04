@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import os
+import random
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, TypeVar
+from urllib.parse import urlparse
 
 from daft.las.infra.tos_client import TosClient
 from daft.las.io import download_file, exists, upload_file
@@ -72,7 +76,10 @@ def run_on_local_path(path: str, func: Callable[[str], T]) -> T:
         raise FileNotFoundError(path)
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        temp_file_path = str(Path(temp_dir, Path(path).name))
+        path_name = Path(path).name
+        if len(path_name) >= 85:
+            path_name = hashlib.md5(path_name.encode()).hexdigest()
+        temp_file_path = str(Path(temp_dir, path_name))
         download_file(path, temp_file_path)
         return func(temp_file_path)
 
@@ -233,14 +240,32 @@ def tracking_usage(op: str, model_service_or_lib: str | None = None) -> None:
 
 
 def generate_filename_base_input(src_data: str, src_type: str, file_type: str, batch_idx: int, idx: int) -> str:
-    if src_type == "video_url":
-        if src_data and src_data.startswith(("tos://", "s3://")):
-            file_name = f"{src_type.split('_')[0]}_{batch_idx}_{idx}.{src_data.split('.')[-1]}"
-        elif src_data and src_data.startswith(("https://", "http://")):
-            file_name = f"{int(time.time())!s}_{idx}.{file_type}"
-        else:
-            file_name = ""
+    if "url" in src_type and src_data and src_data.startswith(("tos://", "s3://")):
+        file_name = f"{src_type.split('_')[0]}_{batch_idx}_{idx}.{src_data.split('.')[-1]}"
     else:
-        file_name = f"video_binary.{file_type}"
+        file_name = f"{int(time.time())!s}_{batch_idx}_{idx}.{file_type}"
 
     return file_name
+
+
+def generate_filename_prefix(
+    src_type: str, idx: int, original_content: list[str], original_content_name: list[str], suffix: str = ""
+) -> str:
+    try:
+        if original_content_name and len(original_content_name) == len(original_content):
+            name = original_content_name[idx]
+        elif "url" in src_type:
+            parsed = urlparse(original_content[idx])
+            filename = Path(parsed.path).name or f"binary_{uuid.uuid4().hex}"
+            filename = filename.split("?")[0]
+            p = Path(filename)
+            if p.suffix:
+                name = p.stem
+            else:
+                name = filename
+        else:
+            name = f"{int(time.time())!s}_{(random.randint(1, 1000000))!s}"
+    except Exception:
+        # 文件名生成兜底逻辑
+        name = f"{int(time.time())!s}_{(random.randint(1, 1000000))!s}"
+    return f"{name}{suffix}"

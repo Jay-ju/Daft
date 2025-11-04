@@ -140,7 +140,8 @@ las = [
   "blobfile==3.0.0",
   "audioread==3.0.1",
   "soxr==0.5.0.post1",
-  "flashinfer-python==0.3.1.post1"
+  "flashinfer-python==0.3.1.post1; sys_platform == 'linux'",
+  "kaldi_native_fbank>=1.15"
 ]
 mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]

@@ -15,6 +15,7 @@ from daft.las.functions.udf import las_udf
 from tests.las.functions import assert_dataframe_result
 
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 rank = random.randint(0, num_gpus - 1)
 
 

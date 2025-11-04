@@ -26,6 +26,8 @@ class QwenVLVideoUnderstanding(Operator):
       - 捕捉视频时空特征与语义关联
     - 对话式提示支持
       - 通过 `prompt` 参数引导生成方向
+    - 资源使用
+      - 推荐使用48G及以上显存的GPU
 
     **优化特性**
     - 中英文混合场景优化：特别针对中文语义增强

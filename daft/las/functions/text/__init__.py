@@ -27,6 +27,8 @@ from .url_ratio_calculator import UrlRatioCalculator
 from .whitespace_normalizer import WhitespaceNormalizer
 from .word_repetition_calculator import WordRepetitionCalculator
 from .multilingual_text_translate import MultilingualTextTranslate
+from .embedding.bge_embedding import BgeEmbedding
+from .remove_links import RemoveLinks
 
 __all__ = [
     "AlphanumericRatioCalculator",

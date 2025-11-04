@@ -23,6 +23,7 @@ if __name__ == "__main__":
     batch_size = 1
     rank = 0
     num_gpus = int(os.getenv("NUM_GPUS", 1))
+    num_gpus = 1
 
     ds = daft.from_pydict(samples)
     ds = ds.with_column(

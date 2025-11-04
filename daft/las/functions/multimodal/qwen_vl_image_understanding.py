@@ -26,6 +26,8 @@ class QwenVLImageUnderstanding(Operator):
       - 实现图像内容到语义空间的精准映射
     - 对话式提示支持
       - 通过 `prompt` 参数引导生成方向
+    - 资源使用
+      - 推荐使用48G及以上显存的GPU
 
     **场景优化**
     - 中英文混合场景优化：特别针对中文语义增强

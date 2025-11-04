@@ -18,9 +18,11 @@ from .audio_split_by_duration import AudioSplitByDuration
 from .audio_speaker_verification_eres2net import AudioSpeakerVerificationEres2net
 from .audio_risk_rec import AudioRiskRec
 from .audio_vad_silero import AudioVadSilero
+from .audio_asr_firered import AudioAsrFireRed
 
 __all__ = [
     "AudioAsrDoubao",
+    "AudioAsrFireRed",
     "AudioAsrWhisper",
     "AudioDuration",
     "AudioLidWhisper",

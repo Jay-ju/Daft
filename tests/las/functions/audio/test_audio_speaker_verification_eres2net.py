@@ -16,6 +16,7 @@ from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
 
 audio_src_type = "audio_url"
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 rank = random.randint(0, num_gpus - 1)
 
 

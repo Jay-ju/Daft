@@ -25,6 +25,7 @@ class QwenVLVideoUnderstandingVLLM(Operator):
         - 时空联合建模：自动捕捉视频的时空特征与语义关联，实现更精准的视频内容理解。
         - 对话式提示支持：通过 `prompt` 参数自定义生成方向，满足多样化业务需求。
         - 高效推理：集成VLLM推理引擎，支持 `bfloat16`、`float16`、`float32` 三种精度，充分利用GPU算力。
+        - 推荐使用48G及以上显存的GPU
 
     **适用场景**
         - 视频内容理解与摘要

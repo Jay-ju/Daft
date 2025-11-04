@@ -26,6 +26,8 @@ class LlavaOneVisionImageUnderstanding(Operator):
       - 实现图像内容到语义空间的精准映射
     - 对话式提示支持
       - 通过 `prompt` 参数引导生成方向
+    - 资源使用
+      - 推荐使用48G及以上显存的GPU
 
     **场景优化**
     - 中英文混合场景优化：特别针对中文语义增强
@@ -62,7 +64,7 @@ class LlavaOneVisionImageUnderstanding(Operator):
                 默认值："image_url"
             model_path: 本地模型文件存储的绝对路径，默认为容器内预置路径。当使用自定义模型时需修改此路径
                 默认值："/opt/las/models"
-            model_name: 支持的视觉语言模型版本，当前仅支持 Qwen2.5-VL系列模型
+            model_name: 支持的视觉语言模型版本，当前仅支持 LLaVA one vision 系列模型
                 可选值：["LLaVA-OneVision-1.5-8B-Instruct", "LLaVA-OneVision-1.5-4B-Instruct"]
                 默认值："LLaVA-OneVision-1.5-8B-Instruct"
             prompt: 用户理解图片内容的提示词，模型会根据提示词来生成图像的描述。

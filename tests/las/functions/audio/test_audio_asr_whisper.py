@@ -23,6 +23,7 @@ temperature = 0.5
 logprob_threshold = -1.0
 batch_size = 1
 num_gpus = int(os.getenv("NUM_GPUS", 1))
+num_gpus = 1
 rank = random.randint(0, num_gpus - 1)
 
 

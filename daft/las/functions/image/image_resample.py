@@ -5,9 +5,7 @@ from __future__ import annotations
 import base64
 import io
 import logging
-import random
 import tempfile
-import time
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +13,7 @@ from PIL import Image  # noqa: TID253
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import tracking_usage
+from daft.las.functions.utils.common_utils import generate_filename_prefix, tracking_usage
 from daft.las.functions.utils.image_utils import decode_image
 from daft.las.io import upload_file
 
@@ -32,9 +30,9 @@ class ImageResample(Operator):
         - 双三次插值（bicubic） - 高精度平滑处理
         - Lanczos插值（lanczos） - 抗锯齿最佳，适合照片
     - 多格式输入支持：
-        - URL
-        - Base64编码
-        - 二进制流
+        - URL地址（image_url）
+        - Base64编码（image_base64）
+        - 二进制流（image_binary）
     - 双输出模式：
         - Base64编码直出
         - TOS持久化存储
@@ -130,16 +128,6 @@ class ImageResample(Operator):
             )
             return None, ""
 
-    def _generate_filename_prefix(self, idx: int, original_images: list[str], original_images_name: list[str]) -> str:
-        if original_images_name and len(original_images_name) == len(original_images):
-            name = ".".join(original_images_name[idx].split(".")[:-1])
-        elif self.image_src_type == "image_url":
-            name = Path(original_images[idx]).stem
-        else:
-            name = f"{int(time.time())!s}_{(random.randint(1, 1000000))!s}"
-            logger.info("Generated filename prefix: %s", name)
-        return f"{name}_resample"
-
     def _save(self, image: Image.Image, prefix: str) -> str | None:
         """Save resampled images."""
         filename = f"{prefix}{self.image_suffix}"
@@ -167,10 +155,10 @@ class ImageResample(Operator):
 
         Args:
             images: 包含输入图像的数组，支持URL/base64/二进制格式
-            images_name: 可选参数，包含图像标识名的数组，用于生成输出文件名
+            images_name: 可选参数，包含图像标识名的数组，用于生成输出文件名。建议传入以确保文件名唯一性，且不要带后缀；如果不传入，会为无法解析出名称的图片随机生成名称。
 
         Returns:
-            pyarrow.Array: 包含处理结果的字典数组，每个元素包含：
+            包含处理结果的字典数组，每个元素包含：
                 - base64: 重采样后图像的base64编码；
                 - image_path: 本地/TOS存储路径（当配置输出目录时有效）
         """  # noqa: D415
@@ -193,7 +181,8 @@ class ImageResample(Operator):
                     raise ValueError("Empty resampling result")
 
                 if self.tos_dir or self.local_dir:
-                    prefix = self._generate_filename_prefix(idx, images, images_name)
+                    prefix = generate_filename_prefix(self.image_src_type, idx, images, images_name, suffix="_resample")
+                    logger.info("Generated filename prefix: %s", prefix)
                     resampled_img_path = self._save(resampled_img, prefix)
 
             except Exception:

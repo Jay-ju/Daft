@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import os
+
 import pandas as pd
-import pytest
+import torch
 
 import daft
 from daft import col
 from daft.las.functions.text.multilingual_text_translate import MultilingualTextTranslate
 from daft.las.functions.udf import las_udf
+
+daft.set_execution_config(actor_udf_ready_timeout=600)
 
 model_name = "Seed-X-Instruct-7B"
 max_model_len = 2048
@@ -25,8 +29,15 @@ batch_size = 1
 dtype = "bfloat16"
 seed = 42
 
+num_gpus = torch.cuda.device_count()
+if num_gpus == 1:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+else:
+    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+enable_prefix_caching = False
+gpu_memory_utilization = 0.7
 
-@pytest.mark.skip(reason="""T4 GPU not support Flash Attention 2.""")
+
 def test_multilingual_text_translate(local_models_dir):
     samples = {
         "text": [
