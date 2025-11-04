@@ -24,6 +24,7 @@ def get_meta() -> OpMetaModel:
         Category=Category.AUDIO,
         SubCategory=SubCategory.AUDIO_RECOGNITION,
         Tags=["语音识别", "ASR", "多语种"],
+        IsDeprecated=True,
     )
 
 
