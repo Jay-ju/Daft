@@ -178,7 +178,7 @@ class LasDatasetClient:
             table_name = catalog["TableName"]
             table = f"{catalog_name}.{schema_name}.{table_name}"
 
-        return LasDatasetInfo(
+        res = LasDatasetInfo(
             name=result.get("DatasetName", None),
             nick_name=result.get("Nickname", None),
             tags=result.get("Labels", None),
@@ -189,6 +189,12 @@ class LasDatasetClient:
             data_path=result.get("DataPath", None),
             table=table,
         )
+
+        dataset_local_path = os.environ.get(f"LAS_CONTROLLED_DATASET_MOUNT_PATH_{name}")
+        if dataset_local_path is not None:
+            res.data_path = dataset_local_path
+
+        return res
 
     def delete_dataset(self, name: str, delete_data: bool = False) -> None:
         body = {"DatasetName": name, "DeleteData": delete_data}

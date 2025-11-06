@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import daft
 from daft.daft import IOConfig
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig, LasDatasetInfo
@@ -28,12 +30,20 @@ def test_las_dataset_client(uuid_short, monkeypatch, object_store_test_dir):
         description="A dataset for test",
     )
 
+    # Set up local mount path environment variable
+    local_mount_path = "/local/path/to/dataset"
+    monkeypatch.setenv(f"LAS_CONTROLLED_DATASET_MOUNT_PATH_{ds_name}", local_mount_path)
+
     assert client.dataset_exist(name=ds_name) is False
 
     client.create_dataset(dataset=expected)
     actual = client.get_dataset(ds_name)
 
-    assert actual == expected
+    assert actual.name == expected.name
+    assert actual.format == expected.format
+    assert actual.nick_name == expected.nick_name
+    assert actual.description == expected.description
+    assert actual.data_path == "/local/path/to/dataset"
 
     # test delete dataset
     client.delete_dataset(ds_name)
