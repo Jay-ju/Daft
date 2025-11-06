@@ -22,7 +22,7 @@ def get_meta() -> OpMetaModel:
         Name="音频静音检测",
         Clazz=AudioSilenceDetection,
         Category=Category.AUDIO,
-        SubCategory=SubCategory.AUDIO_ANALYSIS,
+        SubCategory=SubCategory.AUDIO_PROCESSING,
         Tags=["静音检测", "音频分析", "质量检测", "音频处理", "静音识别", "ffmpeg", "volumedetect"],
     )
 
