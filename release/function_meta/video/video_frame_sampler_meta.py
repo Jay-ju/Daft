@@ -42,37 +42,37 @@ def get_extra_meta() -> ExtraMetaModel:
     ]
     after = [
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0000.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0001.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0002.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0003.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0004.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0005.jpg",
             Description="",
         ),
         DataItem(
-            Type=ValueType.Image.name,
+            Type=ValueType.Picture.name,
             Value=f"https://{OP_BUCKET}.tos-{OP_REGION}.volces.com/{OP_ENVIRONMENT}/operator_cards/{OP_VERSION}/video_frame_sampler/sample/frame_0006.jpg",
             Description="",
         ),

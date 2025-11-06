@@ -23,7 +23,7 @@ def get_meta() -> OpMetaModel:
         Name="图像美学评分",
         Clazz=ImageAestheticScore,
         Category=Category.IMAGE,
-        SubCategory=SubCategory.IMAGE_ANALYSIS,
+        SubCategory=SubCategory.IMAGE_PROCESSING,
         Tags=["美学评分", "图像质量", "构图分析", "美学评估", "图像分析", "CLIP", "美学质量"],
     )
 
