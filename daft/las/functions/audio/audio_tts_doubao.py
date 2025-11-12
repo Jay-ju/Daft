@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from daft.dependencies import pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
@@ -104,6 +104,7 @@ class AudioTtsDoubao(Operator):
         }
 
         self.client = httpx.AsyncClient()
+        self.event_loop = EventLooper()
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="openspeech")
 
@@ -179,8 +180,7 @@ class AudioTtsDoubao(Operator):
             PyArrow 字符串数组，文本生成的音频结果；
             若识别失败或输入为空字符串，则对应元素为 None。
         """  # noqa: D415
-        loop = asyncio.get_event_loop()
-        results = loop.run_until_complete(self.async_run(texts.to_pylist()))
+        results = self.event_loop.run(self.async_run(texts.to_pylist()))
         return pa.array(results, type=AudioTtsDoubao.__return_column_type__())
 
     @staticmethod

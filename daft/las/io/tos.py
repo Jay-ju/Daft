@@ -342,7 +342,7 @@ class TosIO(LasIO):
             raise FileExistsError(f"The destination file: {remote} already exists.")
 
         try:
-            super(self._fs.__class__, self._fs).put_file(local, remote)
+            super(self._fs.__class__, self._fs).put_file(local, remote)  # type: ignore
         except (ValueError, TosfsError):
             if self._fs.isdir(remote):
                 # The culprit might be the directory bucket doesn't allow overwrote

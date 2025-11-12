@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from daft.dependencies import pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.functions.utils.common_utils import tracking_usage
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class AudioAsrDoubao(Operator):
         self.query_url = f"{openspeech_endpoint}/api/v3/auc/bigmodel/query"
 
         self.client = httpx.AsyncClient()
+        self.event_loop = EventLooper()
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="openspeech")
 
@@ -226,8 +227,7 @@ class AudioAsrDoubao(Operator):
                 - asr_result_simple (str): 提取后的转写文本，按说话人或时间段分段，适合直接阅读或展示
                 - asr_result_text (str): 提取后的转写文本，仅包含转写内容
         """  # noqa: D415
-        loop = asyncio.get_event_loop()
-        results = loop.run_until_complete(self.async_run(audios.to_pylist()))
+        results = self.event_loop.run(self.async_run(audios.to_pylist()))
         return pa.array(results, type=AudioAsrDoubao.__return_column_type__())
 
     @staticmethod

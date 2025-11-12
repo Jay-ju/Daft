@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from daft.dependencies import np, pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.functions.utils.audio_utils import decode_audio_torchaudio, encode_audio
 from daft.las.functions.utils.common_utils import tracking_usage
 
@@ -54,6 +54,7 @@ class AudioStandardization(Operator):
         self.target_dbfs = target_dbfs
         self.target_gain_range = target_gain_range or [-3, 3]
         self.num_coroutines = num_coroutines
+        self.event_loop = EventLooper()
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="torchcodec")
 
@@ -105,8 +106,7 @@ class AudioStandardization(Operator):
         Returns:
             处理后的音频结果；失败则返回 None。
         """  # noqa: D415
-        loop = asyncio.get_event_loop()
-        results = loop.run_until_complete(self.async_run(audio_col.to_pylist()))
+        results = self.event_loop.run(self.async_run(audio_col.to_pylist()))
         return pa.array(results, type=AudioStandardization.__return_column_type__())
 
     @staticmethod

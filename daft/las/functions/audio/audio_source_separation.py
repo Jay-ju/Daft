@@ -13,7 +13,7 @@ from torch.nn import Module
 from torch.nn import functional as F
 
 from daft.dependencies import np, pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.functions.utils.audio_utils import decode_audio, encode_audio
 from daft.las.functions.utils.common_utils import tracking_usage
 
@@ -54,6 +54,7 @@ class AudioSourceSeparation(Operator):
         model_name = str(Path(model_path) / "demucs/htdemucs.pth")
         self.model = torch.load(model_name, weights_only=False)
         self.model.eval().to(self.device)
+        self.event_loop = EventLooper()
         logger.info("Loaded Demucs model from %s on %s", model_path, device)
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="demucs")
@@ -168,8 +169,7 @@ class AudioSourceSeparation(Operator):
         Returns:
             一个二进制数组（pa.binary 类型），每个元素为对应音频中提取出的人声部分，格式为编码后的音频 bytes。
         """  # noqa: D415
-        loop = asyncio.get_event_loop()
-        results = loop.run_until_complete(self.async_run(audio_col.to_pylist()))
+        results = self.event_loop.run(self.async_run(audio_col.to_pylist()))
         return pa.array(results, type=AudioSourceSeparation.__return_column_type__())
 
     @staticmethod
