@@ -36,6 +36,7 @@ class VideoKeyframes(Operator):
         - 直方图法(histogram)
         - I型关键帧标识(I_frame)
     - 支持自定义阈值与数量控制
+    - 支持均匀抽取关键帧（by_count_uniform=True 时，keyframes_cnt 为均匀采样数量；False 时为顺序抽取前 N 帧）
     - 提供时间戳定位功能
     - 支持多种输出格式与存储选项
 
@@ -55,6 +56,9 @@ class VideoKeyframes(Operator):
         keyframes_cnt: int = 10,
         seconds_per_frame: int = -1,
         output_tos_dir: str = "",
+        by_count_uniform: bool = False,
+        return_keyframes: bool = True,
+        return_base64: bool = True,
         **kwargs: Any,
     ) -> None:
         """初始化视频关键帧抽取算子。
@@ -74,6 +78,12 @@ class VideoKeyframes(Operator):
                 默认值：-1
             output_tos_dir: 保存关键帧图片到 TOS 的目标路径，若为空字符串则不上传。
                 默认值：""
+            by_count_uniform: 是否均匀采样关键帧数量（仅 I_frame 方法有效）。True 时 keyframes_cnt 为均匀采样数量，False 时为顺序抽取前 N 帧。
+                默认值：False
+            return_keyframes: 是否返回关键帧图片的 array 数据（大内存，建议只在需要时开启）。
+                默认值：True
+            return_base64: 是否返回关键帧图片的 base64 编码（大内存，建议只在需要时开启）。
+                默认值：True
             **kwargs: 其他参数，透传给父类。
         """  # noqa: D415
         super().__init__(**kwargs)
@@ -83,17 +93,23 @@ class VideoKeyframes(Operator):
         self.keyframes_cnt = keyframes_cnt
         self.seconds_per_frame = seconds_per_frame
         self.output_tos_dir = output_tos_dir.strip("/") if output_tos_dir else ""
+        self.by_count_uniform = by_count_uniform
+        self.return_keyframes = return_keyframes
+        self.return_base64 = return_base64
 
         logger.info("The extract keyframe method: %s", self.method)
         logger.info("The threshold of extracting keyframe : %s", self.threshold)
         logger.info("The count of extracting keyframe : %s", self.keyframes_cnt)
         logger.info("The seconds per frame : %s", self.seconds_per_frame)
+        logger.info("The by_count_uniform : %s", self.by_count_uniform)
+        logger.info("The return_keyframes : %s", self.return_keyframes)
+        logger.info("The return_base64 : %s", self.return_base64)
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="cv2")
 
     def extract_keyframes_by_img_feature(
         self, video_path: str, local_output_path: str, tos_output_dir: str | None
-    ) -> tuple[list[np.ndarray], list[str], list[float]]:
+    ) -> tuple[list[np.ndarray], list[str], list[float], list[str]]:
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_interval = int(fps) if fps > 0 else 1
@@ -103,7 +119,7 @@ class VideoKeyframes(Operator):
         ret, prev_frame = cap.read()
         if not ret:
             logger.info("Failed to read the video.")
-            return [], [], []
+            return [], [], [], []
 
         prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
         keyframe_index = 0
@@ -115,9 +131,10 @@ class VideoKeyframes(Operator):
         else:
             prev_hist = None
 
-        keyframe_array_list = []
-        keyframe_base64_list = []
-        keyframe_timestamps_list = []
+        keyframe_array_list: list[np.ndarray] = []
+        keyframe_base64_list: list[str] = []
+        keyframe_timestamps_list: list[float] = []
+        keyframe_tos_paths_list: list[str] = []
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -153,10 +170,9 @@ class VideoKeyframes(Operator):
                     if local_output_path and tos_output_dir:
                         keyframe_filename = f"{local_output_path}/" f"keyframe_{keyframe_index:04d}{self.img_type}"
                         cv2.imwrite(keyframe_filename, frame)
-                        upload_file(
-                            str(keyframe_filename),
-                            f"{tos_output_dir}/{Path(keyframe_filename).name}",
-                        )
+                        tos_path = f"{tos_output_dir}/{Path(keyframe_filename).name}"
+                        upload_file(str(keyframe_filename), tos_path)
+                        keyframe_tos_paths_list.append(tos_path)
                         logger.info("The keyframe output tos path: %s", tos_output_dir)
 
                     _, buffer = cv2.imencode(self.img_type, frame)
@@ -175,72 +191,119 @@ class VideoKeyframes(Operator):
 
         shutil.rmtree(local_output_path)
         cap.release()
-        return keyframe_array_list, keyframe_base64_list, keyframe_timestamps_list
+        return keyframe_array_list, keyframe_base64_list, keyframe_timestamps_list, keyframe_tos_paths_list
 
     def _extract_keyframes_by_i_frame(
         self, input_video: str, local_output_path: str, tos_output_dir: str | None
-    ) -> tuple[list[np.ndarray], list[str], list[float]]:
+    ) -> tuple[list[np.ndarray], list[str], list[float], list[str]]:
         container = decode_video(input_video)
-        key_frames = []
         input_video_stream = container.streams.video[0]
         ori_skip_method = input_video_stream.codec_context.skip_frame
         input_video_stream.codec_context.skip_frame = "NONKEY"
-        keyframe_array_list = []
-        keyframe_base64_list = []
-        keyframe_timestamps_list = []
+
+        keyframe_array_list: list[np.ndarray] = []
+        keyframe_base64_list: list[str] = []
+        keyframe_timestamps_list: list[float] = []
+        keyframe_tos_paths_list: list[str] = []
 
         container.seek(0)
-        for i, frame in enumerate(container.decode(input_video_stream)):
-            img = frame.to_ndarray(format="bgr24")
-            if local_output_path and tos_output_dir:
-                img_filename = f"{local_output_path}/keyframe_{i:04d}{self.img_type}"
-                cv2.imwrite(img_filename, img)
-                logger.info("Saved %s", img_filename)
-                upload_file(str(img_filename), f"{tos_output_dir}/{Path(img_filename).name}")
-                logger.info("The keyframe output tos path: %s", tos_output_dir)
-            key_frames.append(frame)
-            keyframe_array_list.append(img)
-            _, buffer = cv2.imencode(self.img_type, img)
-            frame_base64 = base64.b64encode(buffer).decode("utf-8")
-            keyframe_base64_list.append(frame_base64)
-            timestamp = float(frame.pts * frame.time_base)
-            keyframe_timestamps_list.append(timestamp)
-            if 0 < self.keyframes_cnt <= len(key_frames):
-                break
+        if self.by_count_uniform and self.keyframes_cnt > 0:
+            # 收集所有 I 帧
+            all_frames = []
+            for frame in container.decode(input_video_stream):
+                img = frame.to_ndarray(format="bgr24")
+                timestamp = float(frame.pts * frame.time_base)
+                all_frames.append((img, frame, timestamp))
+            total = len(all_frames)
+            if total == 0:
+                input_video_stream.codec_context.skip_frame = ori_skip_method
+                shutil.rmtree(local_output_path)
+                container.close()
+                return [], [], [], []
+            # 均匀采样
+            indices = np.linspace(0, total - 1, min(self.keyframes_cnt, total), dtype=int)
+            for idx, i in enumerate(indices):
+                img, frame, timestamp = all_frames[i]
+                if local_output_path and tos_output_dir:
+                    img_filename = f"{local_output_path}/keyframe_{idx:04d}{self.img_type}"
+                    cv2.imwrite(img_filename, img)
+                    logger.info("Saved %s", img_filename)
+                    tos_path = f"{tos_output_dir}/{Path(img_filename).name}"
+                    upload_file(str(img_filename), tos_path)
+                    keyframe_tos_paths_list.append(tos_path)
+                    logger.info("The keyframe output tos path: %s", tos_output_dir)
+                if self.return_keyframes:
+                    keyframe_array_list.append(img)
+                if self.return_base64:
+                    _, buffer = cv2.imencode(self.img_type, img)
+                    frame_base64 = base64.b64encode(buffer).decode("utf-8")
+                    keyframe_base64_list.append(frame_base64)
+                keyframe_timestamps_list.append(timestamp)
+        else:
+            # 顺序取前 n 个 I 帧
+            keyframe_count = 0
+            for frame in container.decode(input_video_stream):
+                img = frame.to_ndarray(format="bgr24")
+                if local_output_path and tos_output_dir:
+                    img_filename = f"{local_output_path}/keyframe_{keyframe_count:04d}{self.img_type}"
+                    cv2.imwrite(img_filename, img)
+                    logger.info("Saved %s", img_filename)
+                    tos_path = f"{tos_output_dir}/{Path(img_filename).name}"
+                    upload_file(str(img_filename), tos_path)
+                    keyframe_tos_paths_list.append(tos_path)
+                    logger.info("The keyframe output tos path: %s", tos_output_dir)
+                if self.return_keyframes:
+                    keyframe_array_list.append(img)
+                if self.return_base64:
+                    _, buffer = cv2.imencode(self.img_type, img)
+                    frame_base64 = base64.b64encode(buffer).decode("utf-8")
+                    keyframe_base64_list.append(frame_base64)
+                timestamp = float(frame.pts * frame.time_base)
+                keyframe_timestamps_list.append(timestamp)
+                keyframe_count += 1
+                if 0 < self.keyframes_cnt <= keyframe_count:
+                    break
 
         input_video_stream.codec_context.skip_frame = ori_skip_method
-        if len(keyframe_array_list) == 0:
+
+        # Check if we have no keyframes by checking timestamps list (which is always populated)
+        if len(keyframe_timestamps_list) == 0:
             container.seek(0)
             for frame in container.decode(input_video_stream):
                 img = frame.to_ndarray(format="bgr24")
-                key_frames.append(frame)
                 if local_output_path and tos_output_dir:
                     img_filename = f"{local_output_path}/keyframe_0000{self.img_type}"
                     cv2.imwrite(img_filename, img)
                     logger.info("Saved %s", img_filename)
-                    upload_file(str(img_filename), f"{tos_output_dir}/{Path(img_filename).name}")
+                    tos_path = f"{tos_output_dir}/{Path(img_filename).name}"
+                    upload_file(str(img_filename), tos_path)
+                    keyframe_tos_paths_list.append(tos_path)
                     logger.info("The keyframe output tos path: %s", tos_output_dir)
-
-                key_frames.append(frame)
-                keyframe_array_list.append(img)
-                _, buffer = cv2.imencode(self.img_type, img)
-                frame_base64 = base64.b64encode(buffer).decode("utf-8")
-                keyframe_base64_list.append(frame_base64)
+                if self.return_keyframes:
+                    keyframe_array_list.append(img)
+                if self.return_base64:
+                    _, buffer = cv2.imencode(self.img_type, img)
+                    frame_base64 = base64.b64encode(buffer).decode("utf-8")
+                    keyframe_base64_list.append(frame_base64)
                 keyframe_timestamps_list.append(float(frame.pts * frame.time_base))
                 break
 
         shutil.rmtree(local_output_path)
         container.close()
-        return keyframe_array_list, keyframe_base64_list, keyframe_timestamps_list
+
+        # Ensure we return proper lists even when flags are False
+        # keyframe_array_list/keyframe_base64_list 已经初始化为 list，不需要再判断 None
+
+        return keyframe_array_list, keyframe_base64_list, keyframe_timestamps_list, keyframe_tos_paths_list
 
     def _extract_keyframes(
         self, video_path: str, local_output_dir: str, tos_output_dir: str | None
-    ) -> tuple[list[np.ndarray], list[str], list[float]]:
+    ) -> tuple[list[np.ndarray], list[str], list[float], list[str]]:
         if self.method in EXTRACT_KEYFRAMES_FEATURE_METHOD:
             return self.extract_keyframes_by_img_feature(video_path, local_output_dir, tos_output_dir)
         if self.method in EXTRACT_KEYFRAMES_INTRA_METHOD:
             return self._extract_keyframes_by_i_frame(video_path, local_output_dir, tos_output_dir)
-        return [], [], []
+        return [], [], [], []
 
     def _prepare_output_dirs(self, video: str) -> str | None:
         if not self.output_tos_dir or not self.output_tos_dir.strip():
@@ -257,7 +320,7 @@ class VideoKeyframes(Operator):
         video: str | None,
         video_binary: bytes | None,
         video_format: str | None,
-    ) -> tuple[list[np.ndarray], list[str], list[float]]:
+    ) -> tuple[list[np.ndarray], list[str], list[float], list[str]]:
         try:
             if video is None and video_binary is not None:
                 with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
@@ -278,7 +341,7 @@ class VideoKeyframes(Operator):
                 assert video is not None
                 tos_output_dir = self._prepare_output_dirs(video)
 
-                def process_video(local_path: str) -> tuple[list[np.ndarray], list[str], list[float]]:
+                def process_video(local_path: str) -> tuple[list[np.ndarray], list[str], list[float], list[str]]:
                     video_path = Path(local_path)
                     video_name = video_path.stem
                     local_output_dir = video_path.parent.joinpath(video_name)
@@ -288,7 +351,7 @@ class VideoKeyframes(Operator):
                 return run_on_local_path(video, process_video)
         except Exception:
             logger.exception("Failed to extract keyframes from video %s", video)
-            return [], [], []
+            return [], [], [], []
 
     def transform(
         self,
@@ -332,20 +395,21 @@ class VideoKeyframes(Operator):
 
         results = []
         for path, binary, fmt in zip(paths_list, binaries_list, formats_list):
-            keyframes, base64s, timestamps = self._process_video(path, binary, fmt)
-            if path is not None:
-                tos_output_dir = self._prepare_output_dirs(path)
-            else:
-                tos_output_dir = None
-            if tos_output_dir and keyframes:
-                tos_paths = [f"{tos_output_dir}/keyframe_{i:04d}{self.img_type}" for i in range(len(keyframes))]
-            else:
-                tos_paths = []
+            keyframes, base64s, timestamps, tos_paths = self._process_video(path, binary, fmt)
 
-            keyframes_list = [k.tolist() for k in keyframes] if keyframes else []
+            if self.return_keyframes and keyframes:
+                keyframes_list = [k.tolist() for k in keyframes]
+            else:
+                keyframes_list = []
+
+            if self.return_base64 and base64s:
+                base64s_list = base64s
+            else:
+                base64s_list = []
+
             result = {
                 "keyframes": keyframes_list,
-                "base64": base64s,
+                "base64": base64s_list,
                 "timestamps": timestamps,
                 "tos_paths": tos_paths,
             }
