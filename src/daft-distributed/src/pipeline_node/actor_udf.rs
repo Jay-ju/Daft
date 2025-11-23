@@ -56,6 +56,7 @@ impl UDFActors {
         };
 
         let actor_name = udf_properties.name.clone();
+        
         let result =
             common_runtime::python::execute_python_coroutine::<_, Vec<Py<PyAny>>>(move |py| {
                 let ray_actor_pool_udf_module =

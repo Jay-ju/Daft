@@ -10,7 +10,7 @@ use daft_local_plan::LocalNodeContext;
 use daft_logical_plan::stats::StatsState;
 use daft_micropartition::MicroPartition;
 use snafu::ResultExt;
-use tracing::{info_span, instrument};
+use tracing::{info, info_span, instrument};
 
 use crate::{
     ExecutionRuntimeContext, ExecutionTaskSpawner, OperatorOutput, PipelineExecutionSnafu,
@@ -69,12 +69,62 @@ pub(crate) trait IntermediateOperator: Send + Sync {
         morsel_size_requirement: MorselSizeRequirement,
         maintain_order: bool,
     ) -> Arc<dyn DispatchSpawner> {
+        let strategy = if maintain_order {
+            "RoundRobinDispatcher"
+        } else {
+            "UnorderedDispatcher"
+        };
+        tracing::debug!(
+            target: "daft.dispatch",
+            strategy = %strategy,
+            maintain_order,
+            op_name = %self.name().to_string(),
+            runner = "native",
+            morsel_requirement = ?morsel_size_requirement
+        );
         if maintain_order {
             Arc::new(RoundRobinDispatcher::new(morsel_size_requirement))
         } else {
             Arc::new(UnorderedDispatcher::new(morsel_size_requirement))
         }
     }
+}
+
+// Preview first up to 10 values from a preferred column and compute a simple fingerprint.
+// Preference order: column named "video_path" or "result"; fallback to the first column (index 0).
+// Fingerprint is computed using DefaultHasher over the '|' joined preview values and formatted as 16-hex.
+fn compute_preview_and_fp(mp: &MicroPartition) -> (String, String) {
+    let mut items_preview = String::from("[]");
+    let mut fingerprint = String::from("0");
+    if let Ok(tables) = mp.get_tables() {
+        if let Some(first) = tables.first() {
+            let names: Vec<&str> = first.schema.field_names().collect();
+            let mut key_idx: usize = 0;
+            if let Some((idx, _)) = names
+                .iter()
+                .enumerate()
+                .find(|(_, n)| **n == "video_path" || **n == "result")
+            {
+                key_idx = idx;
+            }
+            let series = first.get_column(key_idx);
+            let take = std::cmp::min(10, series.len());
+            let mut parts: Vec<String> = Vec::with_capacity(take);
+            for i in 0..take {
+                parts.push(series.get_lit(i).to_string());
+            }
+            if !parts.is_empty() {
+                let ellipsis = if series.len() > 10 { ", ..." } else { "" };
+                items_preview = format!("[{}{}]", parts.join(", "), ellipsis);
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut hasher = DefaultHasher::new();
+                parts.join("|").hash(&mut hasher);
+                fingerprint = format!("{:016x}", hasher.finish());
+            }
+        }
+    }
+    (items_preview, fingerprint)
 }
 
 pub struct IntermediateNode<Op: IntermediateOperator> {
@@ -124,6 +174,7 @@ impl<Op: IntermediateOperator + 'static> IntermediateNode<Op> {
     #[instrument(level = "info", skip_all, name = "IntermediateOperator::run_worker")]
     pub async fn run_worker(
         op: Arc<Op>,
+        worker_idx: usize,
         receiver: Receiver<Arc<MicroPartition>>,
         sender: Sender<Arc<MicroPartition>>,
         runtime_stats: Arc<dyn RuntimeStats>,
@@ -135,11 +186,49 @@ impl<Op: IntermediateOperator + 'static> IntermediateNode<Op> {
             ExecutionTaskSpawner::new(compute_runtime, memory_manager, runtime_stats.clone(), span);
         let mut state = op.make_state()?;
         while let Some(morsel) = receiver.recv().await {
+            // Structured log: recv
+            let rows = morsel.len();
+            let bytes = morsel.size_bytes().unwrap_or(0);
+            let columns_count = morsel.column_names().len();
+            let (items_preview, fingerprint) = compute_preview_and_fp(&morsel);
+            tracing::debug!(
+                op_name = %op.name(),
+                worker_idx,
+                rows,
+                bytes,
+                columns_count,
+                items_preview = %items_preview,
+                fingerprint = %fingerprint,
+                "recv"
+            );
             loop {
+                let exec_start = std::time::Instant::now();
                 let result = op.execute(morsel.clone(), state, &task_spawner).await??;
+                let duration_ms = exec_start.elapsed().as_millis();
+                let result_kind = match &result.1 {
+                    IntermediateOperatorResult::NeedMoreInput(_) => "need_more_input",
+                    IntermediateOperatorResult::HasMoreOutput(_) => "has_more_output",
+                };
+                tracing::debug!(
+                    op_name = %op.name(),
+                    worker_idx,
+                    duration_ms,
+                    result_kind = %result_kind,
+                    "execute_end"
+                );
                 state = result.0;
                 match result.1 {
                     IntermediateOperatorResult::NeedMoreInput(Some(mp)) => {
+                        let (items_preview, fingerprint) = compute_preview_and_fp(&mp);
+                        tracing::debug!(
+                            op_name = %op.name(),
+                            worker_idx,
+                            rows = mp.len(),
+                            bytes = mp.size_bytes().unwrap_or(0),
+                            items_preview = %items_preview,
+                            fingerprint = %fingerprint,
+                            "send"
+                        );
                         if sender.send(mp).await.is_err() {
                             return Ok(());
                         }
@@ -149,6 +238,16 @@ impl<Op: IntermediateOperator + 'static> IntermediateNode<Op> {
                         break;
                     }
                     IntermediateOperatorResult::HasMoreOutput(mp) => {
+                        let (items_preview, fingerprint) = compute_preview_and_fp(&mp);
+                        tracing::debug!(
+                            op_name = %op.name(),
+                            worker_idx,
+                            rows = mp.len(),
+                            bytes = mp.size_bytes().unwrap_or(0),
+                            items_preview = %items_preview,
+                            fingerprint = %fingerprint,
+                            "send"
+                        );
                         if sender.send(mp).await.is_err() {
                             return Ok(());
                         }
@@ -166,12 +265,16 @@ impl<Op: IntermediateOperator + 'static> IntermediateNode<Op> {
         maintain_order: bool,
         memory_manager: Arc<MemoryManager>,
     ) -> OrderingAwareReceiver<Arc<MicroPartition>> {
+        let num_inputs = input_receivers.len();
         let (output_sender, output_receiver) =
-            create_ordering_aware_receiver_channel(maintain_order, input_receivers.len());
-        for (input_receiver, output_sender) in input_receivers.into_iter().zip(output_sender) {
+            create_ordering_aware_receiver_channel(maintain_order, num_inputs);
+        for (worker_idx, (input_receiver, output_sender)) in
+            input_receivers.into_iter().zip(output_sender).enumerate()
+        {
             runtime_handle.spawn(
                 Self::run_worker(
                     self.intermediate_op.clone(),
+                    worker_idx,
                     input_receiver,
                     output_sender,
                     self.runtime_stats.clone(),
@@ -180,6 +283,15 @@ impl<Op: IntermediateOperator + 'static> IntermediateNode<Op> {
                 &self.intermediate_op.name(),
             );
         }
+        let strategy = if maintain_order { "RoundRobinReceiver" } else { "OutOfOrderReceiver" };
+        tracing::debug!(
+            target: "daft.dispatch",
+            strategy = %strategy,
+            maintain_order,
+            op_name = %self.intermediate_op.name().to_string(),
+            runner = "native",
+            inputs = num_inputs
+        );
         output_receiver
     }
 }

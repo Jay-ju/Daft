@@ -245,11 +245,11 @@ impl NativeExecutor {
             let result = tokio::select! {
                 biased;
                 () = cancel.cancelled() => {
-                    log::info!("Execution engine cancelled");
+                    tracing::info!("Execution engine cancelled");
                     Ok(())
                 }
                 _ = tokio::signal::ctrl_c() => {
-                    log::info!("Received Ctrl-C, shutting down execution engine");
+                    tracing::info!("Received Ctrl-C, shutting down execution engine");
                     Ok(())
                 }
                 result = execution_task => result,

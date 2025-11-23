@@ -27,6 +27,8 @@ use runtime_stats::{RuntimeStats, RuntimeStatsManagerHandle, TimedFuture};
 use snafu::{ResultExt, Snafu, futures::TryFutureExt};
 use tracing::Instrument;
 
+
+
 /// The `OperatorOutput` enum represents the output of an operator.
 /// It can be either `Ready` or `Pending`.
 /// If the output is `Ready`, the value is immediately available.
@@ -315,11 +317,11 @@ impl From<Error> for DaftError {
     fn from(err: Error) -> Self {
         match err {
             Error::PipelineCreationError { source, plan_name } => {
-                log::error!("Error creating pipeline from {}", plan_name);
+                tracing::error!("Error creating pipeline from {}", plan_name);
                 source
             }
             Error::PipelineExecutionError { source, node_name } => {
-                log::error!("Error when running pipeline node {}", node_name);
+                tracing::error!("Error when running pipeline node {}", node_name);
                 source
             }
             _ => Self::External(err.into()),

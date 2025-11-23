@@ -78,7 +78,7 @@ impl ScanTaskSource {
             // if configured value is 0
             None => {
                 if cfg.scantask_max_parallel == 0 {
-                    log::info!(
+                    tracing::info!(
                         "The max parallelism of the scan tasks is configured to {}, using all available CPUs instead.",
                         cfg.scantask_max_parallel
                     );
