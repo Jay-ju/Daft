@@ -420,7 +420,7 @@ class DataType:
     def infer_from_object(cls, obj: Any) -> DataType:
         """Infer Daft DataType from a Python object."""
         from daft.series import Series
-
+        
         s = Series.from_pylist([obj])
         return s.datatype()
 

@@ -29,6 +29,8 @@ jobs:
       RUST_BACKTRACE: 1
       DAFT_RUNNER: native
       DAFT_FLOTILLA: 0
+      DAFT_DASHBOARD_SKIP_BUILD: "true"
+      TF_FORCE_GPU_ALLOW_GROWTH: "true"
     runs-on:
       cluster: "gpu"
       linux: {}
@@ -43,7 +45,7 @@ jobs:
       commands:
       # Set HF_ENDPOINT to use a mirror to speed up the test when connecting to HuggingFace
       # Set http_proxy, https_proxy, no_proxy to empty to avoid using proxy when running the openai tests
-      - export HF_ENDPOINT=https://hf-mirror.com && unset http_proxy https_proxy no_proxy && make ve-test
+      - export HF_ENDPOINT=https://hf-mirror.com && export http_proxy=http://sys-proxy-rd-relay.byted.org:8118 && export https_proxy=http://sys-proxy-rd-relay.byted.org:8118 && export no_proxy=code.byted.org && make ve-test
 
     - name: clean resources
       if: "${{always()}}"
@@ -57,3 +59,5 @@ jobs:
       RUST_BACKTRACE: 1
       DAFT_RUNNER: ray
       DAFT_FLOTILLA: 1
+      DAFT_DASHBOARD_SKIP_BUILD: "true"
+      TF_FORCE_GPU_ALLOW_GROWTH: "true"
