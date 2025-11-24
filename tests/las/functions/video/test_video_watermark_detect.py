@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
 from daft.las.functions.udf import las_udf
 from daft.las.functions.video import VideoWatermarkDetect
 from tests.las.functions import assert_dataframe_result
+
+pytestmark = pytest.mark.skip(reason="skip this file that tensorflow is not compatitable with paddlepaddle-gpu")
 
 
 def generate_test_data(tos_test_data_dir, local_test_data_dir):

@@ -17,6 +17,8 @@ jobs:
       DAFT_RUNNER: ray
       DAFT_FLOTILLA: 1
       FORCE_QWENVL_VIDEO_READER: torchvision
+      DAFT_DASHBOARD_SKIP_BUILD: "true"
+      TF_FORCE_GPU_ALLOW_GROWTH: "true"
     runs-on:
       cluster: "gpu"
       linux: {}
