@@ -491,6 +491,21 @@ async fn provide_credentials_with_retry(
 
 async fn build_s3_conf(config: &S3Config) -> super::Result<s3::Config> {
     const DEFAULT_REGION: Region = Region::from_static("us-east-1");
+    const DEFAULT_RETRYABLE_TOS_ERRORS: [&str; 6] = [
+        "UnexpectedEof",
+        "Timeout",
+        "ExceedAccountQPSLimit",
+        "ExceedAccountRateLimit",
+        "ExceedBucketQPSLimit",
+        "ExceedBucketRateLimit",
+    ];
+    let mut custom_retry_msgs = config.custom_retry_msgs.clone();
+    custom_retry_msgs.extend(
+        DEFAULT_RETRYABLE_TOS_ERRORS
+            .iter()
+            .copied()
+            .map(String::from),
+    );
 
     let region = config
         .region_name
@@ -647,9 +662,8 @@ async fn build_s3_conf(config: &S3Config) -> super::Result<s3::Config> {
     builder = builder.force_path_style(force_path_style);
 
     // Add custom retry classifier for customized retry messages
-    if !config.custom_retry_msgs.is_empty() {
+    if !custom_retry_msgs.is_empty() {
         let custom_retrier = {
-            let custom_retry_msgs = config.custom_retry_msgs.clone();
             #[derive(Debug)]
             struct RetryCustomRetrier {
                 retried_msgs: Vec<String>,
