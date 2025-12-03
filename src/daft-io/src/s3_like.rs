@@ -1218,7 +1218,9 @@ impl S3LikeSource {
                     .await
                     .is_ok()
                 {
-                    log::warn!("Ignore NoSuchUpload error since it's a retryable operation and the MPU completed. Ignored err :{err:?}");
+                    log::warn!(
+                        "Ignore NoSuchUpload error since it's a retryable operation and the MPU completed. Ignored err :{err:?}"
+                    );
                     Ok(())
                 } else {
                     Err(UnableToCompleteMultipartUploadSnafu { bucket, key }

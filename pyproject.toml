@@ -20,10 +20,10 @@ maintainers = [
 ]
 name = "daft"
 readme = "README.rst"
-# daft:dev and daft[las] are incompatible on numpy. 
+# daft:dev and daft[las] are incompatible on numpy.
 # daft:dev need numpy≥2.0.0 @ python3.13,  see L176, but daft::las llama-index need numpy<2.0.0,
-# so it is required that Python version 3.13 is not supported 
-requires-python = ">=3.10, <3.13" 
+# so it is required that Python version 3.13 is not supported
+requires-python = ">=3.10, <3.13"
 
 [project.scripts]
 daft = "daft.cli:main"
@@ -57,7 +57,7 @@ las = [
   "httpx[http2] >= 0.27.2",
   "aiolimiter==1.2.1",
   # we should use ray instead of ve-ray
-  "ray[default, data, client] >= 2.46.0", 
+  "ray[default, data, client] >= 2.46.0",
   "tosfs>=2025.6.0",
   "volcengine>=1.0.153",
   "volcengine-python-sdk[ark]>=1.0.102",
@@ -188,7 +188,7 @@ dev = [
   "tiktoken==0.9.0",
   "duckdb==1.1.2",
   # las requires datasets == 2.19.0, incompatible with daft[las]
-  # "datasets==4.0.0", 
+  # "datasets==4.0.0",
   "torch>=2.5.1",
   "torchvision>=0.20.1",
   "tensorflow>=2.18.1; python_version < '3.13'",

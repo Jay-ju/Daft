@@ -77,7 +77,7 @@ class AudioStandardization(Operator):
                 waveform *= 10 ** (gain / 20)
 
             # [-1, 1] 归一化
-            max_amp = np.max(np.abs(waveform))  # type: ignore
+            max_amp = np.max(np.abs(waveform))
             if max_amp > 0:
                 waveform /= max_amp
 

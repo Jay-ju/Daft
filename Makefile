@@ -83,7 +83,7 @@ test: .venv build  ## Run tests
 	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) PATH=$(VENV_BIN)/bin:$PATH $(VENV_BIN)/pytest --hypothesis-seed=$(HYPOTHESIS_SEED) --ignore tests/integration $(EXTRA_ARGS)
 
 .PHONY: ve-test
-ve-test: .venv build  ## Run tests. Ignore test_sentence_transformers because thhe torch.OutOfMemoryError(CUDA out of memory).
+ve-test: .venv build  ## Run tests. Ignore transformers test cases because occur much GPU memory
 	# test_autoscaling.py will shutdown ray cluster, it will impact other test cases in running multiple pipeline in a single machine.
 	HYPOTHESIS_MAX_EXAMPLES=$(HYPOTHESIS_MAX_EXAMPLES) PATH=$(VENV_BIN)/bin:$PATH $(VENV_BIN)/pytest \
 	--hypothesis-seed=$(HYPOTHESIS_SEED) \
@@ -100,7 +100,7 @@ ve-test: .venv build  ## Run tests. Ignore test_sentence_transformers because th
 	--ignore tests/io/test_las_dataset.py \
 	--ignore tests/test_resource_requests.py \
 	--ignore tests/ray/test_autoscaling.py \
-	--ignore tests/ai/test_sentence_transformers.py
+	--ignore tests/ai/transformers
 
 .PHONY: test-las
 test-las: .venv build

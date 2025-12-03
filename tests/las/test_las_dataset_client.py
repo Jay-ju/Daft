@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 import daft
 from daft.daft import IOConfig
 from daft.las.infra.las_dataset import LasDatasetClient, LasDatasetConfig, LasDatasetInfo

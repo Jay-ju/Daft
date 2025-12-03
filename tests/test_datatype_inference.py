@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime
 import decimal
-import sys
 from typing import NamedTuple, TypedDict
 
 import jax

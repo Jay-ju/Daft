@@ -81,32 +81,32 @@ def _format_specified_options(
 def test_read_local_las_dataset(uuid_short, monkeypatch, object_store_test_dir):
     """Test reading LAS dataset with local mount path override."""
     client = LasDatasetClient(LasDatasetConfig())
-    
+
     dataset_name = "dataset_local_" + uuid_short
     dataset_nickname = dataset_name
     root_dir = f"{object_store_test_dir}/{dataset_name}"
-    
+
     # Set up local mount path environment variable
     local_mount_path = "/local/path/to/dataset"
     monkeypatch.setenv(f"LAS_CONTROLLED_DATASET_MOUNT_PATH_{dataset_name}", local_mount_path)
-    
-    read_options, write_options, _, _, _ = _format_specified_options(format="parquet", root_dir=root_dir)
-    
+
+    _, write_options, _, _, _ = _format_specified_options(format="parquet", root_dir=root_dir)
+
     create_ds_options = CreateLasDatasetOptions(
         nick_name=dataset_nickname, privacy="private", description="This is test dataset for local path"
     )
-    
+
     # Create the dataset
     assert client.dataset_exist(dataset_name) is False
     dataframe.write_las_dataset(
         name=dataset_name, format="parquet", write_options=write_options, create_ds_options=create_ds_options
     )
     assert client.dataset_exist(dataset_name) is True
-    
+
     # Get dataset info and verify local mount path is set
     dataset_info = client.get_dataset(dataset_name)
     assert dataset_info.data_path == local_mount_path
-    
+
     # Clean up
     try:
         client.delete_dataset(name=dataset_name)

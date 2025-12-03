@@ -151,8 +151,11 @@ def test_io_cache_cache():
     client = LasIOFactory.get().get_client("/a/b/c")
     assert LasIOFactory.get().get_client("/a/b/c") == client
 
+
 def test_http_io():
-    client = LasIOFactory.get().get_client("http://a/b/c", headers={"Authorization": "Bearer 123456"}, max_retries=3, backoff=1)
+    client = LasIOFactory.get().get_client(
+        "http://a/b/c", headers={"Authorization": "Bearer 123456"}, max_retries=3, backoff=1
+    )
     assert isinstance(client, HttpIO)
     assert client.headers == {"Authorization": "Bearer 123456"}
     assert client.max_retries == 3
