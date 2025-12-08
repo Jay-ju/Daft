@@ -8,17 +8,43 @@ from daft.las.functions.image.image_resample import ImageResample
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
-    TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
-    samples = {"image": [f"tos://{TOS_TEST_DIR}/image_resample/cat_ip_adapter.png"], "image_name": ["cat_ip_adapter"]}
+    if os.getenv("DAFT_RUNNER", "native") == "ray":
+        import logging
+
+        import ray
+
+        def configure_logging():
+            logging.basicConfig(
+                level=logging.INFO,
+                format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S.%s".format(),
+            )
+            logging.getLogger("tracing.span").setLevel(logging.WARNING)
+            logging.getLogger("daft_io.stats").setLevel(logging.WARNING)
+            logging.getLogger("DaftStatisticsManager").setLevel(logging.WARNING)
+            logging.getLogger("DaftFlotillaScheduler").setLevel(logging.WARNING)
+            logging.getLogger("DaftFlotillaDispatcher").setLevel(logging.WARNING)
+
+        ray.init(dashboard_host="0.0.0.0", runtime_env={"worker_process_setup_hook": configure_logging})
+        daft.context.set_runner_ray()
+    daft.set_execution_config(actor_udf_ready_timeout=600)
+    daft.set_execution_config(min_cpu_per_task=0)
+
+    samples = {
+        "image": [
+            "https://las-ai-qa-online.tos-cn-beijing.volces.com/operator_cards_serving/public/qa/shared_image_dataset/cat_ip_adapter.jpeg"
+        ],
+        "image_name": ["cat_ip_adapter"],
+    }
 
     image_suffix = ".jpg"
-    tos_dir = f"tos://{TOS_TEST_DIR}/image_resample/"
     image_src_type = "image_url"
     target_size = (200, 200)
     target_dpi = (72, 72)
     method = "lanczos"
     local_dir = ""
-    num_gpus = 1
+    tos_dir = ""
+    num_gpus = 0
 
     ds = daft.from_pydict(samples)
     ds = ds.with_column(
@@ -40,12 +66,11 @@ if __name__ == "__main__":
     )
 
     ds.show()
-    df = ds.to_pandas()
 
-    # ╭────────────────────────────────┬─────────────────┬────────────────────────────────────────╮
-    # │ image                          ┆ image_name      ┆ image_resample                         │
-    # │ ---                            ┆ ---             ┆ ---                                    │
-    # │ Utf8                           ┆ Utf8            ┆ Struct[base64: Utf8, image_path: Utf8] │
-    # ╞════════════════════════════════╪═════════════════╪════════════════════════════════════════╡
-    # │ tos://las-ai-qa-online/qa/ope… ┆ cat_ip_adapter  ┆ {base64: iVBORw0KGgoAAAANSUhE…         │
-    # ╰────────────────────────────────┴─────────────────┴────────────────────────────────────────╯
+    # ╭────────────────────────────────┬────────────────┬────────────────────────────────────────╮
+    # │ image                          ┆ image_name     ┆ image_resample                         │
+    # │ ---                            ┆ ---            ┆ ---                                    │
+    # │ Utf8                           ┆ Utf8           ┆ Struct[base64: Utf8, image_path: Utf8] │
+    # ╞════════════════════════════════╪════════════════╪════════════════════════════════════════╡
+    # │ https://las-ai-qa-online.tos-… ┆ cat_ip_adapter ┆ {base64: iVBORw0KGgoAAAANSUhE…         │
+    # ╰────────────────────────────────┴────────────────┴────────────────────────────────────────╯

@@ -23,10 +23,12 @@ from .audio_convert import AudioConvert
 from .audio_convert_to_mp3 import AudioConvertToMp3
 from .audio_silence_detection import AudioSilenceDetection
 from .audio_quality_score import AudioQualityScore
+from .audio_asr_lid_whisper import AudioAsrLidWhisper
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrFireRed",
+    "AudioAsrLidWhisper",
     "AudioAsrWhisper",
     "AudioConvert",
     "AudioConvertToMp3",

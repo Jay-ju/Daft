@@ -54,8 +54,6 @@ if __name__ == "__main__":
         )(col("text")),
     )
 
-    df = ds.to_pandas()
-    print(df[0]["embeddings"])
     ds.show()
 
     # ╭──────────────┬────────────────────────────────╮

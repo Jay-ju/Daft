@@ -148,7 +148,7 @@ class AudioVadFsmn(Operator):
 
                     res = self.model.generate(input=tmp_file_name, batch_size_s=self.batch_size_s)
                     timestamps = res[0]["value"]
-                    timestamps_second = [list(x) for x in np.array(timestamps) / 1000]  # type: ignore
+                    timestamps_second = [list(x) for x in np.array(timestamps) / 1000]
                     audio_timestamps_total.append(timestamps_second)
                 except Exception as e:
                     logger.error("Error when processing audio %s: %s", audio, e)

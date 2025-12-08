@@ -177,6 +177,7 @@ class ImageResample(Operator):
             try:
                 img = decode_image(img_data, self.image_src_type)
                 resampled_img, img_base64 = self._resample_image(img)
+                resampled_img_path = None
                 if not resampled_img:
                     raise ValueError("Empty resampling result")
 

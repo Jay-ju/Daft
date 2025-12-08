@@ -15,7 +15,7 @@ from daft.las.functions.udf import las_udf
 
 audio_src_type = "audio_url"
 dtype = "bfloat16"
-source_language = "chinese"
+source_language = None
 translate_to_english = False
 condition_on_prev_tokens = True
 compression_ratio_threshold = 1.35
@@ -36,7 +36,8 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
         f"{tos_test_data_dir}/audio/全剧大部分都是在中国取景拍摄，地点位于浙江省温州市。.wav",
         f"{http_test_data_dir}/audio/全剧大部分都是在中国取景拍摄，地点位于浙江省温州市。.wav",
     ]
-    return pd.DataFrame({"audio_path": paths})
+    languages = ["zh", "zh", "zh", "en", "zh", "zh"]
+    return pd.DataFrame({"audio_path": paths, "languages": languages})
 
 
 @pytest.mark.gpu
@@ -65,7 +66,7 @@ def test_audio_asr_whisper(local_models_dir, tos_test_data_dir, local_test_data_
             num_gpus=num_gpus,
             batch_size=1,
             concurrency=1,
-        )(col("audio_path")),
+        )(col("audio_path"), col("languages")),
     )
 
     actual_df = ds.to_pandas()

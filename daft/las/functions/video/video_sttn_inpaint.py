@@ -7,9 +7,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import IO, TYPE_CHECKING, Any
 
 import cv2
 
@@ -19,6 +20,9 @@ from daft.las.functions.utils.common_utils import run_on_local_path, tracking_us
 from daft.las.io import mkdirs, upload_file
 from daft.las.utils import not_blank
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,12 +30,12 @@ class VideoSttnInpaint(Operator):
     """**视频区域修复**
 
     **核心功能**
-
-    - 智能修复：基于STTN时空记忆网络进行视频内容修复（去除水印、字幕等外来内容）
+    - 智能修复：基于STTN时空记忆网络进行视频内容修复（去除水印、字幕等外来内容），支持设置默认修复区域
     - 多区域支持：支持同时修复一个、多个指定区域或全屏处理
     - 音频保留：视频修复不影响原始音频
     - GPU加速：支持CUDA加速提升处理效率
     - 多输入支持：支持路径输入和二进制输入
+    - 适用性强：支持音视频流不对齐场景
 
     **推荐实践**
     - 建议处理分辨率不超过1080p的视频
@@ -51,6 +55,8 @@ class VideoSttnInpaint(Operator):
         neighbor_stride: int = 5,
         reference_length: int = 10,
         max_load_num: int = 50,
+        is_keep_audio: bool = True,
+        is_set_default_inpaint_areas: bool = False,
         rank: int | None = None,
         **kwargs: Any,
     ) -> None:
@@ -77,6 +83,12 @@ class VideoSttnInpaint(Operator):
                 控制内存使用，避免长视频导致内存溢出
                 约束：max_load_num >= reference_length * neighbor_stride
                 默认值：50
+            is_keep_audio: 是否保留音频
+                修复视频时是否保留原始音频
+                默认值：True
+            is_set_default_inpaint_areas: 是否设置默认修复区域
+                是否根据输入参数默认设置修复区域为画面最下方30%
+                默认值：False
             rank: GPU设备编号
                 指定使用的GPU设备ID（多卡环境生效）
                 None表示自动选择可用GPU
@@ -97,6 +109,8 @@ class VideoSttnInpaint(Operator):
         self.reference_length = reference_length
         self.max_load_num = max(max_load_num, reference_length * neighbor_stride)
         self.rank = rank
+        self.is_keep_audio = is_keep_audio
+        self.is_set_default_inpaint_areas = is_set_default_inpaint_areas
 
         self._sttn_model = None
 
@@ -158,44 +172,126 @@ class VideoSttnInpaint(Operator):
             logger.error("Failed to load STTN model from %s: %s", self.model_dir, str(e))
             raise
 
+    def _get_video_duration(self, video_path: str) -> str | None:
+        """使用 ffprobe 获取视频的精确时长（秒）."""
+        try:
+            # 优先尝试从视频流获取时长
+            command = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=duration",
+                "-of",
+                "default=nw=1:nk=1",
+                video_path,
+            ]
+            duration = subprocess.check_output(command, text=True, stderr=subprocess.PIPE).strip()
+            if duration:
+                return duration
+
+            # 如果流时长为空，回退到容器格式时长
+            command = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=nw=1:nk=1",
+                video_path,
+            ]
+            duration = subprocess.check_output(command, text=True, stderr=subprocess.PIPE).strip()
+            if duration:
+                return duration
+
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            logger.warning("无法使用 ffprobe 获取视频时长 '%s': %s", video_path, str(e))
+        return None
+
     def _merge_audio_to_video(self, temp_video_path: str, original_video_path: str, output_path: str) -> bool:
+        """将音频合并到视频，并精确对齐时长."""
         try:
             with tempfile.NamedTemporaryFile(suffix=".aac", delete=True) as temp_audio:
+                # 1. 提取原始音频
                 audio_extract_cmd = [
                     "ffmpeg",
                     "-y",
                     "-i",
                     original_video_path,
-                    "-acodec",
-                    "copy",
+                    "-map",
+                    "0:a:0",
+                    "-c:a",
+                    "aac",
+                    "-b:a",
+                    "192k",
                     "-vn",
-                    "-loglevel",
-                    "error",
                     temp_audio.name,
                 ]
-                subprocess.check_output(audio_extract_cmd)
 
-                audio_merge_cmd = [
-                    "ffmpeg",
-                    "-y",
-                    "-i",
-                    temp_video_path,
-                    "-i",
-                    temp_audio.name,
-                    "-vcodec",
-                    "libx264",
-                    "-acodec",
-                    "copy",
-                    "-loglevel",
-                    "error",
-                    output_path,
-                ]
-                subprocess.check_output(audio_merge_cmd)
+                subprocess.run(audio_extract_cmd, check=True)
 
+                # 2. 尝试获取视频时长并使用策略一（-t）
+                video_duration = self._get_video_duration(temp_video_path)
+                if video_duration:
+                    logger.info("获取到视频时长为 %s 秒，使用 -t 参数进行精确对齐。", video_duration)
+                    audio_merge_cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        temp_video_path,
+                        "-i",
+                        temp_audio.name,
+                        "-map",
+                        "0:v:0",
+                        "-map",
+                        "1:a:0",
+                        "-c:v",
+                        "copy",
+                        "-c:a",
+                        "copy",
+                        "-t",
+                        video_duration,
+                        "-movflags",
+                        "+faststart",
+                        output_path,
+                    ]
+                # 3. 如果无法获取时长，回退到策略二（apad + shortest）
+                else:
+                    logger.warning("无法获取视频时长，回退到 apad + shortest 方案（将重编码音频）。")
+                    audio_merge_cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-i",
+                        temp_video_path,
+                        "-i",
+                        temp_audio.name,
+                        "-map",
+                        "0:v:0",
+                        "-map",
+                        "1:a:0",
+                        "-c:v",
+                        "copy",
+                        "-filter:a",
+                        "apad",
+                        "-c:a",
+                        "aac",
+                        "-b:a",
+                        "192k",  # 音频重编码
+                        "-shortest",
+                        "-movflags",
+                        "+faststart",
+                        output_path,
+                    ]
+
+                subprocess.run(audio_merge_cmd, check=True, capture_output=True, text=True)
             return True
 
         except Exception as e:
-            logger.warning("Failed to merge audio: %s, fallback to video-only output", str(e))
+            stderr = e.stderr if isinstance(e, subprocess.CalledProcessError) else ""
+            logger.warning("合并音频失败: %s. FFmpeg输出: %s. 回退到仅视频输出。", str(e), stderr)
             shutil.copy2(temp_video_path, output_path)
             return False
 
@@ -229,6 +325,12 @@ class VideoSttnInpaint(Operator):
         mask_size = (height, width)
         return frame_count, fps, width, height, size, mask_size
 
+    def _drain_pipe(self, pipe: IO[bytes], sink: Callable[[str], None]) -> None:
+        """持续读取管道内容并送入 sink 函数."""
+        for line in iter(pipe.readline, b""):
+            sink(line.decode(errors="ignore").strip())
+        pipe.close()
+
     def _create_ffmpeg_process(self, width: int, height: int, fps: float, output_file: str) -> subprocess.Popen[bytes]:
         ffmpeg_cmd = [
             "ffmpeg",
@@ -253,13 +355,26 @@ class VideoSttnInpaint(Operator):
             "23",
             "-pix_fmt",
             "yuv420p",
+            # 日志控制
+            "-loglevel",
+            "error",  # 只报告错误，大幅减少 stderr 输出
+            "-hide_banner",  # 隐藏版本信息
+            "-nostats",  # 关闭周期性统计信息
             output_file,
         ]
 
-        # 启动FFmpeg进程用于实时编码：接收处理后的视频帧并编码为视频文件
+        # 启动后台线程读取 stderr (推荐，兼顾性能与调试)
         ffmpeg_process = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         assert ffmpeg_process.stdin is not None
         assert ffmpeg_process.stderr is not None
+
+        # 创建并启动一个守护线程来消耗 stderr，避免阻塞
+        stderr_thread = threading.Thread(
+            target=self._drain_pipe,
+            args=(ffmpeg_process.stderr, logger.warning),  # 将FFmpeg日志以warning级别打印
+            daemon=True,
+        )
+        stderr_thread.start()
         return ffmpeg_process
 
     def _prepare_inpaint_mask(
@@ -278,85 +393,108 @@ class VideoSttnInpaint(Operator):
         return self._create_mask(mask_size, mask_coordinates)
 
     def _process_video_frames(
-        self,
-        video_cap: cv2.VideoCapture,
-        ffmpeg_process: subprocess.Popen[bytes],
-        sttn_inpaint: Any,
-        mask: Any,
-        frame_count: int,
-        total_batches: int,
+        self, video_cap: cv2.VideoCapture, ffmpeg_process: subprocess.Popen[bytes], sttn_inpaint: Any, mask: Any
     ) -> int:
-        frames_buffer = []
+        frames_buffer: list[Any] = []
         current_frame = 0
         processed_frames = 0
         processed_batches = 0
-
+        min_required = self.reference_length * self.neighbor_stride
         while True:
             ret, frame = video_cap.read()
             if not ret:
+                # 最终 flush 尾批
+                if frames_buffer:
+                    processed_batches += 1
+                    logger.info("Processing final batch %d: %d frames", processed_batches, len(frames_buffer))
+                    # 尾批最小长度保护
+                    if len(frames_buffer) < min_required and len(frames_buffer) >= 1:
+                        last = frames_buffer[-1]
+                        frames_buffer = frames_buffer + [last] * (min_required - len(frames_buffer))
+                    inpainted_frames = sttn_inpaint(frames_buffer, mask)
+                    # 输出长度对齐
+                    if len(inpainted_frames) < len(frames_buffer):
+                        pad = inpainted_frames[-1] if inpainted_frames else frames_buffer[-1]
+                        inpainted_frames = inpainted_frames + [pad] * (len(frames_buffer) - len(inpainted_frames))
+                    # 仅写入原始长度部分，避免填充导致时长变长
+                    write_count = current_frame % self.max_load_num or len(inpainted_frames)
+                    if ffmpeg_process.stdin is None:
+                        logger.error("FFmpeg stdin pipe is closed.")
+                        break
+                    for f in inpainted_frames[:write_count]:
+                        ffmpeg_process.stdin.write(f.tobytes())
+                        # 手动flush
+                        ffmpeg_process.stdin.flush()
+                        processed_frames += 1
                 break
-
             frames_buffer.append(frame)
             current_frame += 1
-
-            if len(frames_buffer) >= self.max_load_num or current_frame == frame_count:
+            if len(frames_buffer) >= self.max_load_num:
                 processed_batches += 1
-                logger.info(
-                    "Processing batch %d/%d, current frame buffer: %d frames",
-                    processed_batches,
-                    total_batches,
-                    len(frames_buffer),
-                )
-
-                if len(frames_buffer) >= 1:
-                    logger.info(
-                        "Processing batch %d/%d: %d frames, STTN inference starting...",
-                        processed_batches,
-                        total_batches,
-                        len(frames_buffer),
-                    )
-                    inpainted_frames = sttn_inpaint(frames_buffer, mask)
-                    logger.info("STTN inference completed, writing frames to FFmpeg...")
-                    for inpainted_frame in inpainted_frames:
-                        if ffmpeg_process.stdin is not None:
-                            ffmpeg_process.stdin.write(inpainted_frame.tobytes())
-                        processed_frames += 1
-                    logger.info(
-                        "Batch %d/%d completed, total processed frames: %d/%d",
-                        processed_batches,
-                        total_batches,
-                        processed_frames,
-                        frame_count,
-                    )
+                logger.info("Processing batch %d: %d frames", processed_batches, len(frames_buffer))
+                inpainted_frames = sttn_inpaint(frames_buffer, mask)
+                # 输出长度对齐
+                if len(inpainted_frames) < len(frames_buffer):
+                    pad = inpainted_frames[-1]
+                    inpainted_frames = inpainted_frames + [pad] * (len(frames_buffer) - len(inpainted_frames))
+                if ffmpeg_process.stdin is None:
+                    logger.error("FFmpeg stdin pipe is closed.")
+                    break
+                for f in inpainted_frames[: len(frames_buffer)]:
+                    ffmpeg_process.stdin.write(f.tobytes())
+                    # 手动flush
+                    ffmpeg_process.stdin.flush()
+                    processed_frames += 1
                 frames_buffer = []
-
         return processed_frames
 
     def _finalize_ffmpeg_process(self, ffmpeg_process: subprocess.Popen[bytes]) -> None:
-        if ffmpeg_process.stdin is not None:
-            ffmpeg_process.stdin.close()
+        # 1. 首先关闭 stdin，这是通知 FFmpeg 数据已写完的关键信号
+        if ffmpeg_process.stdin:
+            try:
+                ffmpeg_process.stdin.close()
+            except BrokenPipeError:
+                # 如果 FFmpeg 已经因为其他错误退出，这里会触发 BrokenPipeError
+                logger.warning("FFmpeg stdin pipe was already closed.")
 
+        # 2. 等待进程结束，设置超时
         try:
-            ffmpeg_process.wait(timeout=300)
+            # 等待 FFmpeg 完成所有编码和文件写入操作
+            ffmpeg_process.wait(timeout=60)  # 超时可以设得宽松一些
         except subprocess.TimeoutExpired:
-            logger.error("FFmpeg encoding timeout after 300 seconds, terminating process")
-            ffmpeg_process.kill()
+            logger.error("FFmpeg timed out after 60s. Terminating...")
+            ffmpeg_process.kill()  # 强制终止
+            # 等待 kill 完成
             ffmpeg_process.wait()
-            raise RuntimeError("FFmpeg encoding timeout")
-
-        if ffmpeg_process.returncode != 0:
+            # 即使超时，也尝试读取残余的 stderr 输出以供分析
             stderr_output = ""
-            if ffmpeg_process.stderr is not None:
-                stderr_output = ffmpeg_process.stderr.read().decode()
-            logger.error("FFmpeg encoding failed: %s", stderr_output)
-            raise RuntimeError(f"FFmpeg encoding failed: {stderr_output}")
+            if ffmpeg_process.stderr:
+                stderr_output = ffmpeg_process.stderr.read().decode(errors="ignore")
+            raise RuntimeError(f"FFmpeg encoding timed out. Stderr: {stderr_output}")
+
+        # 3. 检查退出码
+        if ffmpeg_process.returncode != 0:
+            # 如果使用了后台线程，大部分日志已被消费。这里可能只能读到最后一点。
+            stderr_output = ""
+            if ffmpeg_process.stderr:
+                stderr_output = ffmpeg_process.stderr.read().decode(errors="ignore")
+            logger.error("FFmpeg failed with exit code %s. Stderr: %s", ffmpeg_process.returncode, stderr_output)
+            raise RuntimeError(
+                f"FFmpeg encoding failed. Exit code: {ffmpeg_process.returncode}. Stderr: {stderr_output}"
+            )
+        else:
+            logger.info("FFmpeg process finished successfully.")
 
     def _upload_final_video(self, temp_video_path: str, local_video_path: str, video_name: str) -> str:
         output_path = f"{video_name}_inpainted.mp4"
         tos_output_path = f"{self.output_tos_dir}/{output_path}"
-        with tempfile.NamedTemporaryFile(suffix=".mp4") as temp_final:
-            self._merge_audio_to_video(temp_video_path, local_video_path, temp_final.name)
-            upload_file(temp_final.name, tos_output_path)
+        if self.is_keep_audio:
+            with tempfile.NamedTemporaryFile(suffix=".mp4") as temp_final:
+                self._merge_audio_to_video(temp_video_path, local_video_path, temp_final.name)
+                upload_file(temp_final.name, tos_output_path)
+        # 忽略音频，只保留视频
+        else:
+            upload_file(temp_video_path, tos_output_path)
         return tos_output_path
 
     def _process_video(
@@ -374,7 +512,9 @@ class VideoSttnInpaint(Operator):
         except ValueError:
             return {"output_path": None, "processed_frames": None, "processed_resolution": None}
 
-        def process_single_video(local_video_path: str) -> dict[str, Any]:
+        def process_single_video(
+            local_video_path: str, inpaint_areas: list[dict[str, Any]] | None = None
+        ) -> dict[str, Any]:
             video_cap = cv2.VideoCapture(local_video_path)
             if not video_cap.isOpened():
                 logger.error("Cannot open video: %s", local_video_path)
@@ -383,6 +523,10 @@ class VideoSttnInpaint(Operator):
             try:
                 frame_count, fps, width, height, size, mask_size = self._get_video_metadata(video_cap)
                 total_batches = (frame_count + self.max_load_num - 1) // self.max_load_num
+
+                # 计算默认字幕位置
+                if inpaint_areas is None and self.is_set_default_inpaint_areas:
+                    inpaint_areas = [{"ymin": int(height * 0.7), "ymax": height, "xmin": 0, "xmax": width}]
 
                 logger.info(
                     "Starting video processing: %s - frames: %d, resolution: %dx%d, estimated batches: %d",
@@ -400,9 +544,7 @@ class VideoSttnInpaint(Operator):
                         sttn_inpaint = self._load_sttn_model()
                         mask = self._prepare_inpaint_mask(inpaint_areas, size, mask_size)
 
-                        processed_frames = self._process_video_frames(
-                            video_cap, ffmpeg_process, sttn_inpaint, mask, frame_count, total_batches
-                        )
+                        processed_frames = self._process_video_frames(video_cap, ffmpeg_process, sttn_inpaint, mask)
 
                         video_cap.release()
                         self._finalize_ffmpeg_process(ffmpeg_process)
@@ -444,7 +586,9 @@ class VideoSttnInpaint(Operator):
                 return {"output_path": None, "processed_frames": None, "processed_resolution": None}
 
         if is_valid_video_path and video_path is not None:
-            return run_on_local_path(str(video_path), process_single_video)
+            # 限定识别的区域
+            return run_on_local_path(str(video_path), lambda path: process_single_video(path, inpaint_areas))
+
         elif video_binary is not None:
             with tempfile.TemporaryDirectory(dir="/tmp") as temp_sub_dir:
                 video_extension = f".{video_format}" if video_format else ".mp4"
@@ -453,7 +597,7 @@ class VideoSttnInpaint(Operator):
                 with temp_filepath.open("wb") as tmp:
                     tmp.write(video_binary)
 
-                return process_single_video(str(temp_filepath))
+                return process_single_video(str(temp_filepath), inpaint_areas)
         else:
             return {"output_path": None, "processed_frames": None, "processed_resolution": None}
 

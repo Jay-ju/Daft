@@ -4,7 +4,7 @@ import os
 
 import daft
 from daft import col
-from daft.las.functions.image.image_easyocr import ImageEasyOcr
+from daft.las.functions.image.image_nsfw_detect import ImageNsfwDetect
 from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
@@ -27,48 +27,46 @@ if __name__ == "__main__":
 
         ray.init(dashboard_host="0.0.0.0", runtime_env={"worker_process_setup_hook": configure_logging})
         daft.context.set_runner_ray()
+
     daft.set_execution_config(actor_udf_ready_timeout=600)
     daft.set_execution_config(min_cpu_per_task=0)
 
     samples = {
         "image": [
-            "https://las-ai-qa-online.tos-cn-beijing.volces.com/operator_cards_serving/public/qa/shared_image_dataset/通用场景图片.jpeg"
-        ],
+            "https://las-ai-qa-online.tos-cn-beijing.volces.com/operator_cards_serving/public/qa/shared_image_dataset/cat_ip_adapter.jpeg"
+        ]
     }
 
     image_src_type = "image_url"
     model_path = os.getenv("MODEL_PATH", "/opt/las/models")
-    model_name = "EasyOCR"
-    quantize = True
-    lang_list = ["en", "ch_sim"]
-    batch_size = 16
-    num_gpus = 1
+    model_name = "Falconsai/nsfw_image_detection"
+    rank = 0
+    num_gpus = 0
+    batch_size = 1
 
     ds = daft.from_pydict(samples)
     ds = ds.with_column(
-        "ocr_result",
+        "nsfw_detect",
         las_udf(
-            ImageEasyOcr,
+            ImageNsfwDetect,
             construct_args={
                 "image_src_type": image_src_type,
+                "batch_size": batch_size,
                 "model_path": model_path,
                 "model_name": model_name,
-                "quantize": quantize,
-                "lang_list": lang_list,
-                "batch_size": batch_size,
+                "rank": rank,
             },
             num_gpus=num_gpus,
             batch_size=1,
         )(col("image")),
     )
-    ds.show()
-    df = ds.to_pandas()
 
-    # ╭────────────────────────────────┬───────────────────╮
-    # │ image                          ┆ ocr_result        │
-    # │ ---                            ┆ ---               │
-    # │ Utf8                           ┆ Utf8              │
-    # ╞════════════════════════════════╪═══════════════════╡
-    # │ tos://tos_bucket/image_easyoc… ┆ 不论结局           │
-    # │                                ┆ 我己经很感谢相遇…    │
-    # ╰────────────────────────────────┴───────────────────╯
+    ds.show()
+
+    # ╭────────────────────────────────┬────────────────────────╮
+    # │ image                          ┆ nsfw_detect            │
+    # │ ---                            ┆ ---                    │
+    # │ Utf8                           ┆ Float64                │
+    # ╞════════════════════════════════╪════════════════════════╡
+    # │ https://las-ai-qa-online.tos-… ┆ 0.000114               │
+    # ╰────────────────────────────────┴────────────────────────╯

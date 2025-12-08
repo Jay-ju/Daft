@@ -39,9 +39,11 @@ class CleanHtmlTag(Operator):
         """HTML文档处理器初始化方法.
 
         Args:
-            separator: 文本内容分隔符，默认为换行符'\n'。
-                用于替换被移除HTML标签后的空白区域
-            strip: 是否去除首尾空格，默认为True
+            separator: 文本内容分隔符
+                描述：用于替换被移除HTML标签后的空白区域；
+                默认值：换行符'\n'
+            strip: 是否去除首尾空格
+                默认值：True
         """  # noqa: D301
         super().__init__(**kwargs)
         self.separator = separator

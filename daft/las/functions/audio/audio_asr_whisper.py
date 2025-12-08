@@ -28,7 +28,7 @@ class AudioAsrWhisper(Operator):
     - 语音翻译：可将识别结果翻译为英文
 
     **推荐实践**
-    - 优先处理30秒内的音频片段
+    - 30秒内长度的音频片段可支持 batch_size > 1，提高处理效率；否则建议 batch_size 设置为1
     - 英文场景识别准确率最高
 
     **支持模型**
@@ -48,7 +48,7 @@ class AudioAsrWhisper(Operator):
         model_path: str = "/opt/las/models",
         model_name: str = "openai/whisper-large-v3",
         batch_size: int = 10,
-        source_language: str = "chinese",
+        source_language: str | None = None,
         translate_to_english: bool = False,
         condition_on_prev_tokens: bool = True,
         compression_ratio_threshold: float = 1.35,
@@ -85,8 +85,8 @@ class AudioAsrWhisper(Operator):
             batch_size: 单次处理的音频样本数量
                 默认值：10
             source_language: 音频源语言
-                支持：chinese/english/japanese/korean等
-                默认值："chinese"
+                支持：chinese/english/japanese/korean等，可以设置为None以启用自动检测
+                默认值：None
             translate_to_english: 英文翻译模式
                 是否将识别结果翻译为英文
                 启用后输出文本将为英文翻译结果
@@ -158,7 +158,7 @@ class AudioAsrWhisper(Operator):
             raise RuntimeError(f"Model loading failed, please check model path: {model_dir}") from e
 
         # Generation parameters logging
-        generate_kwargs = {
+        self.generate_kwargs = {
             "condition_on_prev_tokens": self.condition_on_prev_tokens,
             "compression_ratio_threshold": self.compression_ratio_threshold,
             "temperature": self.temperature,
@@ -167,9 +167,9 @@ class AudioAsrWhisper(Operator):
             "language": self.source_language,
         }
         if self.translate_to_english:
-            generate_kwargs["task"] = "translate"
+            self.generate_kwargs["task"] = "translate"
 
-        logger.debug("Generation parameters:\n %s", json.dumps(generate_kwargs, indent=2))
+        logger.debug("Generation parameters:\n %s", json.dumps(self.generate_kwargs, indent=2))
 
         try:
             self.pipe = pipeline(
@@ -179,7 +179,6 @@ class AudioAsrWhisper(Operator):
                 feature_extractor=processor.feature_extractor,
                 torch_dtype=self.dtype,
                 device=self.device,
-                generate_kwargs=generate_kwargs,
             )
             logger.info("ASR pipeline initialized successfully")
         except RuntimeError as e:
@@ -248,7 +247,7 @@ class AudioAsrWhisper(Operator):
         )
         return timestamps_update
 
-    def transform(self, audios: pa.Array) -> pa.Array:
+    def transform(self, audios: pa.Array, languages: pa.Array | None = None) -> pa.Array:
         """批量处理音频数组生成语音识别结果。
 
         该方法使用预加载的Whisper模型对输入的音频数据进行批量ASR处理，生成包含识别文本、
@@ -274,6 +273,8 @@ class AudioAsrWhisper(Operator):
         try:
             results, timestamps, segments = [], [], []
             total_audios = len(audios)
+            if languages:
+                languages = languages.to_pylist()
 
             for batch_idx in range(0, total_audios, self.batch_size):
                 sub_audios = audios.slice(batch_idx, self.batch_size)
@@ -298,11 +299,26 @@ class AudioAsrWhisper(Operator):
                         processed_batch.append(audio_binary)
                         logger.debug("Audio processing for item %s", audio_ref[:15])
 
-                    batch_result = self.pipe(
-                        processed_batch,
-                        return_timestamps=True,
-                        batch_size=len(processed_batch),
-                    )
+                    generate_kwargs = self.generate_kwargs.copy()
+
+                    # 如果数据对应不同的语种，需要对每条数据专门设立语种
+                    if languages:
+                        batch_result = []
+                        batch_languages = languages[batch_idx : batch_idx + len(processed_batch)]
+                        for i, audio_binary in enumerate(processed_batch):
+                            generate_kwargs["language"] = batch_languages[i]
+                            batch_result_current = self.pipe(
+                                audio_binary, return_timestamps=True, generate_kwargs=generate_kwargs
+                            )
+                            batch_result.append(batch_result_current)
+
+                    else:
+                        batch_result = self.pipe(
+                            processed_batch,
+                            return_timestamps=True,
+                            batch_size=len(processed_batch),
+                            generate_kwargs=self.generate_kwargs,
+                        )
                     for item in batch_result:
                         results_batch.append(item["text"])
                         chunk_data = item["chunks"]

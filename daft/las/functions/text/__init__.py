@@ -29,13 +29,18 @@ from .word_repetition_calculator import WordRepetitionCalculator
 from .multilingual_text_translate import MultilingualTextTranslate
 from .embedding.bge_embedding import BgeEmbedding
 from .remove_links import RemoveLinks
+from .clean_email import CleanEmail
+from .chunk_text_sentence_similarity import ChunkTextSentenceSimilarity
 
 __all__ = [
     "AlphanumericRatioCalculator",
+    "BgeEmbedding",
     "BgeSparseDenseEmbedding",
     "BulletLineRatioCalculator",
     "ChineseTextConverter",
+    "ChunkTextSentenceSimilarity",
     "ChunkTextSentenceSplitter",
+    "CleanEmail",
     "CleanHtmlTag",
     "CommonCrawlContentExtractor",
     "ContentRiskRec",
@@ -49,6 +54,7 @@ __all__ = [
     "PerplexityCalculator",
     "PreSignUrlForTos",
     "RegexReplacer",
+    "RemoveLinks",
     "RepeatedLinesCalculator",
     "SpecialCharactersRatioCalculator",
     "TextLengthCalculator",

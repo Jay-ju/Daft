@@ -132,7 +132,9 @@ las = [
   "flashinfer-python==0.3.1.post1; sys_platform == 'linux'",
   "kaldi_native_fbank>=1.15",
   "uroman",
-  "pypinyin"
+  "pypinyin",
+  "imagededup==0.3.3.post2",
+  "llama-index-embeddings-huggingface~=0.3.1"
 ]
 mcap = ["mcap", "mcap-ros2-support", "mcap-protobuf-support"]
 numpy = ["numpy"]

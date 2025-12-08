@@ -53,6 +53,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
 
 
 @pytest.mark.gpu
+@pytest.mark.skip(reason="GPU is required for this test.")
 def test_qwen_vl_video_understanding(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 

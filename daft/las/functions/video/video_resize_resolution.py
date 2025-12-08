@@ -1,5 +1,3 @@
-# Copyright (c) Beijing Volcano Engine Technology Ltd.
-
 from __future__ import annotations
 
 import logging
@@ -175,7 +173,12 @@ class VideoResizeResolution(Operator):
         video = container.streams.video[0]
         width = video.codec_context.width
         height = video.codec_context.height
-        logger.info("Origin video width: %d, height: %d", width, height)
+        has_audio = False
+        try:
+            has_audio = bool(getattr(container.streams, "audio", None)) and len(container.streams.audio) > 0
+        except Exception:
+            has_audio = False
+        logger.info("Origin video width: %d, height: %d, has_audio: %s", width, height, has_audio)
         origin_ratio = width / height
         container.close()
 
@@ -222,27 +225,17 @@ class VideoResizeResolution(Operator):
             width = round(width / force_divisible_by) * force_divisible_by
             height = round(height / force_divisible_by) * force_divisible_by
 
-        args = ["-nostdin", "-v", "quiet", "-y"]
-        try:
-            input_stream = ffmpeg.input(video_path)
+        # 全局参数：不静默，捕获错误；隐藏 banner；允许覆盖
+        global_args = ["-nostdin", "-hide_banner", "-loglevel", "error", "-y"]
 
-            if need_resize:
-                video_stream = input_stream.video.filter("scale", width=width, height=height)
-                logger.info("Resizing video: %s -> %s (%dx%d)", video_path, resized_video_path, width, height)
-            else:
-                video_stream = input_stream.video
-                logger.info("Standardizing video without resize: %s -> %s", video_path, resized_video_path)
-
-            audio_stream = input_stream.audio
-
-            output_params: dict[str, Any] = {
+        def _build_output_params() -> dict[str, Any]:
+            params: dict[str, Any] = {
                 "vcodec": self.video_codec,
-                "acodec": "aac",
-                "strict": "-2",
+                # 通用兼容性：确保输出可在更多播放器解码
+                "pix_fmt": "yuv420p",
             }
-
             if self.video_codec == "h264_nvenc":
-                output_params.update(
+                params.update(
                     {
                         "cq": self.cq,
                         "gpu": self.device_id,
@@ -250,28 +243,107 @@ class VideoResizeResolution(Operator):
                     }
                 )
             else:
-                output_params.update(
+                params.update(
                     {
                         "crf": self.crf,
                         "preset": self.preset,
                     }
                 )
+            return params
 
-            stream = (
-                ffmpeg.output(video_stream, audio_stream, resized_video_path, **output_params)
-                .global_args(*args)
-                .overwrite_output()
-            )
+        def _compile_cmd(s: ffmpeg.nodes.FilterableStream | ffmpeg.nodes.OutputStream) -> str:
+            try:
+                return " ".join(s.compile())
+            except Exception:
+                return "<failed to compile ffmpeg command>"
 
-            _, stderr = ffmpeg.run(stream, capture_stdout=True, capture_stderr=True)
-            if stderr:
-                logger.error("FFmpeg stderr output: %s", stderr.decode("utf-8"))
+        # 输入/视频流
+        input_stream = ffmpeg.input(video_path)
+        if need_resize:
+            video_stream = input_stream.video.filter("scale", width=width, height=height)
+            logger.info("Resizing video: %s -> %s (%dx%d)", video_path, resized_video_path, int(width), int(height))
+        else:
+            video_stream = input_stream.video
+            logger.info("Standardizing video without resize: %s -> %s", video_path, resized_video_path)
+
+        output_params = _build_output_params()
+
+        # 优先 copy 音频；无音频则只输出视频
+        try:
+            if has_audio:
+                # 第一次尝试：acodec=copy，不改变音频
+                stream_copy = (
+                    ffmpeg.output(video_stream, input_stream.audio, resized_video_path, acodec="copy", **output_params)
+                    .global_args(*global_args)
+                    .overwrite_output()
+                )
+                cmd_copy = _compile_cmd(stream_copy)
+                logger.info("FFmpeg command (video+audio copy): %s", cmd_copy)
+                _, err = ffmpeg.run(stream_copy, capture_stdout=True, capture_stderr=True)
+                if err:
+                    # 记录可诊断的 stderr（安全处理 None/bytes）
+                    try:
+                        err_text = err.decode("utf-8", errors="ignore")
+                    except Exception:
+                        err_text = str(err)
+                    if err_text.strip():
+                        logger.info("FFmpeg stderr (copy): %s", err_text.strip())
+            else:
+                # 无音频：仅输出视频
+                stream_video_only = (
+                    ffmpeg.output(video_stream, resized_video_path, **output_params)
+                    .global_args(*global_args)
+                    .overwrite_output()
+                )
+                cmd_vo = _compile_cmd(stream_video_only)
+                logger.info("FFmpeg command (video only): %s", cmd_vo)
+                _, err = ffmpeg.run(stream_video_only, capture_stdout=True, capture_stderr=True)
+                if err:
+                    try:
+                        err_text = err.decode("utf-8", errors="ignore")
+                    except Exception:
+                        err_text = str(err)
+                    if err_text.strip():
+                        logger.info("FFmpeg stderr (video only): %s", err_text.strip())
 
         except ffmpeg.Error as e:
-            logger.exception("FFmpeg failed with command: %s", e)
-            raise
+            # 如果第一次失败且含音频，自动尝试回退到 AAC 重编码（兼容容器/编码差异）
+            if has_audio:
+                logger.warning("FFmpeg failed on audio copy, retry with AAC re-encode.")
+                try:
+                    output_params_aac = dict(output_params)
+                    output_params_aac.update({"acodec": "aac", "strict": "-2"})
+                    stream_aac = (
+                        ffmpeg.output(video_stream, input_stream.audio, resized_video_path, **output_params_aac)
+                        .global_args(*global_args)
+                        .overwrite_output()
+                    )
+                    cmd_aac = _compile_cmd(stream_aac)
+                    logger.info("FFmpeg command (video+audio aac): %s", cmd_aac)
+                    _, err2 = ffmpeg.run(stream_aac, capture_stdout=True, capture_stderr=True)
+                    if err2:
+                        try:
+                            err_text2 = err2.decode("utf-8", errors="ignore")
+                        except Exception:
+                            err_text2 = str(err2)
+                        if err_text2.strip():
+                            logger.info("FFmpeg stderr (aac): %s", err_text2.strip())
+                except ffmpeg.Error as e2:
+                    # 两次都失败：记录详细 stderr 与命令，抛出异常
+                    safe_stderr_1 = e.stderr.decode("utf-8", errors="ignore") if e.stderr else ""
+                    safe_stderr_2 = e2.stderr.decode("utf-8", errors="ignore") if e2.stderr else ""
+                    logger.error("FFmpeg failed (copy) stderr:\n%s", safe_stderr_1)
+                    logger.error("FFmpeg failed (aac) stderr:\n%s", safe_stderr_2)
+                    logger.exception("FFmpeg failed twice when processing: %s", video_path)
+                    raise
+            else:
+                # 无音频的场景直接记录并抛出
+                safe_stderr = e.stderr.decode("utf-8", errors="ignore") if e.stderr else ""
+                logger.error("FFmpeg failed (video-only) stderr:\n%s", safe_stderr)
+                logger.exception("FFmpeg failed when processing (video-only): %s", video_path)
+                raise
 
-        logger.info("Resized video width: %d, height: %d", width, height)
+        logger.info("Resized video width: %d, height: %d", int(width), int(height))
         return resized_video_path
 
     def _process_video(

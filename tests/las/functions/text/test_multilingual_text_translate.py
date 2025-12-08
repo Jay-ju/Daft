@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 
 import pandas as pd
+import pytest
 import torch
 
 import daft
@@ -38,6 +39,7 @@ enable_prefix_caching = False
 gpu_memory_utilization = 0.7
 
 
+@pytest.mark.skip(reason="GPU is required for this test.")
 def test_multilingual_text_translate(local_models_dir):
     samples = {
         "text": [

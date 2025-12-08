@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 import daft
 from daft import col
@@ -27,6 +28,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
     return pd.DataFrame({"audio_path": paths})
 
 
+@pytest.mark.skip(reason="GPU is required for this test.")
 def test_qwen_omni_audio_understanding(local_models_dir, tos_test_data_dir, local_test_data_dir, http_test_data_dir):
     input_df = generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_dir)
 
