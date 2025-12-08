@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import random
@@ -36,51 +37,75 @@ class LasAsrSubmitter(Operator):
 
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         endpoint: str | None = None,
         version: str = "v1",
+        uid: str | None = None,
         operator_id: str = "las_asr",
-        operator_version: str = "v1",
+        operator_version: str = "v2",
         num_coroutines: int = 20,
         max_retries: int = 3,
-        enable_idempotent: bool = False,
-        enable_punc: bool = False,
-        enable_ddc: bool = False,
-        enable_speaker_info: bool = False,
-        enable_itn: bool = True,
-        enable_channel_split: bool = False,
-        enable_lid: bool = False,
-        show_speech_rate: bool = False,
-        show_volume: bool = False,
+        model_version: str = "400",
+        enable_punc: bool | None = None,
+        enable_ddc: bool | None = None,
+        enable_speaker_info: bool | None = None,
+        enable_itn: bool | None = None,
+        enable_channel_split: bool | None = None,
+        show_speech_rate: bool | None = None,
+        show_volume: bool | None = None,
+        enable_lid: bool | None = None,
+        enable_emotion_detection: bool | None = None,
+        enable_gender_detection: bool | None = None,
+        enable_poi_fc: bool | None = None,
+        enable_music_fc: bool | None = None,
         **kwargs: Any,
     ) -> None:
-        """创建一个LasAsrSubmitter实例，用于提交音频到LAS ASR 服务进行处理.
+        """创建一个 LasAsrSubmitter 实例，用于提交音频到LAS ASR 服务进行处理.
 
         Args:
-            api_key: LAS服务 API Key。
-            endpoint: LAS服务 API Endpoint。
-            version: LAS服务 API Version，默认值: "v1"。
-            operator_id: LAS ASR服务ID，默认值: "las_asr"。
-            operator_version: LAS ASR服务版本，默认值: "v1"。
-            num_coroutines: 单个实例并发处理音频的最大数量，默认值: 20。
-            max_retries: 单次API请求最大重试次数，默认值：3。
-            enable_idempotent: 用于判断是否重试处理数据，为True时，每次都会重新处理，默认值：False。
-            enable_punc: 文本标点，将原始语音输出转换为带标点的形式，以提高文本的可读性，默认值：False。
-            enable_ddc: 语义顺滑，旨在提高自动语音识别（ASR）结果的文本可读性和流畅性。这项技术通过删除或修改ASR结果中的不流畅部分，如停顿词、语气词、语义重复词等，使得文本更加易于阅读和理解，默认值：False。
-            enable_speaker_info: 语音角色信息，开启后可返回说话人的信息，10人以内，效果较好，默认值：False。
-            enable_itn: 文本规范化，将原始语音输出转换为书面形式，以提高文本的可读性，默认值：True。
-            enable_channel_split: 语音分轨，开启后会在返回结果中使用channel_id标记，1为左声道，2为右声道，默认值：False。
-            enable_lid: 语言识别，目前支持语种：中英文、上海话、闽南语，四川、陕西、粤语，开启后会在additions信息中使用lid_lang标记, 返回对应的语种标签，默认值：False。
-            show_speech_rate: 语速信息，开启后会在分句additions信息中使用speech_rate标记，单位为 token/s，默认值：False。
-            show_volume: 音量信息，开启后可在分句additions信息中使用volume标记，单位为 分贝，默认值：False。
+            api_key: LAS 服务 API Key。若为空，将从环境变量 `LAS_API_KEY` 读取。
+            endpoint: LAS 服务 API Endpoint。若为空，将读取环境变量 `LAS_SERVICE_ENDPOINT`。
+            version: API 版本，默认 "v1"。
+            uid: 用户唯一标识，默认 None。
+            operator_id: LAS ASR服务版本ID，默认 "las_asr"。
+            operator_version: LAS ASR服务版本，默认 "v1"。
+            num_coroutines: 单实例并发提交的最大数量，默认 20。
+            max_retries: 单次 API 请求最大重试次数，默认 3。
+            model_version: 模型版本，传 "400" 使用 400 模型，默认 310。
+            enable_punc: 是否开启标点补全。
+            enable_ddc: 是否开启语义顺滑（DDC）。
+            enable_speaker_info: 是否包含说话人信息。
+            enable_itn: 是否开启文本规范化（ITN）。
+            enable_channel_split: 是否开启通道分离。
+            show_speech_rate: 是否返回语速。
+            show_volume: 是否返回音量。
+            enable_lid: 是否开启语种识别。
+            enable_emotion_detection: 是否开启情绪检测。
+            enable_gender_detection: 是否开启性别检测。
+            enable_poi_fc: 是否开启 POI 领域推荐词。
+            enable_music_fc: 是否开启音乐领域推荐词。
+            **kwargs: 额外请求参数，包括：
+                 `model_name`：默认从环境变量 `LAS_AUDIO_ASR_MODEL_NAME` 读取，缺省为 "bigmodel"），
+                `show_utterances`：输出语音停顿、分句、分词信息。
+                `vad_segment`：打开双声道识别时，通常需要使用vad分句，可同时打开此参数，默认False。
+                `end_window_size`：强制判停时间范围300 - 5000ms，建议设置800ms或者1000ms，比较敏感的场景可以配置500ms或者更小。
+                `corpus`: 领域推荐词，默认 None。·
+
+        Returns:
+            None
+
+        Raises:
+            ValueError: 当 `api_key` 或 `endpoint` 缺失且无法从环境变量获取时抛出。
+
         """
         super().__init__(**kwargs)
+        self.logger = logging.getLogger(f"LasAsrSubmitter-{id(self)}")
 
+        api_key = api_key or os.getenv("LAS_API_KEY")
         if not api_key:
-            raise ValueError(f"api_key: {api_key} is invalid.")
+            raise ValueError("api_key is missing: provided via parameter or set LAS_API_KEY environment variable")
 
-        # TODO set a default online endpoint
-        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT", "")
+        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT")
         if endpoint is None or not endpoint.startswith("http"):
             raise ValueError(f"endpoint: {endpoint} is invalid.")
 
@@ -90,24 +115,46 @@ class LasAsrSubmitter(Operator):
             retry_config=DEFAULT_RETRY_POLICY.with_max_retries(max_retries),
         )
 
+        # construct static template for submit request
         self.static_template: dict[str, Any] = {
             "operator_id": operator_id,
             "operator_version": operator_version,
-            "idempotent_id": enable_idempotent,
-            "data": {
-                "enable_itn": enable_itn,
-                "enable_punc": enable_punc,
-                "enable_ddc": enable_ddc,
-                "enable_speaker_info": enable_speaker_info,
-                "enable_channel_split": enable_channel_split,
-                "show_speech_rate": show_speech_rate,
-                "show_volume": show_volume,
-                "enable_lid": enable_lid,
-            },
         }
 
+        if uid is None:
+            self.user_info = None
+        else:
+            self.user_info = {
+                "user": {"uid": uid},
+            }
+
+        # construct request options
+        self.request_options: dict[str, Any] = {
+            "model_name": kwargs.pop("model_name", os.getenv("LAS_AUDIO_ASR_MODEL_NAME", "bigmodel")),
+            "model_version": model_version,
+            "enable_itn": enable_itn,
+            "enable_punc": enable_punc,
+            "enable_ddc": enable_ddc,
+            "enable_speaker_info": enable_speaker_info,
+            "enable_channel_split": enable_channel_split,
+            "show_utterances": kwargs.pop("show_utterances", None),
+            "show_speech_rate": show_speech_rate,
+            "show_volume": show_volume,
+            "enable_lid": enable_lid,
+            "enable_emotion_detection": enable_emotion_detection,
+            "enable_gender_detection": enable_gender_detection,
+            "vad_segment": kwargs.pop("vad_segment", None),
+            "end_window_size": kwargs.pop("end_window_size", None),
+            "sensitive_words_filter": kwargs.pop(
+                "sensitive_words_filter", os.getenv("LAS_AUDIO_ASR_SENSITIVE_WORDS_FILTER")
+            ),
+            "enable_poi_fc": enable_poi_fc,
+            "enable_music_fc": enable_music_fc,
+            "corpus": kwargs.pop("corpus", None),
+        }
+        self.request_options = {k: v for k, v in self.request_options.items() if v is not None}
+
         self.semaphore = asyncio.Semaphore(num_coroutines)
-        self.logger = logging.getLogger(f"LasAsrSubmitter-{id(self)}")
         self.stats = AsyncOperatorStats(self.logger)
         self.event_loop = EventLooper()
 
@@ -117,20 +164,24 @@ class LasAsrSubmitter(Operator):
     def __return_column_type__() -> pa.DataType:
         return pa.string()
 
-    def transform(self, audio_urls: pa.Array) -> pa.Array:
-        results = self.event_loop.run(self.run(audio_urls.to_pylist()))
+    def transform(self, audio_urls: pa.Array, audio_metas: pa.Array | None = None) -> pa.Array:
+        results = self.event_loop.run(
+            self.run(audio_urls.to_pylist(), audio_metas.to_pylist() if audio_metas else [None] * len(audio_urls))
+        )
         return pa.array(results, type=self.__return_column_type__())
 
-    async def run(self, audio_urls: list[str]) -> list[str]:
+    async def run(self, audio_urls: list[str], audio_metas: list[dict[str, Any] | None]) -> list[str]:
         await self.stats.log_accept(len(audio_urls))
 
-        async def _submit(url: str) -> str:
+        async def _submit(url: str, audio_meta: dict[str, Any] | None = None) -> str:
             async with self.semaphore:
-                return await self.submit(url)
+                return await self.submit(url, audio_meta)
 
         # log the process before current batch
         await self.stats.log_process()
-        result = await asyncio.gather(*[_submit(url) for url in audio_urls])
+        result = await asyncio.gather(
+            *[_submit(url, dict(meta) if meta else None) for url, meta in zip(audio_urls, audio_metas)]
+        )
         # log the process after current batch
         await self.stats.log_process()
 
@@ -150,7 +201,7 @@ class LasAsrSubmitter(Operator):
 
         return False
 
-    async def submit(self, url: str) -> str:
+    async def submit(self, url: str, audio_meta: dict[str, Any] | None = None) -> str:
         await self.stats.log_submit()
 
         if not url:
@@ -164,19 +215,63 @@ class LasAsrSubmitter(Operator):
             return ""
 
         try:
+            from urllib.parse import urlparse
+
+            filename = os.path.basename(urlparse(url).path)
+            ext = filename.split(".")[-1].lower() if (filename and "." in filename) else ""
+            guessed_format = ext if ext in {"wav", "mp3", "aac", "flac", "ogg"} else None
+            audio_payload = {
+                "url": url,
+            }
+
+            if audio_meta:
+                self.logger.debug("Submitting LAS ASR audio %s with meta %s", url, audio_meta)
+                audio_optional = {
+                    "language": audio_meta.get("language"),
+                    "codec": audio_meta.get("codec"),
+                    "rate": audio_meta.get("rate"),
+                    "bits": audio_meta.get("bits"),
+                    "channel": audio_meta.get("channel"),
+                    "format": audio_meta.get("format"),
+                }
+                audio_payload.update({k: v for k, v in audio_optional.items() if v is not None})
+            if not audio_payload.get("format") and guessed_format:
+                audio_payload["format"] = guessed_format
+
+            request_payload = dict(self.request_options)
+            # append corpus
+            if audio_meta:
+                corpus = audio_meta.get("corpus")
+                if corpus:
+                    request_payload["corpus"] = corpus
+
+            data_payload = {
+                "audio": audio_payload,
+                "request": request_payload,
+            }
+            if self.user_info:
+                data_payload["user"] = self.user_info
+
+            payload = {
+                **self.static_template,
+                "data": data_payload,
+            }
+            self.logger.debug("Submitting LAS ASR request for audio: %s, payload: %s", url, payload)
             resp = await self.client.request(
                 method="POST",
                 path="submit",
-                json={**self.static_template, "data": {**self.static_template["data"], "audio_url": url}},
+                json=payload,
                 retry_condition=self._retry_condition,
             )
 
             attempt_num = resp.headers.get("attempt_num", 0)
             meta = resp.json().get("metadata", {})
+            self.logger.debug("The metadata of response for audio: %s is %s", url, meta)
+
             if resp.status_code != 200 or meta.get("business_code") != "0":
                 await self.stats.log_failed()
                 self.logger.warning(
-                    "Failed to sumit url: %s, http status: %s, attempt: %s, detail: %s",
+                    "Failed to submit url: %s, http status: %s, attempt: %s, detail: %s",
                     url,
                     resp.status_code,
                     attempt_num,
@@ -195,11 +290,11 @@ class LasAsrSubmitter(Operator):
 class LasAsrPoller(Operator):
     def __init__(
         self,
-        api_key: str,
+        api_key: str | None = None,
         endpoint: str | None = None,
         version: str = "v1",
         operator_id: str = "las_asr",
-        operator_version: str = "v1",
+        operator_version: str = "v2",
         num_coroutines: int = 20,
         max_retries: int = 5,
         max_polling_seconds: int = 7200,
@@ -208,32 +303,42 @@ class LasAsrPoller(Operator):
         waiting_exp_base: float = 2,
         waiting_jitter: float = 1,
         waiting_max_seconds: float = 30,
+        enable_speaker_info: bool = False,
+        enable_channel_split: bool = False,
         **kwargs: Any,
     ):
-        """创建一个LasAsrPoller实例，并发地轮询多个ASR任务的结果.
+        """创建一个 LasAsrPoller 实例，并发轮询任务状态与结果（Poll）.
+
+        - 异步流程：携带 `task_id` 调用（POST /api/v1/poll）直至 `COMPLETED`/`FAILED`/`TIMEOUT`
+        - 输出结构保持向后兼容：`{"asr_result_raw": str(JSON), "asr_result_text": text, "failed_reason": msg}`
 
         Args:
-            api_key: LAS服务 API Key。
-            endpoint: LAS服务 API Endpoint。
-            version: LAS服务 API Version，默认值: "v1"。
-            operator_id: LAS ASR服务ID，默认值: "las_asr"。
-            operator_version: LAS ASR服务版本，默认值: "v1"。
-            num_coroutines: 轮询task状态的最大并发数，默认值: 20。
-            max_retries: 单次轮询API请求的最大重试次数，默认值: 5。
-            max_polling_seconds: 单个个task最大轮询时长，单位：秒，默认值: 7200。
-            max_polling_num: 单个task最大轮询次数，默认值: 240。
-            waiting_initial: 轮询初始等待时间，默认值: 1。
-            waiting_exp_base: 轮询指数退避等待时间的底数，默认值: 2。
-            waiting_jitter: 轮询随机退避等待时间的范围，默认值: 1。
-            waiting_max_seconds: 单次最大等待时长，单位：秒，默认值: 30。
+            api_key: LAS 服务 API Key。若为空，将从环境变量 `LAS_API_KEY` 读取。
+            endpoint: LAS 服务 API Endpoint。若为空，将读取环境变量 `LAS_SERVICE_ENDPOINT`。
+            version: API 版本，默认 "v1"。
+            operator_id: 算子 ID，默认 "las_asr"。
+            operator_version: 算子版本，默认 "v2"。
+            num_coroutines: 并发轮询的最大数量，默认 20。
+            max_retries: 单次轮询请求最大重试次数，默认 5。
+            max_polling_seconds: 最大等待时长（秒）。若未设置，从环境变量 `LAS_MAX_WAIT_SECONDS` 读取，默认 7200。
+            max_polling_num: 最大轮询次数，默认 240。
+            waiting_initial: 轮询间隔（秒）。若未设置，从环境变量 `LAS_POLL_INTERVAL_SECONDS` 读取，默认 1。
+            waiting_exp_base: 指数退避底数，默认 2。
+            waiting_jitter: 退避抖动范围，默认 1。
+            waiting_max_seconds: 单次最大等待上限（秒），默认 30。
+
+        Raises:
+            ValueError: 当 `api_key` 或 `endpoint` 缺失且无法从环境变量获取时抛出。
+
         """
         super().__init__(**kwargs)
+        self.logger = logging.getLogger(f"LasAsrPoller-{id(self)}")
 
+        api_key = api_key or os.getenv("LAS_API_KEY")
         if not api_key:
-            raise ValueError(f"api_key: {api_key} is invalid.")
+            raise ValueError("api_key is missing: provided via parameter or set LAS_API_KEY environment variable")
 
-        # TODO set a default online endpoint
-        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT", "")
+        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT")
         if endpoint is None or not endpoint.startswith("http"):
             raise ValueError(f"endpoint: {endpoint} is invalid.")
 
@@ -249,15 +354,20 @@ class LasAsrPoller(Operator):
         }
 
         self.semaphore = asyncio.Semaphore(num_coroutines)
-        self.logger = logging.getLogger(f"LasAsrPoller-{id(self)}")
         self.stats = AsyncOperatorStats(self.logger)
         self.max_polling_seconds = max_polling_seconds
         self.max_polling_num = max_polling_num
         self.polling_stats: dict[str, Any] = {}
-        self.waiting_initial = waiting_initial
+        self.waiting_initial = (
+            waiting_initial if waiting_initial is not None else float(os.getenv("LAS_POLL_INTERVAL_SECONDS", 2.0))
+        )
         self.waiting_exp_base = waiting_exp_base
         self.waiting_jitter = waiting_jitter
         self.waiting_max_seconds = waiting_max_seconds
+
+        self.enable_speaker_info = enable_speaker_info
+        self.enable_channel_split = enable_channel_split
+
         self.default_result = {"asr_result_raw": "", "asr_result_text": ""}
         self.event_loop = EventLooper()
 
@@ -267,6 +377,7 @@ class LasAsrPoller(Operator):
             [
                 pa.field("asr_result_raw", pa.string()),
                 pa.field("asr_result_text", pa.string()),
+                pa.field("asr_result_simple", pa.string()),
                 pa.field("failed_reason", pa.string()),
             ]
         )
@@ -342,6 +453,7 @@ class LasAsrPoller(Operator):
                     return {**self.default_result, "failed_reason": str(resp.status_code)}
 
                 result = resp.json()
+                self.logger.debug("Polling response for audio: %s, task: %s: %s", audio, task_id, result)
                 meta = resp.json().get("metadata", {})
                 if meta.get("business_code") != "0":
                     await self.stats.log_failed()
@@ -364,17 +476,26 @@ class LasAsrPoller(Operator):
                 if task_status == "COMPLETED":
                     await self.stats.log_succeed()
                     clean_polling_stats()
+                    result_data = data.get("result", {})
+                    utts = result_data.get("utterances", [])
+                    formatted_result = self.format_asr_text(utts)
+
+                    try:
+                        raw_str = json.dumps(result_data, ensure_ascii=False)
+                    except Exception:
+                        raw_str = str(result_data)
                     return {
-                        "asr_result_raw": data["asr_result_raw"],
-                        "asr_result_text": data["asr_result_text"],
+                        "asr_result_raw": raw_str,
+                        "asr_result_simple": formatted_result,
+                        "asr_result_text": result_data.get("text", ""),
                         "failed_reason": "",
                     }
-                elif task_status == "FAILED":
+                elif task_status in ["FAILED", "TIMEOUT"]:
                     await self.stats.log_failed()
                     clean_polling_stats()
                     metadata = result.get("metadata", {})
                     self.logger.warning("The task %s of audio %s is failed, detail: %s", task_id, audio, metadata)
-                    return {**self.default_result, "failed_reason": metadata.get("business_code", "FAILED_TASK_STATUS")}
+                    return {**self.default_result, "failed_reason": metadata.get("business_code", task_status)}
                 elif task_status in ["ACCEPTED", "PENDING", "RUNNING"]:
                     waiting = self.wait_exponential_jitter(attempts + 1)
                     self.logger.debug(
@@ -431,3 +552,31 @@ class LasAsrPoller(Operator):
             result = self.waiting_max_seconds
 
         return max(0, min(result, self.waiting_max_seconds))
+
+    def ms_to_hms(self, ms: int) -> str:
+        """将毫秒转换为 hh:mm:ss 格式."""
+        ms //= 1000
+        h, ms = divmod(ms, 3600)
+        m, s = divmod(ms, 60)
+        return f"{h}:{m:02d}:{s:02d}"
+
+    def format_asr_text(self, utts: list[Any]) -> str:
+        lines = []
+
+        if self.enable_speaker_info:
+            for u in utts:
+                lines.append(
+                    f"说话人 {u['additions']['speaker']} "
+                    f"{self.ms_to_hms(u['start_time'])} {self.ms_to_hms(u['end_time'])}\n{u['text']}\n"
+                )
+        elif self.enable_channel_split:
+            for u in utts:
+                lines.append(
+                    f"通道 {u['additions']['channel_id']} "
+                    f"{self.ms_to_hms(u['start_time'])} {self.ms_to_hms(u['end_time'])}\n{u['text']}\n"
+                )
+        else:
+            for u in utts:
+                lines.append(f"{self.ms_to_hms(u['start_time'])} {self.ms_to_hms(u['end_time'])} {u['text']}")
+
+        return "\n".join(lines).strip()

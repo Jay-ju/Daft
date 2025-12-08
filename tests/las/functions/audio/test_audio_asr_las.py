@@ -44,6 +44,7 @@ def test_audio_asr_las(http_test_data_dir):
             construct_args={
                 "api_key": api_key,
                 "endpoint": endpoint,
+                "enable_speaker_info": True,
                 "max_retries": 10,
             },
             num_cpus=1,
@@ -59,6 +60,7 @@ def test_audio_asr_las(http_test_data_dir):
             construct_args={
                 "api_key": api_key,
                 "endpoint": endpoint,
+                "enable_speaker_info": True,
             },
             num_cpus=1,
             concurrency=1,
@@ -70,6 +72,7 @@ def test_audio_asr_las(http_test_data_dir):
         {
             "asr_result_raw": col("asr_result").struct.get("asr_result_raw"),
             "asr_result_text": col("asr_result").struct.get("asr_result_text"),
+            "asr_result_simple": col("asr_result").struct.get("asr_result_simple"),
             "failed_reason": col("asr_result").struct.get("failed_reason"),
         }
     ).exclude("asr_result", "asr_result_raw")
@@ -77,7 +80,8 @@ def test_audio_asr_las(http_test_data_dir):
     expected_df = pd.DataFrame(
         {
             "audio_path": paths,
-            "asr_result_text": ["", "全剧大部分都是在中国取景拍摄地点位于浙江省温州市", ""],
+            "asr_result_text": ["", "全剧大部分都是在中国取景拍摄，地点位于浙江省温州市。", ""],
+            "asr_result_simple": ["", "说话人 1 0:00:00 0:00:07 全剧大部分都是在中国取景拍摄，地点位于浙江省温州市。", ""],
             "failed_reason": [
                 "[Invalid audio URI] OperatorWrapper Process failed: internal error,audio download failed",
                 "",
@@ -89,6 +93,6 @@ def test_audio_asr_las(http_test_data_dir):
     assert_dataframe_result(
         actual_df=df.to_pandas(),
         expect_df=expected_df,
-        expect_columns=["audio_path", "asr_result_text", "failed_reason"],
+        expect_columns=["audio_path", "asr_result_text", "asr_result_simple", "failed_reason"],
         expect_row_num=3,
     )

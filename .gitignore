@@ -4,6 +4,8 @@
 # vscode
 .vscode/
 
+.trae/
+
 .coverage
 .env
 venv
