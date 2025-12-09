@@ -27,11 +27,14 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
     - 深度思考机制：模型在回答问题前自动进行问题拆解和逻辑推理，生成思维链（reasoning_content）
     - 多模态场景支持：支持图片/视频理解任务，自动构建符合多模态模型规范的message结构
     - 输入简化机制：配置图片/视频的base64编码、URL等输入格式，便可以实现视觉理解功能
+    - 多种数据源支持：支持本地文件路径、HTTP/HTTPS URL、TOS/S3对象存储等多种数据源
+    - 灵活的输入组合：支持单独使用文本、图片、视频，或任意组合使用
 
     **输入输出规范：**
     - 输入格式：
-        - 图片/视频数据/文本数据：string类型，支持base64编码/url地址
-        - （可选）用户提示词：string类型，当需要为每条数据指定不同提示词时传入，未传入时使用类初始化参数中的prompt
+        - 图片：string类型/列表类型，支持base64编码、binary数据格式、HTTP/HTTPS URL、TOS地址
+        - 视频：string类型/列表类型，支持base64编码、binary数据格式、HTTP/HTTPS URL、TOS地址
+        - 文本：string类型/列表类型，用户输入的文本
     - 输出格式：
         - 默认模式：struct类型包含 llm_result（生成结果）、reasoning_content（思维链内容）和 finish_reason（模型结果结束原因）
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，额外返回 finish_reason 字段：
@@ -51,7 +54,6 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
         model: str,
         version: str | None = None,
         thinking_type: str | None = None,
-        multimodal_type: str = "image",
         **kwargs: Any,
     ) -> None:
         """提供基于火山方舟平台的大模型服务，使用具备深度思考能力的模型进行图片、视频或文本进行分析理解，并返回文本输出.
@@ -73,15 +75,8 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
                 图文混排场景下，输入系统图片 URL，用于指导模型的行为
             system_video_url: 系统视频 URL
                 图文混排场景下，输入系统视频 URL，用于指导模型的行为
-            prompt: 用户提示词，
-                用户提示词，用于指导模型的行为。配置该字段时，会和输入的文本拼接，以user角色方式输入给模型。同时，该字段也可以配置为{query}，此时，输入的文本会替换掉该字段.
-            multimodal_type: 媒体内容类型
-                指定处理的是图像还是视频，默认是 image。可选值:
-                - image: 图片
-                - video: 视频
-                - text: 文本
             image_format: 图片编码格式
-                仅在 multimodal_type=image时生效，默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
+                默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
             image_url_detail: 图片质量
                 支持手动设置图片的质量，取值范围high、low、auto。
                 - high：高细节模式，适用于需要理解图像细节信息的场景，如对图像的多个局部信息/特征提取、复杂/丰富细节的图像理解等场景，理解更全面。
@@ -151,20 +146,39 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
             model=model,
             version=version,
             llm_config=llm_config,
-            multimodal_type=multimodal_type,
             **kwargs,
         )
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=model)
 
-    def transform(self, media_datas: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
+    def transform(
+        self,
+        images: pa.Array | str | None = None,
+        videos: pa.Array | str | None = None,
+        texts: pa.Array | str | None = None,
+    ) -> pa.Array:
         """批量使用大模型进行视频理解.
 
-        该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
+        该方法使用火山方舟平台上的大模型对输入的图像、视频和文本数据进行批量推理，生成对应的模型输出结果。
+        支持单独或组合使用图像、视频和文本输入，能够处理多种数据源格式（URL、Base64、二进制）。
 
         Args:
-            media_datas: 传入待处理的图片或视频数据。支持传入图片或视频的base64编码或url
-            user_prompts: 传入用户提示词。当传入图片或视频数据时，若图片或视频数据使用的提示词不同时，可以通过该字段指定。若相同，则可以通过prompt参数指定。
+            images: 传入待处理的图片数据。支持传入图片的base64编码或url。支持传入单张图片，也支持以list方式传入多张图片。
+                （但是不允许输入的图片中既包括单张图片的字符串类型，也包含list类型。）
+                根据source_type参数的不同，图片数据会被相应处理：
+                - url模式：支持http/https/tos/s3等协议的URL，其中tos/s3会生成预签名URL
+                - base64模式：直接使用Base64编码数据
+                - binary模式：将二进制数据转换为Base64编码
+
+            videos: 传入待处理的视频数据。支持传入视频的base64编码或url。支持传入单条视频，也支持以list方式传入多条视频。
+                （但是不允许输入的视频中既包括单条视频的字符串类型，也包含list类型。）
+                根据source_type参数的不同，视频数据会被相应处理：
+                - url模式：支持http/https/tos/s3等协议的URL，其中tos/s3会生成预签名URL
+                - base64模式：直接使用Base64编码数据
+                - binary模式：将二进制数据转换为Base64编码
+
+            texts: 传入用户提示词。可以传入单条提示词，也可以以list方式传入多条提示词。
+                （但是不允许输入的提示词中既包括单条提示词的字符串类型，也包含list类型。）
 
         Returns:
                 当环境变量LAS_LLM_FINISH_REASON_CHECK=true时，返回字段类型为struct，包含以下字段：
@@ -175,7 +189,7 @@ class ArkLLMThinkingVision(ArkLLMVisionUnderstanding):
                     - llm_result: 模型输出结果
                     - reasoning_content: 模型输出思考内容
         """
-        return super().transform(media_datas, user_prompts)
+        return super().transform(images, videos, texts)
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:

@@ -19,11 +19,10 @@ if __name__ == "__main__":
             ArkLLMThinkingVision,
             construct_args={
                 "model": "doubao-seed-1.6-flash",
-                "multimodal_type": "video",
-                "prompt": "视频里有什么？",
+                "system_text": "你是一个专业的视频理解助手，能够分析视频中的内容并提供详细的描述。",
                 "inference_type": "online",
             },
-        )(col("videos")),
+        )(videos=col("videos")),
     )
 
     df = df.with_column("reasoning_content", col("llm_result").struct.get("reasoning_content"))

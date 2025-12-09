@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from daft.las.functions.ark_llm.ark_llm_generate import ArkLLMGenerate
 from daft.las.functions.ark_llm.llm_generate_utils import gen_media_data
@@ -16,7 +16,8 @@ from daft.las.infra.las_ark import (
 
 logger = logging.getLogger(__name__)
 
-from daft.dependencies import pa
+if TYPE_CHECKING:
+    from daft.dependencies import pa
 
 
 class ArkLLMVisionUnderstanding(ArkLLMGenerate):
@@ -25,11 +26,14 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
     **核心功能：**
     - 多模态场景支持：支持图片/视频理解任务，自动构建符合多模态模型规范的message结构
     - 输入简化机制：配置图片/视频的base64编码、URL等输入格式，便可以实现视觉理解功能
+    - 多种数据源支持：支持本地文件路径、HTTP/HTTPS URL、TOS/S3对象存储等多种数据源
+    - 灵活的输入组合：支持单独使用文本、图片、视频，或任意组合使用
 
     **输入输出规范：**
     - 输入格式：
-        - 图片/视频数据：string类型，支持base64编码/url地址
-        - （可选配置）用户提示词：string类型，当用户需要为每条数据指定不同提示词时，传入用户提示词。若不传入，则使用prompt字段配置的统一提示词）
+        - 图片：string类型/列表类型，支持base64编码、binary数据格式、HTTP/HTTPS URL、TOS地址
+        - 视频：string类型/列表类型，支持base64编码、binary数据格式、HTTP/HTTPS URL、TOS地址
+        - 文本：string类型/列表类型，用户输入的文本
     - 输出格式：
         - 默认模式：str类型生成结果
         - 诊断模式：设置环境变量 LAS_LLM_FINISH_REASON_CHECK=true，返回完整的生成结果和模型结果结束原因：
@@ -45,8 +49,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         system_text: str | None = None,
         system_image_url: str | None = None,
         system_video_url: str | None = None,
-        prompt: str | None = None,
-        multimodal_type: str = "image",
         image_format: str = "jpeg",
         image_url_detail: str | None = None,
         video_format: str = "mp4",
@@ -82,15 +84,8 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 图文混排场景下，输入系统图片 URL，用于指导模型的行为
             system_video_url: 系统视频 URL
                 图文混排场景下，输入系统视频 URL，用于指导模型的行为
-            prompt: 用户提示词，
-                用户提示词，用于指导模型的行为。配置该字段时，会和输入的文本拼接，以user角色方式输入给模型。同时，该字段也可以配置为{query}，此时，输入的文本会替换掉该字段.
-            multimodal_type: 媒体内容类型
-                指定处理的是图像还是视频，默认是 image。可选值:
-                - image: 图片
-                - video: 视频
-                - text: 文本
             image_format: 图片编码格式
-                仅在 multimodal_type=image 时生效，默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
+                默认 jpeg。支持格式: JPEG, PNG, WEBP,GIF, BMP, TIFF等常见格式。详细格式请参考 https://www.volcengine.com/docs/82379/1362931#%E5%9B%BE%E7%89%87%E6%A0%BC%E5%BC%8F%E8%AF%B4%E6%98%8E
             image_url_detail: 图片质量
                 支持手动设置图片的质量，取值范围high、low、auto。
                 - high：高细节模式，适用于需要理解图像细节信息的场景，如对图像的多个局部信息/特征提取、复杂/丰富细节的图像理解等场景，理解更全面。
@@ -168,29 +163,56 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         self.system_text = system_text
         self.system_image_url = system_image_url
         self.system_video_url = system_video_url
-        self.prompt = prompt
         self.image_url_detail = image_url_detail
         self.video_fps = video_fps
 
         self.source_type = source_type.lower() if source_type else "url"
         assert self.source_type in ["binary", "base64", "url"], "source_type must be binary, base64 or url"
 
-        self.multimodal_type = multimodal_type.lower() if multimodal_type else "image"
-        assert self.multimodal_type in ["image", "video", "text"], "multimodal_type must be image, video, text"
-
         self.image_format = image_format.lower() if image_format else "jpeg"
         self.video_format = video_format.lower() if video_format else "mp4"
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=model)
 
-    def transform(self, media_datas: pa.Array, user_prompts: pa.Array | None = None) -> pa.Array:
+    def _flatten_if_list(self, item: Any) -> list[Any]:
+        """Flatten nested lists or return the item as a single-item list."""
+        if item is None:
+            return []
+        if isinstance(item, list):
+            result = []
+            for sub_item in item:
+                result.extend(self._flatten_if_list(sub_item))
+            return result
+        return [item]
+
+    def transform(
+        self,
+        images: pa.Array | str | None = None,
+        videos: pa.Array | str | None = None,
+        texts: pa.Array | str | None = None,
+    ) -> pa.Array:
         """批量使用大模型进行视频理解.
 
-        该方法使用预加载的大模型对输入的文本数组进行批量推理，生成对应的模型输出结果。
+        该方法使用火山方舟平台上的大模型对输入的图像、视频和文本数据进行批量推理，生成对应的模型输出结果。
+        支持单独或组合使用图像、视频和文本输入，能够处理多种数据源格式（URL、Base64、二进制）。
 
         Args:
-            media_datas: 传入待处理的图片或视频数据。支持传入图片或视频的base64编码或url
-            user_prompts: 传入用户提示词。当传入图片或视频数据时，若图片或视频数据使用的提示词不同时，可以通过该字段指定。若相同，则可以通过prompt参数指定。
+            images: 传入待处理的图片数据。支持传入图片的base64编码或url。支持传入单张图片，也支持以list方式传入多张图片。
+                （但是不允许输入的图片中既包括单张图片的字符串类型，也包含list类型。）
+                根据source_type参数的不同，图片数据会被相应处理：
+                - url模式：支持http/https/tos/s3等协议的URL，其中tos/s3会生成预签名URL
+                - base64模式：直接使用Base64编码数据
+                - binary模式：将二进制数据转换为Base64编码
+
+            videos: 传入待处理的视频数据。支持传入视频的base64编码或url。支持传入单条视频，也支持以list方式传入多条视频。
+                （但是不允许输入的视频中既包括单条视频的字符串类型，也包含list类型。）
+                根据source_type参数的不同，视频数据会被相应处理：
+                - url模式：支持http/https/tos/s3等协议的URL，其中tos/s3会生成预签名URL
+                - base64模式：直接使用Base64编码数据
+                - binary模式：将二进制数据转换为Base64编码
+
+            texts: 传入用户提示词。可以传入单条提示词，也可以以list方式传入多条提示词。
+                （但是不允许输入的提示词中既包括单条提示词的字符串类型，也包含list类型。）
 
         Returns:
             （默认情况下）当环境变量LAS_LLM_FINISH_REASON_CHECK=false时，返回字段类型为str。
@@ -198,48 +220,88 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
                 - llm_result: 模型输出结果
                 - finish_reason: 模型输出结束原因
         """
-        message_generator = {
-            "image": self._build_image_message,
-            "video": self._build_video_message,
-            "text": self._build_text_message,
-        }[self.multimodal_type]
+        assert (
+            images is not None or videos is not None or texts is not None
+        ), "At least one of images, videos or texts must be provided."
 
-        media_list = media_datas.to_pylist()
-        text_list = user_prompts.to_pylist() if user_prompts else [None] * len(media_datas)
+        def normalize_input(input_data: pa.Array | None) -> tuple[list[Any] | None, int]:
+            if input_data is None:
+                return None, 0
 
-        model_messages: list[list[dict[str, Any]]] = [
-            self._safe_generate_message(message_generator, media, text) for media, text in zip(media_list, text_list)
-        ]
+            if hasattr(input_data, "to_pylist"):
+                pylist = input_data.to_pylist()
+                return pylist, len(pylist)
+            elif isinstance(input_data, str) or not isinstance(input_data, (list, tuple)):
+                return [input_data], 1
+            else:
+                pylist = list(input_data)
+                return pylist, len(pylist)
 
-        messages_array = pa.array(model_messages)
-        return super().transform(messages_array)
+        # Normalize inputs and get their lengths
+        normalized_images, image_length = normalize_input(images)
+        normalized_videos, video_length = normalize_input(videos)
+        normalized_texts, text_length = normalize_input(texts)
 
-    def _safe_generate_message(
-        self, generator: Callable[[Any, str | None], list[dict[str, Any]]], media: Any, prompt: str | None = None
-    ) -> list[dict[str, Any]]:
-        """Safe generate message."""
-        try:
-            return generator(media, prompt)
-        except Exception:
-            logger.exception("The message generation failed ")
-            return []
+        # Calculate the maximum length among all inputs
+        data_len = max(image_length, video_length, text_length)
 
-    def _build_image_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
-        """Build image message structure."""
-        image_content = self._create_image_content(media_data)
-        return self._assemble_message(image_content=image_content, user_prompt=user_prompt)
+        messages_list = self._prepare_model_messages(normalized_images, normalized_videos, normalized_texts, data_len)
+        return super().process(messages_list)
 
-    def _build_video_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
-        """Build video message structure."""
-        video_content = self._create_video_content(media_data)
-        return self._assemble_message(video_content=video_content, user_prompt=user_prompt)
+    def _prepare_model_messages(
+        self, images: list[Any] | None, videos: list[Any] | None, texts: list[Any] | None, data_len: int = 0
+    ) -> pa.Array:
+        def prepare_list(input_list: list[Any] | None, length: int) -> list[Any]:
+            if input_list is None:
+                return [None] * length
 
-    def _build_text_message(self, media_data: Any, user_prompt: str | None = None) -> list[dict[str, Any]]:
-        if media_data is None:
-            text_content = None
-        else:
-            text_content = {"type": "text", "text": media_data}
-        return self._assemble_message(text_content=text_content, user_prompt=user_prompt)
+            input_len = len(input_list)
+            if input_len == 1 and length > 1:
+                return input_list * length
+            elif input_len < length:
+                return input_list + [None] * (length - input_len)
+            else:
+                return input_list[:length]
+
+        # Prepare lists with consistent length
+        image_list = prepare_list(images, data_len)
+        video_list = prepare_list(videos, data_len)
+        text_list = prepare_list(texts, data_len)
+
+        model_messages: list[list[dict[str, Any]]] = []
+        for i in range(data_len):
+            try:
+                flat_images = self._flatten_if_list(image_list[i])
+                flat_videos = self._flatten_if_list(video_list[i])
+                flat_texts = self._flatten_if_list(text_list[i])
+                user_content = []
+
+                for text in flat_texts:
+                    if text is not None:
+                        user_content.append({"type": "text", "text": text})
+
+                for image in flat_images:
+                    image_content = self._create_image_content(image)
+                    if image_content:
+                        user_content.append(image_content)
+
+                for video in flat_videos:
+                    video_content = self._create_video_content(video)
+                    if video_content:
+                        user_content.append(video_content)
+
+                messages = []
+                if user_content:
+                    messages.append({"role": "user", "content": user_content})
+
+                if system_content := self._build_system_message():
+                    messages.insert(0, {"role": "system", "content": system_content})
+
+                model_messages.append(messages)
+            except Exception as e:
+                logger.error("Error preparing model messages for index %d: %s", i, str(e))
+                model_messages.append([])
+        return model_messages
 
     def _create_image_content(self, media_data: Any) -> dict[str, Any] | None:
         """Create image content structure."""
@@ -262,36 +324,6 @@ class ArkLLMVisionUnderstanding(ArkLLMGenerate):
         if self.video_fps is not None:
             video_info["fps"] = self.video_fps
         return {"type": "video_url", "video_url": video_info}
-
-    def _assemble_message(
-        self,
-        *,
-        text_content: dict[str, Any] | None = None,
-        image_content: dict[str, Any] | None = None,
-        video_content: dict[str, Any] | None = None,
-        user_prompt: str | None = None,
-    ) -> list[dict[str, Any]]:
-        user_content = []
-        if prompt_text := (user_prompt or self.prompt):
-            user_content.append({"type": "text", "text": prompt_text})
-
-        if text_content:
-            user_content.append(text_content)
-
-        if image_content:
-            user_content.append(image_content)
-        if video_content:
-            user_content.append(video_content)
-
-        if user_content:
-            messages = [{"role": "user", "content": user_content}]
-        else:
-            messages = []
-
-        if system_content := self._build_system_message():
-            messages.insert(0, {"role": "system", "content": system_content})
-
-        return messages
 
     def _build_system_message(self) -> list[dict[str, Any]]:
         system_content = []

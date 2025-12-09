@@ -19,11 +19,10 @@ if __name__ == "__main__":
             ArkLLMVisionUnderstanding,
             construct_args={
                 "model": "doubao-1.5-thinking-vision-pro",
-                "multimodal_type": "video",
-                "prompt": "视频里有什么？",
+                "system_text": "你是一个专业的视频理解助手，你需要根据视频内容回答用户的问题。",
                 "inference_type": "online",
             },
-        )(col("videos")),
+        )(videos=col("videos")),
     )
     df.show()
 

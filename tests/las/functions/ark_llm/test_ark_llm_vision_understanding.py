@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import unittest
 from typing import Any
 from unittest.mock import AsyncMock, patch
@@ -34,10 +33,9 @@ def test_doubao_1_5_thinking_vision_pro_video(tos_test_data_dir):
                 "model": "doubao-1.5-thinking-vision-pro",
                 "version": "250428",
                 "inference_type": "online",
-                "multimodal_type": "video",
-                "prompt": "视频里是什么",
+                "system_text": "视频里是什么",
             },
-        )(col("video_path")),
+        )(videos=col("video_path")),
     )
 
     result_df = df.to_pandas()
@@ -46,87 +44,35 @@ def test_doubao_1_5_thinking_vision_pro_video(tos_test_data_dir):
     assert result_df["llm_result"][0]
 
 
-def test_full_message_with_system():
-    """Test full message structure with system content."""
-    vision_generate = ArkLLMVisionUnderstanding(
-        model="test_model",
-        version="test_version",
-        multimodal_type="image",
-        source_type="url",
-        system_text="System instruction",
-    )
-    # test gen message
-    result = vision_generate._build_image_message("http://test.media.url")
+@pytest.mark.ark_llm
+def test_doubao_1_5_thinking_vision_pro_many_sources(tos_test_data_dir, http_test_data_dir):
+    input_dict = {
+        "video_path": [
+            [f"{tos_test_data_dir}/video/sample.mp4", f"{http_test_data_dir}/video/singer.mp4"],
+            [f"{tos_test_data_dir}/video/file_example_MP4_480_1_5MG.mp4"],
+        ],
+        "image_path": [f"{tos_test_data_dir}/image/forest.jpg", None],
+        "text": ["里面图片和视频都是描述什么内容", "里面图片和视频都是关于什么场景的，使用10个字以内回答。"],
+    }
 
-    except_res = [
-        {"role": "system", "content": [{"type": "text", "text": "System instruction"}]},
-        {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.media.url"}}]},
-    ]
-    assert result == except_res
-
-
-def test_gen_message_video_with_user_prompt():
-    """Test video type and user prompt parameter."""
-    vision_generate = ArkLLMVisionUnderstanding(
-        model="test_model",
-        version="test_version",
-        multimodal_type="video",
-        source_type="url",
-        video_fps=2.0,
+    df = daft.from_pydict(input_dict)
+    df = df.with_column(
+        OUTPUT_COLUMN_NAME,
+        las_udf(
+            ArkLLMVisionUnderstanding,
+            construct_args={
+                "model": "doubao-1.5-thinking-vision-pro",
+                "version": "250428",
+                "inference_type": "online",
+                "system_text": "你是一个专业的视频理解模型，你的任务是根据视频内容和图片内容，回答用户的问题。",
+            },
+        )(videos=col("video_path"), images=col("image_path"), texts=col("text")),
     )
 
-    result = vision_generate._build_video_message("http://test.video.url", user_prompt="Analyze this video")
-    except_res = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Analyze this video"},
-                {"type": "video_url", "video_url": {"url": "http://test.video.url", "fps": 2.0}},
-            ],
-        }
-    ]
-
-    assert result == except_res
-
-
-def test_gen_message_image_with_system_content():
-    """Test image type and system content parameter."""
-    vision_generate = ArkLLMVisionUnderstanding(
-        model="test_model",
-        version="test_version",
-        multimodal_type="image",
-        source_type="url",
-        system_text="You are a helpful assistant.",
-        image_url_detail="detail info",
-    )
-
-    result = vision_generate._build_image_message("http://test.image.url")
-
-    except_res = [
-        {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
-        {
-            "role": "user",
-            "content": [{"type": "image_url", "image_url": {"url": "http://test.image.url", "detail": "detail info"}}],
-        },
-    ]
-
-    assert result == except_res
-
-
-def test_gen_message_video_with_tos_url():
-    """Test video type and user prompt parameter."""
-    vision_generate = ArkLLMVisionUnderstanding(
-        model="test_model",
-        version="test_version",
-        multimodal_type="video",
-        source_type="url",
-        video_fps=2.0,
-    )
-
-    os.environ["TOS_PRE_SIGN_URL_EXPIRES"] = "3600"
-    result = vision_generate._build_video_message("tos://test_bucket/object_for_test", user_prompt="Analyze this video")
-    sign_url = result[0]["content"][1]["video_url"]["url"]
-    assert sign_url and sign_url.startswith("https") and "X-Tos-Expires=3600" in sign_url
+    result_df = df.to_pandas()
+    assert "llm_result" in result_df.columns
+    assert len(result_df) == 2
+    assert result_df["llm_result"][0]
 
 
 @pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
@@ -134,133 +80,7 @@ class TestArkLLMImageUnderstandingBuildVideoMessage(unittest.TestCase):
     def setUp(self):
         self.model = "test_model"
         self.version = "test_version"
-        self.ark_llm = ArkLLMVisionUnderstanding(model=self.model, version=self.version, multimodal_type="video")
-
-    @patch.object(ArkLLMVisionUnderstanding, "_create_video_content")
-    @patch.object(ArkLLMVisionUnderstanding, "_assemble_message")
-    def test_build_video_message_with_user_prompt(self, mock_assemble, mock_create):
-        """Test video type and user prompt parameter."""
-        mock_create.return_value = {"video": "test_video_data"}
-        mock_assemble.return_value = {"role": "user", "content": "test_content"}
-
-        media_data = "test_media_data"
-        user_prompt = "test_prompt"
-
-        # Build message
-        result = self.ark_llm._build_video_message(media_data, user_prompt)
-
-        mock_create.assert_called_once_with(media_data)
-        mock_assemble.assert_called_once_with(video_content={"video": "test_video_data"}, user_prompt=user_prompt)
-        self.assertEqual(result, {"role": "user", "content": "test_content"})
-
-    @patch.object(ArkLLMVisionUnderstanding, "_create_video_content")
-    @patch.object(ArkLLMVisionUnderstanding, "_assemble_message")
-    def test_build_video_message_without_user_prompt(self, mock_assemble, mock_create):
-        """Test video type and without user prompt parameter."""
-        mock_create.return_value = {"video": "test_video_data"}
-        mock_assemble.return_value = {"role": "user", "content": "default_content"}
-
-        media_data = "test_media_data"
-
-        result = self.ark_llm._build_video_message(media_data)
-
-        mock_create.assert_called_once_with(media_data)
-        mock_assemble.assert_called_once_with(video_content={"video": "test_video_data"}, user_prompt=None)
-        self.assertEqual(result, {"role": "user", "content": "default_content"})
-
-    @patch.object(ArkLLMVisionUnderstanding, "_create_video_content")
-    def test_build_video_message_with_empty_media_data(self, mock_create):
-        """Test video type and empty media data."""
-        mock_create.side_effect = ValueError("Invalid media data")
-
-        media_data = ""
-
-        with self.assertRaises(ValueError) as context:
-            self.ark_llm._build_video_message(media_data)
-
-        self.assertEqual(str(context.exception), "Invalid media data")
-
-    @patch.object(ArkLLMVisionUnderstanding, "_create_video_content")
-    @patch.object(ArkLLMVisionUnderstanding, "_assemble_message")
-    def test_build_video_message_with_special_characters(self, mock_assemble, mock_create):
-        """Test video type and media data with special characters."""
-        mock_create.return_value = {"video": "special_chars_data"}
-        mock_assemble.return_value = {"role": "user", "content": "special_content"}
-
-        media_data = "data_with_特殊字符"
-        user_prompt = "prompt_with_特殊字符"
-
-        result = self.ark_llm._build_video_message(media_data, user_prompt)
-
-        mock_create.assert_called_once_with(media_data)
-        mock_assemble.assert_called_once_with(video_content={"video": "special_chars_data"}, user_prompt=user_prompt)
-        self.assertEqual(result, {"role": "user", "content": "special_content"})
-
-    def test_full_message_with_system(self):
-        """Test full message structure with system content."""
-        vision_generate = ArkLLMVisionUnderstanding(
-            model="test_model",
-            version="test_version",
-            multimodal_type="image",
-            source_type="url",
-            system_text="System instruction",
-        )
-
-        result = vision_generate._build_image_message("http://test.media.url")
-
-        except_res = [
-            {"role": "system", "content": [{"type": "text", "text": "System instruction"}]},
-            {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.media.url"}}]},
-        ]
-        assert result == except_res
-
-    def test_gen_message_video_with_user_prompt(self):
-        """Test video type and user prompt parameter."""
-        vision_generate = ArkLLMVisionUnderstanding(
-            model="test_model",
-            version="test_version",
-            multimodal_type="video",
-            source_type="url",
-            video_fps=2.0,
-        )
-
-        result = vision_generate._build_video_message("http://test.video.url", user_prompt="Analyze this video")
-        except_res = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Analyze this video"},
-                    {"type": "video_url", "video_url": {"url": "http://test.video.url", "fps": 2.0}},
-                ],
-            }
-        ]
-
-        assert result == except_res
-
-    def test_gen_message_image_with_system_content(self):
-        """Test image type and system content parameter."""
-        vision_generate = ArkLLMVisionUnderstanding(
-            model="test_model",
-            version="test_version",
-            multimodal_type="image",
-            source_type="url",
-            system_text="You are a helpful assistant.",
-            image_url_detail="detail info",
-        )
-
-        result = vision_generate._build_image_message("http://test.image.url")
-
-        except_res = [
-            {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant."}]},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": "http://test.image.url", "detail": "detail info"}}
-                ],
-            },
-        ]
-
-        assert result == except_res
+        self.ark_llm = ArkLLMVisionUnderstanding(model=self.model, version=self.version)
 
 
 class MockArkLLMTextGenerateTransform(ArkLLMVisionUnderstanding):
@@ -301,7 +121,7 @@ def test_process_normal_image_without_prompt():
             "http://test.image.url2",
         ]
     )
-    result = mock_class.transform(requests)
+    result = mock_class.transform(images=requests)
 
     assert result.to_pylist() == ["response1", None, None, None, "response5"]
 
@@ -319,9 +139,7 @@ def test_process_video_with_prompt():
         ]
     )
 
-    mock_class = MockArkLLMTextGenerateTransform(
-        mock_callable=mock_callable, source_type="url", multimodal_type="video"
-    )
+    mock_class = MockArkLLMTextGenerateTransform(mock_callable=mock_callable, source_type="url")
 
     requests = pa.array(
         [
@@ -341,7 +159,7 @@ def test_process_video_with_prompt():
             None,
         ]
     )
-    result = mock_class.transform(requests, prompts)
+    result = mock_class.transform(videos=requests, texts=prompts)
 
     assert result.to_pylist() == [
         {"llm_result": "response1", "finish_reason": "stop"},
@@ -356,12 +174,10 @@ def test_process_video_with_prompt():
 @pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
 def test_binary_input():
     mock_callable = AsyncMock(return_value=[{"choices": [{"message": {"content": "response1"}}]}])
-    mock_class = MockArkLLMTextGenerateTransform(
-        mock_callable=mock_callable, source_type="binary", multimodal_type="image"
-    )
+    mock_class = MockArkLLMTextGenerateTransform(mock_callable=mock_callable, source_type="binary")
     requests = pa.array([b"base64_data"])
 
-    result = mock_class.transform(requests)
+    result = mock_class.transform(images=requests)
     assert result.to_pylist() == ["response1"]
 
 
@@ -369,10 +185,309 @@ def test_binary_input():
 def test_process_no_valid_indices():
     mock_callable = AsyncMock(return_value=[None, None])
 
-    mock_class = MockArkLLMTextGenerateTransform(
-        mock_callable=mock_callable, source_type="url", multimodal_type="video"
-    )
+    mock_class = MockArkLLMTextGenerateTransform(mock_callable=mock_callable, source_type="url")
     requests = pa.array(["", None])
 
-    result = mock_class.transform(requests)
+    result = mock_class.transform(videos=requests)
     assert result.to_pylist() == [None, None]
+
+
+@pytest.mark.skipif(get_tests_daft_runner_name() != "native", reason="requires Native Runner to be in use")
+class TestArkLLMVisionUnderstandingPrepareModelMessages(unittest.TestCase):
+    def setUp(self):
+        self.model = "test_model"
+        self.version = "test_version"
+        self.ark_llm = ArkLLMVisionUnderstanding(model=self.model, version=self.version)
+
+    def test_prepare_model_messages_with_images_only(self):
+        """Test _prepare_model_messages with images only."""
+        images = ["http://test.image1.url", "http://test.image2.url"]
+        videos = None
+        texts = None
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.image1.url"}}]}],
+            [{"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.image2.url"}}]}],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_videos_only(self):
+        """Test _prepare_model_messages with videos only."""
+        images = None
+        videos = ["http://test.video1.url", "http://test.video2.url"]
+        texts = None
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [{"role": "user", "content": [{"type": "video_url", "video_url": {"url": "http://test.video1.url"}}]}],
+            [{"role": "user", "content": [{"type": "video_url", "video_url": {"url": "http://test.video2.url"}}]}],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_texts_only(self):
+        """Test _prepare_model_messages with texts only."""
+        images = None
+        videos = None
+        texts = ["text1", "text2"]
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [{"role": "user", "content": [{"type": "text", "text": "text1"}]}],
+            [{"role": "user", "content": [{"type": "text", "text": "text2"}]}],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_images_and_texts(self):
+        """Test _prepare_model_messages with images and texts."""
+        images = ["http://test.image.url"]
+        videos = None
+        texts = ["Describe this image"]
+        data_len = 1
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe this image"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image.url"}},
+                    ],
+                }
+            ]
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_system_content(self):
+        """Test _prepare_model_messages with system content."""
+        ark_llm_with_system = ArkLLMVisionUnderstanding(
+            model=self.model, version=self.version, system_text="You are a helpful assistant"
+        )
+
+        images = ["http://test.image.url"]
+        videos = None
+        texts = None
+        data_len = 1
+
+        result = ark_llm_with_system._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {"role": "system", "content": [{"type": "text", "text": "You are a helpful assistant"}]},
+                {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "http://test.image.url"}}]},
+            ]
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_none_values(self):
+        """Test _prepare_model_messages with None values in arrays."""
+        images = ["http://test.image.url", None]
+        videos = None
+        texts = ["text1", "text2"]
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "text1"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image.url"}},
+                    ],
+                }
+            ],
+            [{"role": "user", "content": [{"type": "text", "text": "text2"}]}],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_empty_arrays(self):
+        """Test _prepare_model_messages with empty arrays."""
+        images = pa.array([])
+        videos = None
+        texts = None
+        data_len = 0
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = []
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_list_inputs(self):
+        """Test _prepare_model_messages with list inputs that need flattening."""
+        with patch.object(self.ark_llm, "_flatten_if_list", side_effect=lambda x: x if isinstance(x, list) else [x]):
+            images = [["http://test.image1.url", "http://test.image2.url"]]
+            videos = None
+            texts = [["text1", "text2"]]
+            data_len = 1
+
+            result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+            expected = [
+                [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": "text1"},
+                            {"type": "text", "text": "text2"},
+                            {"type": "image_url", "image_url": {"url": "http://test.image1.url"}},
+                            {"type": "image_url", "image_url": {"url": "http://test.image2.url"}},
+                        ],
+                    }
+                ]
+            ]
+
+            self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_multiple_images_and_videos(self):
+        """Test _prepare_model_messages with multiple images and videos in lists."""
+        images = [["http://test.image1.url", "http://test.image2.url"], ["http://test.image3.url"]]
+        videos = [
+            ["http://test.video1.url", "http://test.video2.url"],
+            ["http://test.video3.url", "http://test.video4.url"],
+        ]
+
+        texts = ["Describe these images and videos", "What's in these media files?"]
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Describe these images and videos"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image1.url"}},
+                        {"type": "image_url", "image_url": {"url": "http://test.image2.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video1.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video2.url"}},
+                    ],
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "What's in these media files?"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image3.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video3.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video4.url"}},
+                    ],
+                }
+            ],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_mixed_single_and_list_inputs(self):
+        """Test _prepare_model_messages with mixed single items and lists."""
+        images = [
+            ["http://test.image1.url"],
+            ["http://test.image2.url", "http://test.image3.url"],
+        ]
+
+        videos = [
+            ["http://test.video1.url", "http://test.video2.url"],
+            ["http://test.video3.url"],
+        ]
+
+        texts = ["First prompt", "Second prompt"]
+        data_len = 2
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "First prompt"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image1.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video1.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video2.url"}},
+                    ],
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Second prompt"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image2.url"}},
+                        {"type": "image_url", "image_url": {"url": "http://test.image3.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video3.url"}},
+                    ],
+                }
+            ],
+        ]
+
+        self.assertEqual(result, expected)
+
+    def test_prepare_model_messages_with_complex_multimedia_combinations(self):
+        """Test _prepare_model_messages with complex combinations of multimedia."""
+        images = [
+            ["http://test.image1.url", "http://test.image2.url", "http://test.image3.url"],
+            None,
+            ["http://test.image4.url"],
+        ]
+        videos = [
+            ["http://test.video1.url"],
+            ["http://test.video2.url", "http://test.video3.url"],
+            None,
+        ]
+        texts = ["Single prompt"]
+        data_len = 3
+
+        result = self.ark_llm._prepare_model_messages(images, videos, texts, data_len)
+
+        expected = [
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Single prompt"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image1.url"}},
+                        {"type": "image_url", "image_url": {"url": "http://test.image2.url"}},
+                        {"type": "image_url", "image_url": {"url": "http://test.image3.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video1.url"}},
+                    ],
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Single prompt"},
+                        {"type": "video_url", "video_url": {"url": "http://test.video2.url"}},
+                        {"type": "video_url", "video_url": {"url": "http://test.video3.url"}},
+                    ],
+                }
+            ],
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "Single prompt"},
+                        {"type": "image_url", "image_url": {"url": "http://test.image4.url"}},
+                    ],
+                }
+            ],
+        ]
+
+        self.assertEqual(result, expected)

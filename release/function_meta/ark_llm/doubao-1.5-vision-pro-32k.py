@@ -19,10 +19,10 @@ if __name__ == "__main__":
             ArkLLMVisionUnderstanding,
             construct_args={
                 "model": "doubao-1.5-vision-pro-32k",
-                "prompt": "图片里有什么？",
+                "system_text": "你是一个专业的图片理解助手，能够分析图片中的内容并提供详细的描述。",
                 "inference_type": "online",
             },
-        )(col("images")),
+        )(images=col("images")),
     )
     df.show()
 

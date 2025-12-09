@@ -51,7 +51,7 @@ def test_doubao_thinking_vision(tos_test_data_dir, local_test_data_dir, http_tes
                 "image_format": "png",
                 "inference_type": "online",
             },
-        )(col(INPUT_COLUMN_NAME), col("text")),
+        )(images=col(INPUT_COLUMN_NAME), texts=col("text")),
     )
 
     df = df.with_column("llm_result", col(OUTPUT_COLUMN_NAME).struct.get("llm_result"))
@@ -101,10 +101,10 @@ def test_image_vision_without_text():
             }
         ]
     )
-    embedder = MockArkLLMThinkingVision(mock_callable=mock_callable, multimodal_type="image", source_type="url")
+    vision_transform = MockArkLLMThinkingVision(mock_callable=mock_callable, source_type="url")
 
     media_data = pa.array(["http://test.com/img1.jpg"])
-    output_array = embedder.transform(media_datas=media_data)
+    output_array = vision_transform.transform(images=media_data)
 
     expected = pa.StructArray.from_arrays(
         [

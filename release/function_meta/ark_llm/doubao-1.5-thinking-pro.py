@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import daft
 from daft import col
 from daft.las.functions.ark_llm.ark_llm_thinking_vision import ArkLLMThinkingVision
@@ -9,7 +7,6 @@ from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
     # 需配置环境变量 LAS_API_KEY ： LAS_API_KEY 通过在 LAS 服务页面上创建获取
-    TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
     queries = {
         "query": [
             "帮我规划5月去新疆的10天旅行安排",
@@ -24,10 +21,9 @@ if __name__ == "__main__":
             ArkLLMThinkingVision,
             construct_args={
                 "model": "doubao-1.5-thinking-pro",
-                "multimodal_type": "text",
                 "inference_type": "online",
             },
-        )(col("query")),
+        )(texts=col("query")),
     )
 
     df = df.with_column("reasoning_content", col("llm_result").struct.get("reasoning_content"))
