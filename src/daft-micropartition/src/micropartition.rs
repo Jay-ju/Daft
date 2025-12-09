@@ -622,6 +622,30 @@ impl MicroPartition {
         Ok(tables)
     }
 
+    pub(crate) fn get_pruned_tables(
+        &self,
+        io_stats: IOStatsRef,
+    ) -> crate::Result<Arc<Vec<RecordBatch>>> {
+        let tables = self.tables_or_read(io_stats)?;
+        // Sum rows across all tables
+        let total_rows = tables.iter().map(|t| t.num_rows()).sum::<usize>();
+        if total_rows > 0 {
+            // Keep only non-empty tables
+            let filtered: Vec<RecordBatch> = tables
+                .iter()
+                .filter(|t| t.num_rows() > 0)
+                .cloned()
+                .collect();
+            Ok(Arc::new(filtered))
+        } else if tables.is_empty() {
+            // No tables present: create a empty vector
+            Ok(Arc::new(Vec::new()))
+        } else {
+            // All tables are empty: keep exactly one (the first)
+            Ok(Arc::new(vec![tables[0].clone()]))
+        }
+    }
+
     pub fn concat_or_get(&self, io_stats: IOStatsRef) -> crate::Result<Option<RecordBatch>> {
         let tables = self.tables_or_read(io_stats)?;
         if tables.is_empty() {

@@ -25,7 +25,7 @@ impl MicroPartition {
 
         let expected_schema = infer_schema(exprs, &self.schema)?;
 
-        let tables = self.tables_or_read(io_stats)?;
+        let tables = self.get_pruned_tables(io_stats)?;
 
         let evaluated_tables: Vec<_> = tables
             .iter()
@@ -49,7 +49,7 @@ impl MicroPartition {
 
         let expected_schema = infer_schema(exprs.as_ref(), &self.schema)?;
 
-        let tables = self.tables_or_read(io_stats)?;
+        let tables = self.get_pruned_tables(io_stats)?;
 
         let evaluated_table_futs = tables
             .iter()
@@ -79,7 +79,7 @@ impl MicroPartition {
 
         let expected_schema = infer_schema(exprs, &self.schema)?;
 
-        let tables = self.tables_or_read(io_stats)?;
+        let tables = self.get_pruned_tables(io_stats)?;
 
         let evaluated_table_futs = tables
             .iter()
@@ -103,7 +103,7 @@ impl MicroPartition {
     pub fn explode(&self, exprs: &[BoundExpr]) -> DaftResult<Self> {
         let io_stats = IOStatsContext::new("MicroPartition::explode");
 
-        let tables = self.tables_or_read(io_stats)?;
+        let tables = self.get_pruned_tables(io_stats)?;
         let evaluated_tables = tables
             .iter()
             .map(|t| t.explode(exprs))
