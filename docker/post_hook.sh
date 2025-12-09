@@ -21,3 +21,8 @@ pip cache purge
 # Create and link the cache dir of whisper, the source file might be mounted later
 mkdir -p /root/.cache/whisper && \
     ln -s /opt/las/models/iic/speech_whisper-large_lid_multilingual_pytorch/whisper/large-v3.pt /root/.cache/whisper/large-v3.pt
+
+if [ -e /usr/local/cuda/ ]; then
+    echo 'LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib:$LIBRARY_PATH' >> /etc/environment && \
+    echo 'LD_LIBRARY_PATH=/usr/local/cuda/targets/x86_64-linux/lib:$LD_LIBRARY_PATH' >> /etc/environment;
+fi
