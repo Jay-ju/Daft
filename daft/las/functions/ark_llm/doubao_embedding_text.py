@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
 from daft.dependencies import pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.functions.utils.common_utils import tracking_usage
 from daft.las.infra.las_ark import (
     DEFAULT_MAX_CONCURRENCY,
@@ -75,6 +74,7 @@ class DoubaoEmbeddingText(Operator):
         self.options = {k: v for k, v in options_tmp.items() if v is not None}
 
         self.client = LasArkClient(config=ark_config)
+        self.event_loop = EventLooper()
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib=model)
 
@@ -99,7 +99,7 @@ class DoubaoEmbeddingText(Operator):
     def process(self, messages: list[list[str] | None]) -> pa.Array:
         try:
             requests = [{"input": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
-            results = asyncio.run(self._async_requests(requests))
+            results = self.event_loop.run(self._async_requests(requests))
             return self._update_array_with_results(results)
         except Exception:
             logger.exception("Error in transform.")

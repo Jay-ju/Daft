@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
 from typing import Any
 
 from daft.dependencies import pa
-from daft.las.functions.types import Operator
+from daft.las.functions.types import EventLooper, Operator
 from daft.las.infra.las_ark import (
     DEFAULT_INFERENCE_TYPE,
     DEFAULT_MAX_CONCURRENCY,
@@ -159,6 +158,7 @@ class ArkLLMGenerate(Operator):
         self.options = {k: v for k, v in options_tmp.items() if v is not None}
 
         self.options |= self.llm_config
+        self.event_loop = EventLooper()
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:
@@ -191,30 +191,11 @@ class ArkLLMGenerate(Operator):
         messages = messages.to_pylist()
         return self.process(messages)
 
-    def get_loop(self) -> asyncio.AbstractEventLoop:
-        old_loop = None
-        try:
-            old_loop = asyncio.get_event_loop()
-        except RuntimeError:
-            pass
-
-        if old_loop and old_loop.is_running():
-            raise RuntimeError("There is a running event loop, so cannot create a new or use the existing one")
-
-        if old_loop is None or old_loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        else:
-            loop = old_loop
-
-        return loop
-
     def process(self, messages: list[list[dict[Any, Any]]]) -> pa.Array:
         logger.info("Start to process %s messages...", len(messages))
         try:
             requests = [{"messages": msg, **self.options} if msg and len(msg) > 0 else None for msg in messages]
-            loop = self.get_loop()
-            results = loop.run_until_complete(self._async_requests(requests))
+            results = self.event_loop.run(self._async_requests(requests))
             return self._update_array_with_results(results)
         except Exception:
             logger.exception("Error in transform.")
