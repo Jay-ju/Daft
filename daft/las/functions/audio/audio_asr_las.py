@@ -4,22 +4,20 @@ import asyncio
 import json
 import logging
 import os
-import random
-from datetime import datetime
+from logging import Logger
 from typing import TYPE_CHECKING, Any
-
-from daft.dependencies import pa
-from daft.las.functions import Operator
-from daft.las.functions.types import AsyncOperatorStats, EventLooper
-from daft.las.functions.utils.common_utils import tracking_usage
-from daft.las.infra.http.auth import ApiKeyAuthProvider
-from daft.las.infra.http.client import DEFAULT_RETRY_POLICY, AsyncHttpClient, default_retry_condition
+from urllib.parse import urlparse
 
 if TYPE_CHECKING:
     import httpx
 
+from daft.dependencies import pa
+from daft.las.functions.operator import DEFAULT_LAS_OPERATOR_ENDPOINT, LasOperator, LasPollOperator
+from daft.las.functions.types import AsyncOperatorStats, EventLooper
+from daft.las.functions.utils.common_utils import tracking_usage
 
-class LasAsrSubmitter(Operator):
+
+class LasAsrSubmitter(LasOperator):
     """**语音识别模块 - 基于LAS ASR服务的录音转写解决方案**
 
     **核心功能**
@@ -38,7 +36,7 @@ class LasAsrSubmitter(Operator):
     def __init__(
         self,
         api_key: str | None = None,
-        endpoint: str | None = None,
+        endpoint: str = DEFAULT_LAS_OPERATOR_ENDPOINT,
         version: str = "v1",
         uid: str | None = None,
         operator_id: str = "las_asr",
@@ -98,28 +96,16 @@ class LasAsrSubmitter(Operator):
             ValueError: 当 `api_key` 或 `endpoint` 缺失且无法从环境变量获取时抛出。
 
         """
-        super().__init__(**kwargs)
-        self.logger = logging.getLogger(f"LasAsrSubmitter-{id(self)}")
-
-        api_key = api_key or os.getenv("LAS_API_KEY")
-        if not api_key:
-            raise ValueError("api_key is missing: provided via parameter or set LAS_API_KEY environment variable")
-
-        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT")
-        if endpoint is None or not endpoint.startswith("http"):
-            raise ValueError(f"endpoint: {endpoint} is invalid.")
-
-        self.client = AsyncHttpClient(
-            base_url=f"{endpoint}/api/{version}/",
-            auth_provider=ApiKeyAuthProvider(api_key),
-            retry_config=DEFAULT_RETRY_POLICY.with_max_retries(max_retries),
+        super().__init__(
+            operator_id=operator_id,
+            operator_version=operator_version,
+            api_key=api_key,
+            endpoint=endpoint,
+            version=version,
+            max_retries=max_retries,
+            **kwargs,
         )
-
-        # construct static template for submit request
-        self.static_template: dict[str, Any] = {
-            "operator_id": operator_id,
-            "operator_version": operator_version,
-        }
+        self.logger = logging.getLogger(f"LasAsrSubmitter-{id(self)}")
 
         if uid is None:
             self.user_info = None
@@ -175,7 +161,7 @@ class LasAsrSubmitter(Operator):
 
         async def _submit(url: str, audio_meta: dict[str, Any] | None = None) -> str:
             async with self.semaphore:
-                return await self.submit(url, audio_meta)
+                return await self.submit_req(url, audio_meta)
 
         # log the process before current batch
         await self.stats.log_process()
@@ -187,21 +173,7 @@ class LasAsrSubmitter(Operator):
 
         return result
 
-    @classmethod
-    def _retry_condition(cls, resp: httpx.Response | None, ex: Exception | None) -> bool:
-        if default_retry_condition(resp, ex):
-            return True
-
-        if resp is not None:
-            meta = resp.json().get("metadata", {})
-            # 2002: TIMEOUT_ERROR
-            # 2003: SERVER_BUSY
-            if meta and meta.get("business_code") in ["2002", "2003"]:
-                return True
-
-        return False
-
-    async def submit(self, url: str, audio_meta: dict[str, Any] | None = None) -> str:
+    async def submit_req(self, url: str, audio_meta: dict[str, Any] | None = None) -> str:
         await self.stats.log_submit()
 
         if not url:
@@ -215,83 +187,87 @@ class LasAsrSubmitter(Operator):
             return ""
 
         try:
-            from urllib.parse import urlparse
-
-            filename = os.path.basename(urlparse(url).path)
-            ext = filename.split(".")[-1].lower() if (filename and "." in filename) else ""
-            guessed_format = ext if ext in {"wav", "mp3", "aac", "flac", "ogg"} else None
-            audio_payload = {
-                "url": url,
-            }
-
-            if audio_meta:
-                self.logger.debug("Submitting LAS ASR audio %s with meta %s", url, audio_meta)
-                audio_optional = {
-                    "language": audio_meta.get("language"),
-                    "codec": audio_meta.get("codec"),
-                    "rate": audio_meta.get("rate"),
-                    "bits": audio_meta.get("bits"),
-                    "channel": audio_meta.get("channel"),
-                    "format": audio_meta.get("format"),
-                }
-                audio_payload.update({k: v for k, v in audio_optional.items() if v is not None})
-            if not audio_payload.get("format") and guessed_format:
-                audio_payload["format"] = guessed_format
-
-            request_payload = dict(self.request_options)
-            # append corpus
-            if audio_meta:
-                corpus = audio_meta.get("corpus")
-                if corpus:
-                    request_payload["corpus"] = corpus
-
-            data_payload = {
-                "audio": audio_payload,
-                "request": request_payload,
-            }
-            if self.user_info:
-                data_payload["user"] = self.user_info
-
-            payload = {
-                **self.static_template,
-                "data": data_payload,
-            }
-            self.logger.debug("Submitting LAS ASR request for audio: %s, payload: %s", url, payload)
-            resp = await self.client.request(
-                method="POST",
-                path="submit",
-                json=payload,
-                retry_condition=self._retry_condition,
-            )
-
-            attempt_num = resp.headers.get("attempt_num", 0)
-            meta = resp.json().get("metadata", {})
-            self.logger.debug("The metadata of response for audio: %s is %s", url, meta)
-
-            if resp.status_code != 200 or meta.get("business_code") != "0":
-                await self.stats.log_failed()
-                self.logger.warning(
-                    "Failed to submit url: %s, http status: %s, attempt: %s, detail: %s",
-                    url,
-                    resp.status_code,
-                    attempt_num,
-                    resp.text,
-                )
-                return ""
-
-            await self.stats.log_succeed()
-            return meta.get("task_id", "")
+            payload = await self._generate_payload(audio_meta, url)
+            resp = await self.submit(data=payload)
+            return await self.parse_response(resp, url)
         except Exception:
             await self.stats.log_failed()
             self.logger.exception("Failed to sumit url: %s.", url)
             return ""
 
+    async def parse_response(self, resp: httpx.Response, url: str) -> Any:
+        meta = resp.json().get("metadata", {})
+        self.logger.debug("The metadata of response for audio: %s is %s", url, meta)
 
-class LasAsrPoller(Operator):
+        if resp.status_code != 200:
+            await self.stats.log_failed()
+            attempt_num = resp.headers.get("attempt_num", 0)
+            req_id = meta.get("request_id", "")
+            self.logger.warning(
+                "Failed to submit url: %s, http status: %s, attempt: %s, req_id: %s, detail: %s",
+                url,
+                resp.status_code,
+                attempt_num,
+                req_id,
+                resp.text,
+            )
+            return ""
+
+        await self.stats.log_succeed()
+        return meta.get("task_id", "")
+
+    async def _generate_payload(self, audio_meta: dict[str, Any] | None, url: str) -> dict[str, Any]:
+        request_payload = dict(self.request_options)
+        if audio_meta:
+            corpus = audio_meta.get("corpus")
+            if corpus:
+                request_payload["corpus"] = corpus
+
+        audio_payload = self._generate_audio_payload(audio_meta, url)
+        data_payload = {
+            "audio": audio_payload,
+            "request": request_payload,
+        }
+
+        if self.user_info:
+            data_payload["user"] = self.user_info
+
+        self.logger.debug("Submitting LAS ASR request for audio: %s, data payload: %s", url, data_payload)
+        return data_payload
+
+    def _generate_audio_payload(self, audio_meta: dict[str, Any] | None, url: str) -> dict[str, Any]:
+        self.logger.debug("Submitting LAS ASR audio %s with meta %s", url, audio_meta)
+
+        filename = os.path.basename(urlparse(url).path)
+        ext = filename.split(".")[-1].lower() if (filename and "." in filename) else ""
+        guessed_format = ext if ext in {"wav", "mp3", "aac", "flac", "ogg"} else None
+
+        audio_payload = {
+            "url": url,
+        }
+
+        if audio_meta:
+            audio_optional = {
+                "language": audio_meta.get("language"),
+                "codec": audio_meta.get("codec"),
+                "rate": audio_meta.get("rate"),
+                "bits": audio_meta.get("bits"),
+                "channel": audio_meta.get("channel"),
+                "format": audio_meta.get("format"),
+            }
+            audio_payload.update({k: v for k, v in audio_optional.items() if v is not None})
+
+        if not audio_payload.get("format") and guessed_format:
+            audio_payload["format"] = guessed_format
+
+        return audio_payload
+
+
+class LasAsrPoller(LasPollOperator):
     def __init__(
         self,
         api_key: str | None = None,
-        endpoint: str | None = None,
+        endpoint: str = DEFAULT_LAS_OPERATOR_ENDPOINT,
         version: str = "v1",
         operator_id: str = "las_asr",
         operator_version: str = "v2",
@@ -331,45 +307,25 @@ class LasAsrPoller(Operator):
             ValueError: 当 `api_key` 或 `endpoint` 缺失且无法从环境变量获取时抛出。
 
         """
-        super().__init__(**kwargs)
-        self.logger = logging.getLogger(f"LasAsrPoller-{id(self)}")
-
-        api_key = api_key or os.getenv("LAS_API_KEY")
-        if not api_key:
-            raise ValueError("api_key is missing: provided via parameter or set LAS_API_KEY environment variable")
-
-        endpoint = endpoint or os.getenv("LAS_SERVICE_ENDPOINT")
-        if endpoint is None or not endpoint.startswith("http"):
-            raise ValueError(f"endpoint: {endpoint} is invalid.")
-
-        self.client = AsyncHttpClient(
-            base_url=f"{endpoint}/api/{version}/",
-            auth_provider=ApiKeyAuthProvider(api_key),
-            retry_config=DEFAULT_RETRY_POLICY.with_max_retries(max_retries),
+        super().__init__(
+            operator_id=operator_id,
+            operator_version=operator_version,
+            api_key=api_key,
+            endpoint=endpoint,
+            version=version,
+            max_retries=max_retries,
+            num_coroutines=num_coroutines,
+            max_polling_seconds=max_polling_seconds,
+            max_polling_num=max_polling_num,
+            waiting_initial=waiting_initial,
+            waiting_exp_base=waiting_exp_base,
+            waiting_jitter=waiting_jitter,
+            waiting_max_seconds=waiting_max_seconds,
+            **kwargs,
         )
-
-        self.static_template = {
-            "operator_id": operator_id,
-            "operator_version": operator_version,
-        }
-
-        self.semaphore = asyncio.Semaphore(num_coroutines)
-        self.stats = AsyncOperatorStats(self.logger)
-        self.max_polling_seconds = max_polling_seconds
-        self.max_polling_num = max_polling_num
-        self.polling_stats: dict[str, Any] = {}
-        self.waiting_initial = (
-            waiting_initial if waiting_initial is not None else float(os.getenv("LAS_POLL_INTERVAL_SECONDS", 2.0))
-        )
-        self.waiting_exp_base = waiting_exp_base
-        self.waiting_jitter = waiting_jitter
-        self.waiting_max_seconds = waiting_max_seconds
 
         self.enable_speaker_info = enable_speaker_info
         self.enable_channel_split = enable_channel_split
-
-        self.default_result = {"asr_result_raw": "", "asr_result_text": ""}
-        self.event_loop = EventLooper()
 
     @staticmethod
     def __return_column_type__() -> pa.DataType:
@@ -382,176 +338,31 @@ class LasAsrPoller(Operator):
             ]
         )
 
-    @classmethod
-    def _retry_condition(cls, resp: httpx.Response | None, ex: Exception | None) -> bool:
-        if default_retry_condition(resp, ex):
-            return True
-
-        if resp is not None:
-            meta = resp.json().get("metadata", {})
-            # 2002: TIMEOUT_ERROR
-            # 2003: SERVER_BUSY
-            if meta and meta.get("business_code") in ["2002", "2003"]:
-                return True
-
-        return False
-
     def transform(self, audios: pa.Array, tasks: pa.Array) -> pa.Array:
-        results = self.event_loop.run(self.run(audios.to_pylist(), tasks.to_pylist()))
+        results = self.batch_poll(tasks.to_pylist(), audios.to_pylist())
         return pa.array(results, type=self.__return_column_type__())
 
-    async def run(self, audios: list[str], tasks: list[str]) -> list[dict[str, str]]:
-        await self.stats.log_accept(len(audios))
+    def get_logger(self) -> Logger:
+        return logging.getLogger(f"LasAsrPoller-{id(self)}")
 
-        async def _poll(audio: str, task: str) -> dict[str, str]:
-            async with self.semaphore:
-                return await self.poll(audio, task)
+    def get_default_result(self) -> dict[str, str]:
+        return {"asr_result_raw": "", "asr_result_simple": "", "asr_result_text": ""}
 
-        # log the process before current batch
-        await self.stats.log_process()
-        result = await asyncio.gather(*[_poll(url, task) for url, task in zip(audios, tasks)])
-        # log the process after current batch
-        await self.stats.log_process()
+    def parse_response(self, data: dict[str, Any]) -> dict[str, Any]:
+        result_data = data.get("result", {})
+        utts = result_data.get("utterances", [])
+        formatted_result = self.format_asr_text(utts)
 
-        return result
-
-    async def poll(self, audio: str, task_id: str) -> dict[str, str]:
-        def clean_polling_stats() -> None:
-            self.polling_stats.pop(audio, None)
-
-        await self.stats.log_submit()
-
-        if not task_id:
-            await self.stats.log_failed()
-            self.logger.warning("task id is empty, audio: %s, skip.", audio)
-            return {**self.default_result, "failed_reason": "SUBMIT_TASK_FAILED"}
-
-        start = datetime.now()
-        attempts = 0
-        while True:
-            try:
-                resp = await self.client.request(
-                    method="POST",
-                    path="poll",
-                    json={**self.static_template, "task_id": task_id},
-                    retry_condition=self._retry_condition,
-                )
-
-                attempt_num = resp.headers.get("attempt_num", 0)
-                if resp.status_code != 200:
-                    await self.stats.log_failed()
-                    clean_polling_stats()
-
-                    self.logger.warning(
-                        "Failed to query task status, audio: %s, task: %s, http status: %s, attempt: %s, detail: %s",
-                        audio,
-                        task_id,
-                        resp.status_code,
-                        attempt_num,
-                        resp.text,
-                    )
-                    return {**self.default_result, "failed_reason": str(resp.status_code)}
-
-                result = resp.json()
-                self.logger.debug("Polling response for audio: %s, task: %s: %s", audio, task_id, result)
-                meta = resp.json().get("metadata", {})
-                if meta.get("business_code") != "0":
-                    await self.stats.log_failed()
-                    self.logger.warning(
-                        "Failed to query task status, audio: %s, task: %s, http status: %s, attempt: %s, detail: %s",
-                        audio,
-                        task_id,
-                        resp.status_code,
-                        attempt_num,
-                        resp.text,
-                    )
-                    return {
-                        **self.default_result,
-                        "failed_reason": str(meta.get("error_msg", "KNOWN_BUSINESS_CODE")),
-                    }
-
-                task_status = meta.get("task_status", "UNKNOWN")
-                data = result.get("data", {})
-
-                if task_status == "COMPLETED":
-                    await self.stats.log_succeed()
-                    clean_polling_stats()
-                    result_data = data.get("result", {})
-                    utts = result_data.get("utterances", [])
-                    formatted_result = self.format_asr_text(utts)
-
-                    try:
-                        raw_str = json.dumps(result_data, ensure_ascii=False)
-                    except Exception:
-                        raw_str = str(result_data)
-                    return {
-                        "asr_result_raw": raw_str,
-                        "asr_result_simple": formatted_result,
-                        "asr_result_text": result_data.get("text", ""),
-                        "failed_reason": "",
-                    }
-                elif task_status in ["FAILED", "TIMEOUT"]:
-                    await self.stats.log_failed()
-                    clean_polling_stats()
-                    metadata = result.get("metadata", {})
-                    self.logger.warning("The task %s of audio %s is failed, detail: %s", task_id, audio, metadata)
-                    return {**self.default_result, "failed_reason": metadata.get("business_code", task_status)}
-                elif task_status in ["ACCEPTED", "PENDING", "RUNNING"]:
-                    waiting = self.wait_exponential_jitter(attempts + 1)
-                    self.logger.debug(
-                        "Task: %s doesn't finished, audio: %s, status: %s, sleep %fs",
-                        task_id,
-                        audio,
-                        task_status,
-                        waiting,
-                    )
-                    await asyncio.sleep(waiting)
-                else:
-                    await self.stats.log_failed()
-                    clean_polling_stats()
-
-                    self.logger.warning(
-                        "Unexpected task status: %s, task: %s, audio: %s, skip.", task_status, task_id, audio
-                    )
-                    return {**self.default_result, "failed_reason": "UNEXPECTED_TASK_STATUS"}
-
-                attempts += 1
-                cost = (datetime.now() - start).total_seconds()
-                if cost > self.max_polling_seconds:
-                    await self.stats.log_failed()
-                    clean_polling_stats()
-                    self.logger.warning(
-                        "Elapsed max query time: %ss, audio: %s, task: %s.", self.max_polling_seconds, audio, task_id
-                    )
-                    return {**self.default_result, "failed_reason": "ELAPSED_POLLING_TIME"}
-
-                if attempts > self.max_polling_num:
-                    await self.stats.log_failed()
-                    clean_polling_stats()
-
-                    self.logger.warning(
-                        "Elapsed max query number: %s, audio: %s, task: %s.", self.max_polling_num, audio, task_id
-                    )
-                    return {**self.default_result, "failed_reason": "ELAPSED_POLLING_NUM"}
-
-                self.polling_stats[audio] = {"acc_cost": cost, "num": attempts}
-                self.logger.info("The polling stats: %s", self.polling_stats)
-            except Exception as e:
-                await self.stats.log_failed()
-                clean_polling_stats()
-
-                self.logger.exception("Failed to query task status, audio: %s, task: %s.", audio, task_id)
-                return {**self.default_result, "failed_reason": str(e)}
-
-    def wait_exponential_jitter(self, attempt: int) -> float:
-        jitter = random.uniform(0, self.waiting_jitter)
         try:
-            exp = self.waiting_exp_base ** (attempt - 1)
-            result = self.waiting_initial * exp + jitter
-        except OverflowError:
-            result = self.waiting_max_seconds
+            raw_str = json.dumps(result_data, ensure_ascii=False)
+        except Exception:
+            raw_str = str(result_data)
 
-        return max(0, min(result, self.waiting_max_seconds))
+        return {
+            "asr_result_raw": raw_str,
+            "asr_result_simple": formatted_result,
+            "asr_result_text": result_data.get("text", ""),
+        }
 
     def ms_to_hms(self, ms: int) -> str:
         """将毫秒转换为 hh:mm:ss 格式."""

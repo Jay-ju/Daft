@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
+
+import ray
 
 import daft
 from daft import col
@@ -9,7 +11,6 @@ from daft.las.functions.audio.audio_asr_las import LasAsrPoller, LasAsrSubmitter
 from daft.las.functions.udf import las_udf
 
 
-import ray
 def configure_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -34,7 +35,6 @@ if __name__ == "__main__":
 
     daft.set_execution_config(actor_udf_ready_timeout=600)
     daft.set_execution_config(min_cpu_per_task=0)
-
 
     df_samples = daft.from_pydict(samples)
     df = df_samples.with_column(
