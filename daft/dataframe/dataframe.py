@@ -803,6 +803,7 @@ class DataFrame:
         write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append",
         partition_cols: Optional[list[ColumnInputType]] = None,
         io_config: Optional[IOConfig] = None,
+        checkpoint_config: Optional[dict[str, Any]] = None,
     ) -> "DataFrame":
         """Writes the DataFrame as parquet files, returning a new DataFrame with paths to the files that were written.
 
@@ -853,7 +854,12 @@ class DataFrame:
         )
         # Block and write, then retrieve data
         write_df = DataFrame(builder)
-        write_df.collect()
+
+        from daft.execution.checkpoint import try_apply_filter_and_collect
+        from daft.io._parquet import read_parquet
+
+        write_df = try_apply_filter_and_collect(write_df, root_dir, io_config, checkpoint_config, read_parquet)
+
         assert write_df._result is not None
 
         if len(write_df) > 0:
@@ -883,6 +889,7 @@ class DataFrame:
         write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append",
         partition_cols: Optional[list[ColumnInputType]] = None,
         io_config: Optional[IOConfig] = None,
+        checkpoint_config: Optional[dict[str, Any]] = None,
     ) -> "DataFrame":
         """Writes the DataFrame as CSV files, returning a new DataFrame with paths to the files that were written.
 
@@ -933,7 +940,12 @@ class DataFrame:
 
         # Block and write, then retrieve data
         write_df = DataFrame(builder)
-        write_df.collect()
+
+        from daft.execution.checkpoint import try_apply_filter_and_collect
+        from daft.io._csv import read_csv
+
+        write_df = try_apply_filter_and_collect(write_df, root_dir, io_config, checkpoint_config, read_csv)
+
         assert write_df._result is not None
 
         if len(write_df) > 0:
@@ -961,6 +973,7 @@ class DataFrame:
         write_mode: Literal["append", "overwrite", "overwrite-partitions"] = "append",
         partition_cols: Optional[list[ColumnInputType]] = None,
         io_config: Optional[IOConfig] = None,
+        checkpoint_config: Optional[dict[str, Any]] = None,
     ) -> "DataFrame":
         """Writes the DataFrame as JSON files, returning a new DataFrame with paths to the files that were written.
 
@@ -1008,7 +1021,12 @@ class DataFrame:
         )
         # Block and write, then retrieve data
         write_df = DataFrame(builder)
-        write_df.collect()
+
+        from daft.execution.checkpoint import try_apply_filter_and_collect
+        from daft.io._json import read_json
+
+        write_df = try_apply_filter_and_collect(write_df, root_dir, io_config, checkpoint_config, read_json)
+
         assert write_df._result is not None
 
         if len(write_df) > 0:
@@ -1735,6 +1753,19 @@ class DataFrame:
     ###
     # DataFrame operations
     ###
+
+    def _insert_filter_after_source(self, predicate: Union[Expression, str]) -> "DataFrame":
+        """Insert a Filter directly above the unique Source in the logical plan.
+
+        - If there is not exactly one Source in the tree, this is a no-op.
+        - If `predicate` is a string, it is parsed via the SQL expression parser.
+        """
+        if isinstance(predicate, str):
+            from daft.sql.sql import sql_expr
+
+            predicate = sql_expr(predicate)
+        builder = self._builder.insert_filter_after_source(predicate)
+        return DataFrame(builder)
 
     def __column_input_to_expression(self, columns: Iterable[ColumnInputType]) -> list[Expression]:
         # TODO(Kevin): remove this method and use _column_inputs_to_expressions
