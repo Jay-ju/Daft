@@ -51,7 +51,9 @@ las = [
   "python-dotenv>=1.1.1",
   "pyiceberg>=0.7.0",
   "packaging",
-  "pylance",
+  "pylance @ https://proton-pkgs.tos-cn-beijing.volces.com/lance/pylance-0.39.101-cp39-abi3-manylinux_2_28_x86_64.whl ; sys_platform == 'linux'",
+  "pylance; sys_platform != 'linux'",
+  "lancedb==0.25.3",
   "memray~=1.17.2",
   "py-spy",
   "httpx[http2] >= 0.27.2",
@@ -211,7 +213,9 @@ dev = [
   # Ray
   "ray[data, client]>=2.10.0",
   # Lance
-  "pylance>=0.37.0",
+  "pylance @ https://proton-pkgs.tos-cn-beijing.volces.com/lance/pylance-0.39.101-cp39-abi3-manylinux_2_28_x86_64.whl ; sys_platform == 'linux'",
+  "pylance>=0.37.0; sys_platform != 'linux'",
+  "lancedb==0.25.3",
   # Iceberg
   "pyiceberg==0.7.0",
   "pydantic==2.11.7",
