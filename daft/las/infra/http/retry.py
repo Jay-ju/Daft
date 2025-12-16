@@ -57,12 +57,16 @@ class RetryPolicy:
             result = self.initial * exp + jitter
         except OverflowError:
             result = self.max_wait
-
         return max(0, min(result, self.max_wait))
 
     def with_max_retries(self, max_retries: int | None) -> RetryPolicy:
         if max_retries:
             self.max_retries = max_retries
+        return self
+
+    def with_max_wait(self, max_wait: float | None) -> RetryPolicy:
+        if max_wait is not None:
+            self.max_wait = max_wait
         return self
 
     @staticmethod

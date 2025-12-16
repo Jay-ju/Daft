@@ -5,18 +5,20 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from typing import Any
+import uuid
+from typing import TYPE_CHECKING, Any
 
-import httpx
 from dotenv import load_dotenv
 from pydantic import ValidationError
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
+
+from daft.las.infra.http.auth import ApiKeyAuthProvider
+from daft.las.infra.http.client import (
+    DEFAULT_RETRY_POLICY,
+    AsyncHttpClient,
 )
+
+if TYPE_CHECKING:
+    from httpx import Response
 
 DEFAULT_REQUEST_TIMEOUT = 1200
 DEFAULT_MAX_CONCURRENCY = 100
@@ -84,55 +86,83 @@ class LasArkClient:
         assert config.api_key is not None
 
         self.api_key = config.api_key
-
-        self.client = httpx.AsyncClient(
-            base_url=config.base_url,
-            timeout=httpx.Timeout(config.request_timeout),
-            limits=httpx.Limits(
-                max_connections=config.max_connections, max_keepalive_connections=config.max_keepalive_connections
-            ),
-            http2=True,
-        )
-        self.semaphore = asyncio.Semaphore(config.max_concurrency)
         self.chat_endpoint = ENDPOINT_MAP[config.inference_type.lower()]
+        self.max_retries = int(os.environ.get("LAS_MAX_RETRIES", DEFAULT_MAX_RETRIES))
 
-    @retry(  # type: ignore[misc]
-        wait=wait_exponential(multiplier=1, min=2, max=5),
-        stop=stop_after_attempt(os.environ.get("LAS_MAX_RETRIES", DEFAULT_MAX_RETRIES)),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-        retry=retry_if_exception_type((httpx.HTTPError, Exception)),
-    )
+        self.semaphore = asyncio.Semaphore(config.max_concurrency)
+        self.client = AsyncHttpClient(
+            base_url=config.base_url,
+            auth_provider=ApiKeyAuthProvider(config.api_key),
+            connect_timeout=config.request_timeout,
+            read_timeout=config.request_timeout,
+            write_timeout=config.request_timeout,
+            max_connections=config.max_connections,
+            max_keepalive_connections=config.max_keepalive_connections,
+            http2=True,
+            retry_config=DEFAULT_RETRY_POLICY.with_max_retries(self.max_retries).with_max_wait(600),
+        )
+
+    @classmethod
+    def _retry_condition(cls, resp: Response | None, ex: Exception | None) -> bool:
+        if resp is not None:
+            try:
+                result = resp.json()
+            except Exception:
+                result = None
+
+            if isinstance(result, dict):
+                code = result.get("code")
+                if code in [429, 500, 502, 503, 504, 499]:
+                    logger.warning("Request - Retryable API code: %s", code)
+                    return True
+
+            logger.warning("Request - Response status code: %s", resp.status_code)
+            return 500 <= resp.status_code or resp.status_code in [429, 499]
+
+        if ex is not None:
+            message = str(ex)
+            return "ConnectionTerminated" in message or "All connection attempts failed" in message
+
+        return False
+
     async def _send_request(self, payload: dict[str, Any] | None) -> dict[str, Any] | None:
         if payload is None:
             return None
 
-        async with self.semaphore:
-            try:
-                response = await self.client.post(
-                    self.chat_endpoint,
+        request_id = str(uuid.uuid4())
+        try:
+            async with self.semaphore:
+                resp = await self.client.request(
+                    method="POST",
+                    path=self.chat_endpoint,
                     json=payload,
                     headers={
-                        "Authorization": f"Bearer {self.api_key}",
+                        "X-Request-ID": request_id,
                     },
+                    retry_condition=self._retry_condition,
+                    max_retry_duration=172800,
                 )
-                response.raise_for_status()
-                result = response.json()
+            resp.raise_for_status()
+            result = resp.json()
 
-                status_code = result.get("code")
-                if status_code in [429, 500, 502, 503, 504, 499]:
-                    logger.warning("Retryable error code: %s", status_code)
-                    raise Exception(f"Retryable error: {result.get('message')}")
-                elif status_code != 200:
-                    logger.error("API request failed: %s", result.get("message"))
-                    return {"error": result.get("message")}
-                return result["data"]
-            except ValidationError as e:
-                err_msg = f"Parameter validation failed: {e}"
-                logger.exception(err_msg)
-                return {"error": err_msg}
-            except Exception:
-                logger.exception("Request failed")
-                raise
+            code = result.get("code", 200)
+            if code == 200:
+                return result.get("data")
+
+            logger.error(
+                "Request %s - API error code: %s, message: %s",
+                request_id,
+                code,
+                result.get("message"),
+            )
+            return {"error": result.get("message") or f"API error code: {code}"}
+
+        except ValidationError as e:
+            logger.exception("Request %s - Validation error: %s", request_id, e)
+            return {"error": str(e)}
+        except Exception as e:
+            logger.exception("Request %s - Error: %s", request_id, e)
+            raise
 
     async def batch_process(self, requests: list[dict[str, Any] | None]) -> list[dict[str, Any] | None]:
         """Process batch requests."""
