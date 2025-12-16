@@ -9,6 +9,7 @@ from daft.las.functions.udf import las_udf
 
 if __name__ == "__main__":
     TOS_TEST_DIR = os.getenv("TOS_TEST_DIR", "tos_bucket")
+    model_path = os.getenv("MODEL_PATH", "./models")
     samples = {
         "input_path": [f"tos://{TOS_TEST_DIR}/image_aesthetic_score/forest.jpg"],
     }
@@ -16,6 +17,7 @@ if __name__ == "__main__":
 
     # Using Daft to calculate aesthetic scores for images
     constructor_kwargs = {
+        "model_path": model_path,
         "image_src_type": "image_url",
         "batch_size": 1,
     }
@@ -31,5 +33,5 @@ if __name__ == "__main__":
     # │ ---                            ┆ ---                │
     # │ Utf8                           ┆ Float64            │
     # ╞════════════════════════════════╪════════════════════╡
-    # │ tos://las-ai-qa-online/qa/tes… ┆ 0.5603389739990234 │
+    # │ tos://tos_bucket/image_aesthet…┆ 0.5603389739990234 │
     # ╰────────────────────────────────┴────────────────────╯

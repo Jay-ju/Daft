@@ -27,7 +27,7 @@ def generate_test_data(tos_test_data_dir, local_test_data_dir, http_test_data_di
 
     # 期望结果：不存在的文件返回False，silence.wav返回True，sample.wav返回False
     expected_results = [
-        False,  # 不存在的文件
+        None,  # 不存在的文件
         True,  # 静音音频
         False,  # 正常音频
         True,  # 静音音频

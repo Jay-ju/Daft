@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import logging
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -13,40 +11,8 @@ from transformers import CLIPModel, CLIPProcessor
 
 from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import tracking_usage
+from daft.las.functions.utils.common_utils import FastWriteCounter, get_logger, tracking_usage
 from daft.las.functions.utils.image_utils import decode_image_pil
-
-
-class FastWriteCounter:
-    """Thread-safe counter with batch increment support."""
-
-    def __init__(self, init: int = 0) -> None:
-        self._value = int(init)
-        self._lock = threading.Lock()
-
-    def increment(self, n: int = 1) -> None:
-        if n <= 0:
-            return
-        with self._lock:
-            self._value += int(n)
-
-    @property
-    def value(self) -> int:
-        with self._lock:
-            return int(self._value)
-
-
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    handler.setFormatter(formatter)
-    if not logger.handlers:
-        logger.addHandler(handler)
-    return logger
 
 
 class MLP(nn.Module):  # type: ignore[misc]
@@ -214,7 +180,7 @@ class ImageAestheticScore(Operator):
             except Exception as e:
                 self.logger.warning("Failed to decode image: %s", e)
                 images.append(None)
-                self.failed_counter.increment(1)
+                self.failed_counter.increment()
 
         valid_indices = [i for i, img in enumerate(images) if img is not None]
         valid_images = [images[i] for i in valid_indices]
@@ -243,13 +209,15 @@ class ImageAestheticScore(Operator):
             for idx, score in zip(valid_indices, batch_scores):
                 final_scores[idx] = float(score)
 
-            self.success_counter.increment(len(valid_images))
+            for _ in range(len(valid_images)):
+                self.success_counter.increment()
 
             return final_scores
 
         except Exception as e:
             self.logger.error("Inference failed for batch: %s", e)
-            self.failed_counter.increment(len(valid_images))
+            for _ in range(len(valid_images)):
+                self.failed_counter.increment()
             return [None] * len(image_inputs)
 
     def transform(self, image_inputs: pa.Array) -> pa.Array:
@@ -268,7 +236,8 @@ class ImageAestheticScore(Operator):
         for i in range(0, len(input_list), self.batch_size):
             batch = input_list[i : i + self.batch_size]
 
-            self.submit_counter.increment(len(batch))
+            for _ in range(len(batch)):
+                self.submit_counter.increment()
 
             batch_results = self._process_batch(batch)
             results.extend(batch_results)

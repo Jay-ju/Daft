@@ -10,6 +10,7 @@ from .audio_split_by_timestamps import AudioSplitByTimestamps
 from .audio_speaker_diarization import AudioSpeakerDiarization
 from .audio_asr_doubao import AudioAsrDoubao
 from .audio_lid_whisper import AudioLidWhisper
+from .audio_metascore import AudioMetascore
 from .audio_standardization import AudioStandardization
 from .audio_source_separation import AudioSourceSeparation
 from .audio_tts_doubao import AudioTtsDoubao
@@ -24,16 +25,23 @@ from .audio_convert_to_mp3 import AudioConvertToMp3
 from .audio_silence_detection import AudioSilenceDetection
 from .audio_quality_score import AudioQualityScore
 from .audio_asr_lid_whisper import AudioAsrLidWhisper
+from .audio_concat import AudioConcat
+from .audio_concat_fast import AudioConcatFast
+from .audio_metadata_extract import AudioMetadataExtract
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrFireRed",
     "AudioAsrLidWhisper",
     "AudioAsrWhisper",
+    "AudioConcat",
+    "AudioConcatFast",
     "AudioConvert",
     "AudioConvertToMp3",
     "AudioDuration",
     "AudioLidWhisper",
+    "AudioMetadataExtract",
+    "AudioMetascore",
     "AudioQualityScore",
     "AudioRiskRec",
     "AudioSNR",

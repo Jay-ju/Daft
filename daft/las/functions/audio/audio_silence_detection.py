@@ -2,49 +2,16 @@
 
 from __future__ import annotations
 
-import itertools
-import logging
 import os
 import re
 import subprocess
 import tempfile
-import threading
 from typing import Any
 
 from daft.dependencies import pa
 from daft.las.functions.types import Operator
-from daft.las.functions.utils.common_utils import is_local_path, pre_sign_url_for_tos, tracking_usage
-
-
-class FastWriteCounter:
-    def __init__(self, init: int = 0, step: int = 1) -> None:
-        self._number_of_read = 0
-        self._step = step
-        self._counter = itertools.count(init, step)
-        self._lock = threading.Lock()
-
-    def increment(self) -> None:
-        next(self._counter)
-
-    @property
-    def value(self) -> int:
-        with self._lock:
-            value = next(self._counter) - self._number_of_read
-            self._number_of_read += self._step
-        return value
-
-
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    handler.setFormatter(formatter)
-    if not logger.handlers:
-        logger.addHandler(handler)
-    return logger
+from daft.las.functions.utils.common_utils import FastWriteCounter, get_logger, tracking_usage
+from daft.las.io import download_file
 
 
 class AudioSilenceDetection(Operator):
@@ -111,41 +78,18 @@ class AudioSilenceDetection(Operator):
             "%s/%s running, finished/succeed/failed: %s/%s/%s", running, submitted, finished, succeed, failed
         )
 
-    def get_input_path_for_ffmpeg(self, input_path: str) -> str:
-        """Get the appropriate path for audio processing based on input type.
-
-        Args:
-            input_path: Input file path (local, HTTP/HTTPS URL, or TOS/S3 URL)
-
-        Returns:
-            str: Path that audio processor can use directly
-        """
-        if is_local_path(input_path):
-            # Local file path - use as is
-            return input_path
-        elif input_path.startswith(("http://", "https://")):
-            # HTTP/HTTPS URL - use as is
-            return input_path
-        elif input_path.startswith(("tos://", "s3://")):
-            # TOS/S3 URL - need to pre-sign
-            return pre_sign_url_for_tos(input_path, expires=360000)
-        else:
-            # Assume it's a remote path that needs pre-signing
-            self.logger.warning("Unknown path type for %s, treating as TOS/S3", input_path)
-            return pre_sign_url_for_tos(input_path, expires=360000)
-
     @staticmethod
     def __return_column_type__() -> pa.DataType:
         return pa.bool_()
 
-    def _detect_silence(self, audio: str | bytes | bytearray) -> bool:
+    def _detect_silence(self, audio: str | bytes | bytearray) -> bool | None:
         """检测音频是否为静音.
 
         Args:
             audio: 音频文件路径(支持本地或TOS路径) 或 bytes
 
         Returns:
-            bool: True表示音频为静音，False表示音频包含有效声音
+            bool | None: True表示音频为静音，False表示音频包含有效声音，None表示无声道或处理失败
         """
         self.submit_counter.increment()
 
@@ -163,9 +107,12 @@ class AudioSilenceDetection(Operator):
                 self.logger.warning("Unsupported audio input type: %s", type(audio))
                 self.failed_counter.increment()
                 self.log_progress()
-                return False
+                return None
 
-            self.success_counter.increment()
+            if result is None:
+                self.failed_counter.increment()
+            else:
+                self.success_counter.increment()
             self.log_progress()
             return result
 
@@ -173,7 +120,7 @@ class AudioSilenceDetection(Operator):
             self.failed_counter.increment()
             self.log_progress()
             self.logger.error("[AudioSilenceDetection] Failed to detect silence for input %s: %s", audio, e)
-            return False
+            return None
         finally:
             # 清理临时文件
             if tmp_file and os.path.exists(tmp_file.name):
@@ -182,20 +129,25 @@ class AudioSilenceDetection(Operator):
                 except Exception as remove_error:
                     self.logger.warning("Failed to remove temp file %s: %s", tmp_file.name, remove_error)
 
-    def _analyze_audio_file(self, file_path: str) -> bool:
+    def _analyze_audio_file(self, file_path: str) -> bool | None:
         """分析音频文件的静音状态.
 
         Args:
-            file_path: 音频文件路径
+            file_path: 音频文件路径(远程)
 
         Returns:
-            bool: True表示静音，False表示非静音
+            bool | None: True表示静音，False表示非静音，None表示处理失败或没有声道
         """
+        tmp_in = None
         try:
-            url_path = self.get_input_path_for_ffmpeg(file_path)
+            # 下载远程文件到本地临时文件
+            tmp_in = tempfile.NamedTemporaryFile(suffix=os.path.splitext(file_path)[1] or ".tmp", delete=False)
+            tmp_in.close()
+            self.logger.info("Downloading remote file: %s -> %s", file_path, tmp_in.name)
+            download_file(file_path, tmp_in.name)
 
             # 使用音量检测滤镜分析音量
-            cmd = ["ffmpeg", "-i", url_path, "-af", "volumedetect", "-f", "null", "-"]
+            cmd = ["ffmpeg", "-i", tmp_in.name, "-af", "volumedetect", "-f", "null", "-"]
 
             self.logger.info("[AudioSilenceDetection] Running audio volume analysis: %s", " ".join(cmd))
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=self.timeout)
@@ -219,8 +171,10 @@ class AudioSilenceDetection(Operator):
 
             # 判断是否为静音
             if max_volume is None:
-                self.logger.warning("Could not extract max_volume from audio analysis, treating as non-silent")
-                return False
+                self.logger.warning(
+                    "Could not extract max_volume from audio analysis (no audio stream or processing failed)"
+                )
+                return None
 
             is_silence = max_volume <= self.silence_threshold_db
 
@@ -236,10 +190,13 @@ class AudioSilenceDetection(Operator):
 
         except subprocess.TimeoutExpired:
             self.logger.error("Audio volume analysis timed out for file: %s", file_path)
-            return False
+            return None
         except Exception:
             self.logger.exception("Failed to analyze audio file volume: %s", file_path)
-            return False
+            return None
+        finally:
+            if tmp_in and os.path.exists(tmp_in.name):
+                os.remove(tmp_in.name)
 
     def transform(self, audio_inputs: pa.Array) -> pa.Array:
         """检测音频文件是否为静音
@@ -248,7 +205,7 @@ class AudioSilenceDetection(Operator):
             audio_inputs: 存放音频路径或二进制的列
 
         Returns:
-            pa.Array: 存放静音检测结果的布尔值列，True表示静音，False表示非静音
+            pa.Array: 存放静音检测结果的布尔值列，True表示静音，False表示非静音，None表示处理失败或没有声道
         """  # noqa: D415
         results = []
         for audio_input in audio_inputs:
@@ -257,6 +214,6 @@ class AudioSilenceDetection(Operator):
                 results.append(is_silence)
             except Exception:
                 self.logger.exception("Failed to process audio input: %s", audio_input)
-                results.append(False)  # 出错时默认认为非静音
+                results.append(None)  # 出错时返回None
 
         return pa.array(results, type=self.__return_column_type__())

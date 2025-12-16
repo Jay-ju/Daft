@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import itertools
 import logging
 import os
 import random
 import tempfile
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -269,3 +271,47 @@ def generate_filename_prefix(
         # 文件名生成兜底逻辑
         name = f"{int(time.time())!s}_{(random.randint(1, 1000000))!s}"
     return f"{name}{suffix}"
+
+
+class FastWriteCounter:
+    """Thread-safe counter for generating sequential indices.
+
+    Used for tracking batch processing progress in parallel operations.
+    """
+
+    def __init__(self, init: int = 0, step: int = 1) -> None:
+        self._number_of_read = 0
+        self._step = step
+        self._counter = itertools.count(init, step)
+        self._lock = threading.Lock()
+
+    def increment(self) -> None:
+        next(self._counter)
+
+    @property
+    def value(self) -> int:
+        with self._lock:
+            value = next(self._counter) - self._number_of_read
+            self._number_of_read += self._step
+        return value
+
+
+def get_logger(name: str) -> logging.Logger:
+    """Create or get a logger with standardized formatting.
+
+    Args:
+        name: Logger name.
+
+    Returns:
+        Configured logger instance.
+    """
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter(
+        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    handler.setFormatter(formatter)
+    if not logger.handlers:
+        logger.addHandler(handler)
+    return logger

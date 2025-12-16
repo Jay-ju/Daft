@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import asyncio
-import logging
-from typing import Any
+from typing import Any, cast
 
 from daft.dependencies import np, pa
-from daft.las.functions.types import EventLooper, Operator
+from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio_torchaudio, encode_audio
-from daft.las.functions.utils.common_utils import tracking_usage
-
-logger = logging.getLogger(__name__)
+from daft.las.functions.utils.common_utils import FastWriteCounter, get_logger, tracking_usage
 
 
 class AudioStandardization(Operator):
@@ -35,17 +31,15 @@ class AudioStandardization(Operator):
         target_channels: int | None = None,
         target_dbfs: float | None = None,
         target_gain_range: list[float] = [-3, 3],
-        num_coroutines: int = 1,
         **kwargs: Any,
     ) -> None:
         """初始化 AudioStandardization 算子
 
         Args:
-            target_sr: 目标采样率（单位 Hz），如 16000
-            target_channels: 目标声道数，如 1 表示单声道
-            target_dbfs: 目标响度（单位 dBFS）
+            target_sr: 目标采样率（单位 Hz），如 16000，为 None 时保留原始采样率
+            target_channels: 目标声道数，如 1 表示单声道，为 None 时保留原始声道数
+            target_dbfs: 目标响度（单位 dBFS），为 None 时不进行响度归一化
             target_gain_range: 归一化时允许的增益范围，如 [-3, 3]
-            num_coroutines: 并发处理数量限制
             **kwargs: 其他传入 Operator 的参数
         """  # noqa: D415
         super().__init__(**kwargs)
@@ -53,16 +47,43 @@ class AudioStandardization(Operator):
         self.target_channels = target_channels
         self.target_dbfs = target_dbfs
         self.target_gain_range = target_gain_range or [-3, 3]
-        self.num_coroutines = num_coroutines
-        self.event_loop = EventLooper()
+
+        self.submit_counter = FastWriteCounter()
+        self.success_counter = FastWriteCounter()
+        self.failed_counter = FastWriteCounter()
+
+        self.logger = get_logger(f"AudioStandardization-{id(self)}")
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="torchcodec")
 
-    async def process(self, audio: Any) -> bytes | None:
+    def log_progress(self) -> None:
+        submitted = self.submit_counter.value
+        succeed = self.success_counter.value
+        failed = self.failed_counter.value
+        finished = succeed + failed
+        running = submitted - finished
+        self.logger.info(
+            "%s/%s running, finished/succeed/failed: %s/%s/%s", running, submitted, finished, succeed, failed
+        )
+
+    def process(self, audio: Any) -> bytes | None:
+        """Process a single audio file for standardization.
+
+        Args:
+            audio: Input audio (bytes or path)
+
+        Returns:
+            bytes | None: Output audio bytes on success, None on failure
+        """
+        self.submit_counter.increment()
+
         if not audio:
+            self.failed_counter.increment()
+            self.log_progress()
             return None
+
         try:
-            waveform, _ = decode_audio_torchaudio(
+            waveform, actual_sr = decode_audio_torchaudio(
                 audio,
                 sample_rate=self.target_sr,
                 num_channels=self.target_channels,
@@ -81,21 +102,19 @@ class AudioStandardization(Operator):
             if max_amp > 0:
                 waveform /= max_amp
 
-            # 保存为 bytes
-            return encode_audio({"samples": waveform, "sample_rate": self.target_sr})  # type: ignore
+            # 保存为 bytes，使用实际的采样率
+            result = cast("bytes", encode_audio({"samples": waveform, "sample_rate": actual_sr}))
+
+            self.success_counter.increment()
+            self.log_progress()
+            self.logger.info("Finished standardization")
+            return result
 
         except Exception as e:
-            logger.warning("Audio standardization failed: %s", e)
+            self.failed_counter.increment()
+            self.log_progress()
+            self.logger.error("Audio standardization failed: %s", e)
             return None
-
-    async def async_run(self, audio_list: list[bytes]) -> list[bytes | None]:
-        semaphore = asyncio.Semaphore(self.num_coroutines)
-
-        async def bounded(audio: bytes) -> bytes | None:
-            async with semaphore:
-                return await self.process(audio)
-
-        return await asyncio.gather(*[bounded(a) for a in audio_list])
 
     def transform(self, audio_col: pa.Array) -> pa.Array:
         """批量处理音频字节数组
@@ -106,7 +125,15 @@ class AudioStandardization(Operator):
         Returns:
             处理后的音频结果；失败则返回 None。
         """  # noqa: D415
-        results = self.event_loop.run(self.async_run(audio_col.to_pylist()))
+        results = []
+        for audio in audio_col.to_pylist():
+            try:
+                result = self.process(audio)
+            except Exception as e:
+                self.logger.error("[transform] Failed to process audio: %s", e)
+                result = None
+            results.append(result)
+
         return pa.array(results, type=AudioStandardization.__return_column_type__())
 
     @staticmethod

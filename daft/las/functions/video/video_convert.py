@@ -11,18 +11,19 @@ from daft.las.functions.utils.common_utils import FastWriteCounter, get_logger, 
 from daft.las.io import download_file, upload_file
 
 
-class AudioConvert(Operator):
-    """**音频格式转换处理器**
+class VideoConvert(Operator):
+    """**通用视频格式转换处理器**
 
     **核心功能：**
-    - 支持音频格式转换（WAV、MP3、FLAC）
+    - 支持多种视频格式之间的转换
     - 自动选择合适的编码器
     - 通过extra_params支持自定义ffmpeg参数
-    - 支持本地文件、HTTP/HTTPS URL和TOS/S3存储
 
     **格式支持：**
-    - 输入：WAV、FLAC、MP3、AAC、M4A、OGG、WMA、APE等主流音频格式
-    - 输出：WAV (pcm_s16le)、MP3 (libmp3lame)、FLAC (flac)
+    - 输入：AVI、MOV、MKV、FLV、WMV、3GP、MP4等主流视频格式
+    - 输出：MP4、AVI、MOV、MKV、FLV、WEBM等
+    - 视频编解码器：H.264、H.265、VP8、VP9等
+    - 音频编解码器：AAC、MP3、Opus等
     """  # noqa: D415
 
     def __init__(
@@ -32,33 +33,36 @@ class AudioConvert(Operator):
         extra_params: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
-        """初始化通用音频转换算子
+        """初始化通用视频转换算子
 
         Args:
-            output_format: 输出音频格式，仅支持 "wav", "mp3", "flac"，默认为 "wav"
+            output_format: 输出视频格式，支持 "mp4", "avi", "mov", "mkv", "flv", "webm"
             timeout: ffmpeg 执行超时时间（秒），默认为 None（无超时）
             extra_params: 额外的 ffmpeg 参数列表，直接拼接到命令中
                 例如：
-                - 音轨选择: ["-map", "0:a"]  # 选择所有音轨
-                - 采样率: ["-ar", "44100"]
-                - 比特率: ["-b:a", "192k"]  # 适用于 MP3
-                - 压缩级别: ["-compression_level", "8"]  # 适用于 FLAC
+                - 视频质量: ["-crf", "23"]
+                - 视频码率: ["-b:v", "2M"]
+                - 编码预设: ["-preset", "medium"]
+                - 视频缩放: ["-vf", "scale=-2:720"]
+                - 音频码率: ["-b:a", "192k"]
+                - 音频采样率: ["-ar", "48000"]
+                - 特定编码器: ["-c:v", "libx265", "-c:a", "aac"]
             **kwargs: 其他参数
 
         Raises:
-            ValueError: 如果 output_format 不是 "wav", "mp3" 或 "flac"
+            ValueError: 如果 output_format 不在支持的格式列表中
         """  # noqa: D415
         super().__init__(**kwargs)
 
         # 支持的输出格式
-        self.supported_formats = ("wav", "mp3", "flac")
+        self.supported_formats = ("mp4", "avi", "mov", "mkv", "flv", "webm")
         self.output_format = output_format.lstrip(".").lower()
 
         if self.output_format not in self.supported_formats:
             raise ValueError(f"output_format must be one of {self.supported_formats}, got '{output_format}'")
 
         # 根据输出格式自动选择编码器
-        self.audio_codec = self._get_codec_for_format(self.output_format)
+        self.video_codec, self.audio_codec = self._get_codecs_for_format(self.output_format)
         self.timeout = timeout
         self.extra_params = extra_params or []
 
@@ -66,16 +70,23 @@ class AudioConvert(Operator):
         self.success_counter = FastWriteCounter()
         self.failed_counter = FastWriteCounter()
 
-        self.logger = get_logger(f"AudioConvert-{id(self)}")
+        self.logger = get_logger(f"VideoConvert-{id(self)}")
 
         tracking_usage(op=self.__class__.__name__, model_service_or_lib="ffmpeg")
 
-    def _get_codec_for_format(self, format: str) -> str:
-        """根据输出格式选择合适的编码器."""
+    def _get_codecs_for_format(self, format: str) -> tuple[str, str]:
+        """根据输出格式选择合适的视频和音频编码器.
+
+        Returns:
+            tuple[str, str]: (video_codec, audio_codec)
+        """
         format_codec_map = {
-            "wav": "pcm_s16le",
-            "mp3": "libmp3lame",
-            "flac": "flac",
+            "mp4": ("libx264", "aac"),
+            "avi": ("libx264", "mp3"),
+            "mov": ("libx264", "aac"),
+            "mkv": ("libx264", "aac"),
+            "flv": ("libx264", "aac"),
+            "webm": ("libvpx-vp9", "libopus"),
         }
         return format_codec_map[format]
 
@@ -90,11 +101,11 @@ class AudioConvert(Operator):
         )
 
     def process(self, input_path: str, output_path: str) -> str | None:
-        """Process a single audio file for format conversion.
+        """Process a single video file for format conversion.
 
         Args:
-            input_path: Input audio file path (local path, HTTP/HTTPS URL, or TOS/S3 URL)
-            output_path: Output audio file path
+            input_path: Input video file path (local path, HTTP/HTTPS URL, or TOS/S3 URL)
+            output_path: Output video file path
 
         Returns:
             str | None: Output path on success, None on failure
@@ -110,7 +121,6 @@ class AudioConvert(Operator):
                     suffix=os.path.splitext(input_path)[1] or ".tmp", delete=False, dir=tmpdir
                 )
                 tmp_input.close()
-                # self.logger.info("Downloading input file: %s -> %s", input_path, tmp_input.name)
                 download_file(input_path, tmp_input.name)
 
                 # Create temporary output file
@@ -119,11 +129,11 @@ class AudioConvert(Operator):
 
                 cmd = ["ffmpeg", "-y", "-i", tmp_input.name]
 
-                # Select first audio track by default
-                cmd += ["-map", "0:a:0"]
+                # Select first video and audio track by default
+                cmd += ["-map", "0:v:0", "-map", "0:a:0"]
 
-                # No video and set codec
-                cmd += ["-vn", "-c:a", self.audio_codec]
+                # Set video and audio codec
+                cmd += ["-c:v", self.video_codec, "-c:a", self.audio_codec]
 
                 # Extra parameters
                 cmd += self.extra_params
@@ -160,11 +170,11 @@ class AudioConvert(Operator):
                     pass
 
     def transform(self, input_col: pa.Array, output_col: pa.Array) -> pa.Array:
-        """将音频文件转换为指定格式
+        """将视频文件转换为指定格式
 
         Args:
-            input_col: 包含输入音频路径的数组（支持本地路径、HTTP/HTTPS URL、TOS/S3 URL）
-            output_col: 包含输出音频文件路径的数组
+            input_col: 包含输入视频路径的数组（支持本地路径、HTTP/HTTPS URL、TOS/S3 URL）
+            output_col: 包含输出视频文件路径的数组
 
         Returns:
             pa.Array: 包含转换结果路径的数组，成功返回输出路径，失败返回None

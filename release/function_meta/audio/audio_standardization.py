@@ -28,7 +28,6 @@ if __name__ == "__main__":
                 "target_channels": 1,
                 "target_dbfs": -20.0,
                 "target_gain_range": [-3.0, 3.0],
-                "concurrency": 2,
             },
             num_gpus=0,
             batch_size=1,
@@ -42,5 +41,5 @@ if __name__ == "__main__":
     # │ ---                            ┆ ---                            │
     # │ Utf8                           ┆ Binary                         │
     # ╞════════════════════════════════╪════════════════════════════════╡
-    # │ tos: // las - ai - cn - beijing / qa / op… ┆ b"RIFF\xce\x9a\x08\x00WAVEfmt… │
+    # │ tos://tos_bucket/audio_stand…  ┆ b"RIFF\xce\x9a\x08\x00WAVEfmt… │
     # ╰────────────────────────────────┴────────────────────────────────╯

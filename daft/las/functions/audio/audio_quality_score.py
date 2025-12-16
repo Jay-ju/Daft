@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import itertools
 import logging
-import threading
 from pathlib import Path
 from typing import Any
 
@@ -13,44 +11,13 @@ import librosa
 from daft.dependencies import np, pa
 from daft.las.functions.types import Operator
 from daft.las.functions.utils.audio_utils import decode_audio
-from daft.las.functions.utils.common_utils import tracking_usage
+from daft.las.functions.utils.common_utils import FastWriteCounter, get_logger, tracking_usage
 
 logger = logging.getLogger(__name__)
 
 
 SAMPLING_RATE = 16000
 INPUT_LENGTH = 9.01
-
-
-class FastWriteCounter:
-    def __init__(self, init: int = 0, step: int = 1) -> None:
-        self._number_of_read = 0
-        self._step = step
-        self._counter = itertools.count(init, step)
-        self._lock = threading.Lock()
-
-    def increment(self) -> None:
-        next(self._counter)
-
-    @property
-    def value(self) -> int:
-        with self._lock:
-            value = next(self._counter) - self._number_of_read
-            self._number_of_read += self._step
-        return value
-
-
-def get_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        fmt="%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    handler.setFormatter(formatter)
-    if not logger.handlers:
-        logger.addHandler(handler)
-    return logger
 
 
 class ComputeScore:

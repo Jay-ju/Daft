@@ -131,6 +131,8 @@ las = [
   "soxr==0.5.0.post1",
   "flashinfer-python==0.3.1.post1; sys_platform == 'linux'",
   "kaldi_native_fbank>=1.15",
+  "audiobox_aesthetics~=0.0.4",
+  "kaldi_native_fbank>=1.15",
   "uroman",
   "pypinyin",
   "imagededup==0.3.3.post2",
