@@ -69,6 +69,7 @@ las = [
   "torch==2.7.0",
   "torchvision==0.22.0",
   "torchaudio==2.7.0",
+  "clearvoice==0.1.2",
   "torchcodec==0.4.0",
   "librosa>=0.11.0",
   "av>=14.0.1",
@@ -349,6 +350,12 @@ addopts = "-m 'not (integration or benchmark or hypothesis)'"
 minversion = "6.0"
 testpaths = [
   "tests"
+]
+
+[tool.uv]
+override-dependencies = [
+  "soundfile==0.13.1",
+  "librosa>=0.11.0"
 ]
 
 [tool.uv.sources.daft_dashboard]
