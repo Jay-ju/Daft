@@ -20,6 +20,9 @@ flash-attn = ["wheel", "flash-attn~=2.8.0.post2"]
 targets.wheel.artifacts = ["daft"]
 targets.wheel.packages = ["daft"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.mypy]
 exclude = ['daft/pickle/*.py$']
 files = ["daft/**/*.py", "daft/**/*.pyx", "tests/**/*.py"]
