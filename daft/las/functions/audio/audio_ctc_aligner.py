@@ -239,8 +239,9 @@ class AudioCTCAligner(Operator):
     """音频 CTC 对齐算子，用于将音频与文本按时间戳实施对齐，目前支持中文和英文。
 
     Args:
-        model_path: 模型文件所在路径，如果不指定则会尝试在线下载模型，推荐事先从 https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt
+        model_path: 模型文件所在路径，你可以从 https://dl.fbaipublicfiles.com/mms/torchaudio/ctc_alignment_mling_uroman/model.pt
                     下载模型，并从本地离线加载
+        model_name: 模型文件名，默认值为 MMS/ctc_alignment_mling_uroman_model.pt
 
     Returns:
         返回结果为 JSON 格式字符串（如下所示），每个元素包含 word（单词）、score（置信度）、start（开始时间戳）和 end（结束时间戳），其中时间戳以毫秒为单位。
@@ -258,7 +259,12 @@ class AudioCTCAligner(Operator):
     ]
     """  # noqa: D415
 
-    def __init__(self, model_path: str | None = None, **kwargs: Any):
+    def __init__(
+        self,
+        model_path: str = "/opt/las/models",
+        model_name: str = "MMS/ctc_alignment_mling_uroman_model.pt",
+        **kwargs: Any,
+    ):
         super().__init__(**kwargs)
 
         start_time = time.time()
@@ -268,21 +274,14 @@ class AudioCTCAligner(Operator):
         self.en_normalizer = EnglishNormalizer(self.allowed_chars)
         self.zh_normalizer = ChineseNormalizer(self.allowed_chars)
 
-        if model_path:
-            kwargs = {
-                "model_dir": model_path,
-            }
-            if os.path.isfile(model_path):
-                kwargs = {
-                    "model_dir": os.path.dirname(model_path),
-                    "file_name": os.path.basename(model_path),
-                }
-
-            logger.info("Loading model from %s", model_path)
-            self.model = bundle.get_model(with_star=False, dl_kwargs=kwargs)
-        else:
-            self.model = bundle.get_model(with_star=False)
-
+        self.model_path = f"{model_path}/{model_name}"
+        self.model = bundle.get_model(
+            with_star=False,
+            dl_kwargs={
+                "model_dir": os.path.dirname(self.model_path),
+                "file_name": os.path.basename(self.model_path),
+            },
+        )
         self.model.to(self.device)
         self.model.eval()
 
@@ -291,7 +290,7 @@ class AudioCTCAligner(Operator):
 
         logger.info(
             "Finish initializing audio ctc aligner, model path: %s, device: %s, elapsed: %ss",
-            model_path,
+            self.model_path,
             self.device,
             round(time.time() - start_time, 2),
         )

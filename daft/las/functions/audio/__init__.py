@@ -28,12 +28,14 @@ from .audio_asr_lid_whisper import AudioAsrLidWhisper
 from .audio_concat import AudioConcat
 from .audio_concat_fast import AudioConcatFast
 from .audio_metadata_extract import AudioMetadataExtract
+from .audio_beats_classifier import AudioBeatsClassifier
 
 __all__ = [
     "AudioAsrDoubao",
     "AudioAsrFireRed",
     "AudioAsrLidWhisper",
     "AudioAsrWhisper",
+    "AudioBeatsClassifier",
     "AudioConcat",
     "AudioConcatFast",
     "AudioConvert",

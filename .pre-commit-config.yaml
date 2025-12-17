@@ -11,7 +11,8 @@ repos:
     exclude: |
       (?x)^(
           daft/pickle/.*\.py|
-          benchmarking/.*
+          benchmarking/.*|
+          daft/las/functions/audio/beats/.*
       )$
 
 - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -69,11 +70,19 @@ repos:
     # Run the linter.
   - id: ruff
     args: [--fix, --exit-non-zero-on-fix, --show-fixes]
-    exclude: benchmarking
+    exclude: |
+      (?x)^(
+          benchmarking/.*|
+          daft/las/functions/audio/beats/.*
+      )$
     # Run the formatter.
   - id: ruff-format
     name: Python code Formatting
-    exclude: benchmarking
+    exclude: |
+      (?x)^(
+          benchmarking/.*|
+          daft/las/functions/audio/beats/.*
+      )$
 
 - repo: local
   hooks:
