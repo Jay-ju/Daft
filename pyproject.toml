@@ -71,9 +71,9 @@ las = [
   "torchaudio==2.7.0",
   "clearvoice==0.1.2",
   "torchcodec==0.4.0",
-  "librosa>=0.11.0",
+  "librosa>=0.10.2.post1",
   "av>=14.0.1",
-  "soundfile==0.13.1",
+  "soundfile>=0.12.1",
   "peft>=0.12.0",
   "ffmpeg-python>=0.2.0",
   "pyannote.audio==3.3.2",
@@ -350,12 +350,6 @@ addopts = "-m 'not (integration or benchmark or hypothesis)'"
 minversion = "6.0"
 testpaths = [
   "tests"
-]
-
-[tool.uv]
-override-dependencies = [
-  "soundfile==0.13.1",
-  "librosa>=0.11.0"
 ]
 
 [tool.uv.sources.daft_dashboard]
