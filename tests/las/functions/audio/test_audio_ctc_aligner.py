@@ -28,9 +28,7 @@ def test_audio_ctc_alignment(local_models_dir, tos_test_data_dir, local_test_dat
             "ctc_result",
             las_udf(
                 AudioCTCAligner,
-                construct_args={
-                    "model_path": f"{local_models_dir}/mms/ctc_alignment_mling_uroman_model.pt",
-                },
+                construct_args={ "model_path": local_models_dir },
                 num_gpus=0.5,
                 batch_size=2,
                 concurrency=2,
