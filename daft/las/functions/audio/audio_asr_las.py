@@ -41,6 +41,7 @@ class LasAsrSubmitter(LasOperator):
         uid: str | None = None,
         operator_id: str = "las_asr",
         operator_version: str = "v2",
+        resource: str = "bigasr",  # values: seedasr, bigasr
         num_coroutines: int = 20,
         max_retries: int = 3,
         model_version: str = "400",
@@ -107,6 +108,7 @@ class LasAsrSubmitter(LasOperator):
         )
         self.logger = logging.getLogger(f"LasAsrSubmitter-{id(self)}")
 
+        self.resource = resource
         if uid is None:
             self.user_info = None
         else:
@@ -225,6 +227,7 @@ class LasAsrSubmitter(LasOperator):
 
         audio_payload = self._generate_audio_payload(audio_meta, url)
         data_payload = {
+            "resource": self.resource,
             "audio": audio_payload,
             "request": request_payload,
         }

@@ -26,7 +26,8 @@ def generate_test_data(http_test_data_dir):
 @pytest.mark.skipif(
     not os.getenv("LAS_SERVICE_ENDPOINT", "").startswith("http"), reason="Waiting for set the endpoint of las service."
 )
-def test_audio_asr_las(http_test_data_dir):
+@pytest.mark.parametrize("resource", ["bigasr", "seedasr"])
+def test_audio_asr_las(http_test_data_dir, resource):
     api_key = os.getenv("LAS_API_KEY")
     endpoint = os.getenv("LAS_SERVICE_ENDPOINT")
 
@@ -46,6 +47,7 @@ def test_audio_asr_las(http_test_data_dir):
                 "endpoint": endpoint,
                 "enable_speaker_info": True,
                 "max_retries": 10,
+                "resource": resource,
             },
             num_cpus=1,
             concurrency=1,
