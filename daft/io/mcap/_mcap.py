@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from io import BytesIO
 from typing import TYPE_CHECKING
 
 from daft.api_annotations import PublicAPI
@@ -184,23 +185,51 @@ class MCAPSourceTask(DataSourceTask):
 
     def execute(self) -> Iterator[MicroPartition]:
         from mcap.reader import make_reader
-        from mcap_protobuf.decoder import DecoderFactory as ProtobufDecoderFactory
-        from mcap_ros2.decoder import DecoderFactory as Ros2DecoderFactory
 
         from daft.filesystem import _infer_filesystem
 
-        from .mcap_json_decoder import JsonDecoderFactory
+
+        class _NonSeekableStreamWrapper:
+            def __init__(self, file_obj: BytesIO):
+                self._file_obj = file_obj
+
+            def read(self, size: int = -1) -> bytes:
+                return self._file_obj.read(size)
+
+            def readable(self) -> bool:
+                return True
+
+            def seekable(self) -> bool:
+                return False
+
+            def tell(self) -> int:
+                return self._file_obj.tell()
+
+            def close(self) -> None:
+                self._file_obj.close()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                self.close()
+                return False
 
         resolved_path, fs, _ = _infer_filesystem(self._file_path, self._io_config)
 
         with fs.open_input_file(resolved_path) as file_obj:
-            reader = make_reader(
-                file_obj, decoder_factories=[Ros2DecoderFactory(), ProtobufDecoderFactory(), JsonDecoderFactory()]
-            )
+            file_content = file_obj.read()
 
-            buffer = []
-            for _, channel, message, ros_msg in reader.iter_decoded_messages(
-                topics=self._topics, start_time=self._start_time, end_time=self._end_time, log_time_order=True
+        in_memory_file = BytesIO(file_content)
+        reader = make_reader(_NonSeekableStreamWrapper(in_memory_file), decoder_factories=[])
+
+        buffer = []
+        try:
+            for _, channel, message in reader.iter_messages(
+                topics=self._topics,
+                start_time=self._start_time,
+                end_time=self._end_time,
+                log_time_order=True,
             ):
                 buffer.append(
                     {
@@ -208,7 +237,7 @@ class MCAPSourceTask(DataSourceTask):
                         "log_time": message.log_time,
                         "publish_time": message.publish_time,
                         "sequence": message.sequence,
-                        "data": str(ros_msg),
+                        "data": str(message.data),
                     }
                 )
 
@@ -218,6 +247,9 @@ class MCAPSourceTask(DataSourceTask):
 
             if buffer:
                 yield self._create_micropartition(buffer)
+        finally:
+            reader = None
+            in_memory_file = None
 
     def _create_micropartition(self, data: list[dict[str, object]]) -> MicroPartition:
         import pyarrow as pa
