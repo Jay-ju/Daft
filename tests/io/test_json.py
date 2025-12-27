@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import os
+import re
+
 import pytest
 
 import daft
+from daft.io import FilenameProvider
 
 
 def _make_skippable_dir(tmp_path, files):
@@ -61,3 +65,70 @@ def test_read_json_skip_multiple_empty_files_in_dir(tmp_path):
     # Multiple empties must be skipped; only valid.json contributes rows and schema.
     assert len(df.schema()) == 1
     assert df.count_rows() == 1
+
+
+class RecordingBlockFilenameProvider(FilenameProvider):
+    """Simple FilenameProvider used to test JSON block-oriented writes.
+
+    Mirrors the parquet and CSV tests but uses the "json" extension.
+    """
+
+    def __init__(self) -> None:  # pragma: no cover - exercised via higher-level IO tests
+        self.calls: list[tuple[str, int, int, int, str]] = []
+
+    def get_filename_for_block(
+        self,
+        write_uuid: str,
+        task_index: int,
+        block_index: int,
+        file_idx: int,
+        ext: str,
+    ) -> str:
+        # Record the call so that tests can assert on the arguments.
+        self.calls.append((write_uuid, task_index, block_index, file_idx, ext))
+        # Deterministic pattern that makes it easy to assert on basename.
+        return f"block-{task_index}-{block_index}-{file_idx}.{ext}"
+
+    def get_filename_for_row(
+        self,
+        row: dict[str, object],
+        write_uuid: str,
+        task_index: int,
+        block_index: int,
+        row_index: int,
+        ext: str,
+    ) -> str:  # pragma: no cover - not used in these tests
+        raise AssertionError("get_filename_for_row should not be called for block writes")
+
+
+def _extract_basenames(paths: list[str]) -> list[str]:
+    basenames: list[str] = []
+    for path in paths:
+        if path.startswith("file://"):
+            path = path[len("file://") :]
+        basenames.append(os.path.basename(path))
+    return basenames
+
+
+def test_filename_provider_json_local(tmp_path) -> None:
+    data = {"a": [1, 2, 3]}
+    df = daft.from_pydict(data).repartition(2)
+
+    provider = RecordingBlockFilenameProvider()
+    result_df = df.write_json(str(tmp_path), filename_provider=provider)
+    paths = result_df.to_pydict()["path"]
+    basenames = _extract_basenames(paths)
+
+    # All basenames should follow the provider's pattern and use the json
+    # extension. We do not rely on the exact indices, only that the pattern is
+    # respected.
+    assert basenames
+    assert all(re.match(r"block-0-\d+-\d+\.json", name) for name in basenames)
+
+    # Provider should be invoked once per file and should see a consistent
+    # write_uuid and extension.
+    assert len(provider.calls) == len(basenames)
+    write_uuids = {call[0] for call in provider.calls}
+    assert len(write_uuids) == 1
+    exts = {call[4] for call in provider.calls}
+    assert exts == {"json"}

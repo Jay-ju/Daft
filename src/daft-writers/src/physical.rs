@@ -110,6 +110,17 @@ impl WriterFactory for PhysicalWriterFactory {
         file_idx: usize,
         partition_values: Option<&RecordBatch>,
     ) -> DaftResult<Box<dyn AsyncFileWriter<Input = Self::Input, Result = Self::Result>>> {
+        #[cfg(feature = "python")]
+        let filename_provider = self
+            .output_file_info
+            .filename_provider
+            .as_ref()
+            .map(|wrapper| wrapper.0.clone());
+        #[cfg(not(feature = "python"))]
+        let filename_provider = None;
+
+        let write_uuid = self.output_file_info.write_uuid.clone();
+
         match self.writer_type {
             WriterType::Native => create_native_writer(
                 &self.output_file_info.root_dir,
@@ -118,6 +129,8 @@ impl WriterFactory for PhysicalWriterFactory {
                 self.output_file_info.file_format,
                 partition_values,
                 self.output_file_info.io_config.clone(),
+                filename_provider,
+                write_uuid,
             ),
             WriterType::Pyarrow => create_pyarrow_file_writer(
                 &self.output_file_info.root_dir,
@@ -159,6 +172,7 @@ pub fn create_pyarrow_file_writer(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn create_native_writer(
     root_dir: &str,
     file_idx: usize,
@@ -166,18 +180,36 @@ fn create_native_writer(
     file_format: FileFormat,
     partition_values: Option<&RecordBatch>,
     io_config: Option<daft_io::IOConfig>,
+    filename_provider: Option<Arc<pyo3::Py<pyo3::PyAny>>>,
+    write_uuid: Option<String>,
 ) -> DaftResult<Box<dyn AsyncFileWriter<Input = Arc<MicroPartition>, Result = Option<RecordBatch>>>>
 {
     match file_format {
-        FileFormat::Parquet => {
-            create_native_parquet_writer(root_dir, schema, file_idx, partition_values, io_config)
-        }
-        FileFormat::Json => {
-            create_native_json_writer(root_dir, file_idx, partition_values, io_config)
-        }
-        FileFormat::Csv => {
-            create_native_csv_writer(root_dir, file_idx, partition_values, io_config)
-        }
+        FileFormat::Parquet => create_native_parquet_writer(
+            root_dir,
+            schema,
+            file_idx,
+            partition_values,
+            io_config,
+            filename_provider,
+            write_uuid,
+        ),
+        FileFormat::Json => create_native_json_writer(
+            root_dir,
+            file_idx,
+            partition_values,
+            io_config,
+            filename_provider,
+            write_uuid,
+        ),
+        FileFormat::Csv => create_native_csv_writer(
+            root_dir,
+            file_idx,
+            partition_values,
+            io_config,
+            filename_provider,
+            write_uuid,
+        ),
         _ => Err(DaftError::ComputeError(
             "Unsupported file format for native write".to_string(),
         )),

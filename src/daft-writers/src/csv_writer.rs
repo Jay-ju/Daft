@@ -58,7 +58,7 @@ use crate::{
     AsyncFileWriter,
     batch_file_writer::BatchFileWriter,
     storage_backend::{FileStorageBackend, ObjectStorageBackend, StorageBackend},
-    utils::build_filename,
+    utils::build_filename_with_provider,
 };
 
 pub(crate) fn native_csv_writer_supported(file_schema: &SchemaRef) -> DaftResult<bool> {
@@ -88,9 +88,22 @@ pub(crate) fn create_native_csv_writer(
     file_idx: usize,
     partition_values: Option<&RecordBatch>,
     io_config: Option<IOConfig>,
+    filename_provider: Option<Arc<pyo3::Py<pyo3::PyAny>>>,
+    write_uuid: Option<String>,
 ) -> DaftResult<Box<dyn AsyncFileWriter<Input = Arc<MicroPartition>, Result = Option<RecordBatch>>>>
 {
     let (source_type, root_dir) = parse_url(root_dir)?;
+    #[cfg(feature = "python")]
+    let filename = build_filename_with_provider(
+        source_type,
+        root_dir.as_ref(),
+        partition_values,
+        file_idx,
+        "csv",
+        filename_provider,
+        write_uuid.as_deref(),
+    )?;
+    #[cfg(not(feature = "python"))]
     let filename = build_filename(
         source_type,
         root_dir.as_ref(),

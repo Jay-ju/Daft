@@ -30,7 +30,7 @@ from daft.logical.schema import Field, Schema
 
 if TYPE_CHECKING:
     from daft.dependencies import pc
-    from daft.io import IOConfig
+    from daft.io import FilenameProvider, IOConfig
     from daft.series import Series
     from daft.udf.legacy import BoundUDFArgs, InitArgsType, UninitializedUdf
     from daft.window import Window
@@ -1469,6 +1469,8 @@ class Expression:
         max_connections: int = 32,
         on_error: Literal["raise", "null"] = "raise",
         io_config: IOConfig | None = None,
+        filename_provider: FilenameProvider | None = None,
+        filename_provider_row: Expression | None = None,
     ) -> Expression:
         """Uploads a column of binary data to the provided location(s) (also supports S3, local etc).
 
@@ -1477,7 +1479,15 @@ class Expression:
         """
         from daft.functions import upload
 
-        return upload(self, location, max_connections, on_error, io_config)
+        return upload(
+            self,
+            location,
+            max_connections=max_connections,
+            on_error=on_error,
+            io_config=io_config,
+            filename_provider=filename_provider,
+            filename_provider_row=filename_provider_row,
+        )
 
     def date(self) -> Expression:
         """Retrieves the date for a datetime column."""
@@ -2351,6 +2361,15 @@ class Expression:
 
         return map_get(self, key)
 
+    @property
+    def kv(self) -> ExpressionKVNamespace:
+        """Access the KV namespace for KV operations.
+
+        Returns:
+            ExpressionKVNamespace: The KV namespace.
+        """
+        return ExpressionKVNamespace(self)
+
     def slice(self, start: int | Expression, end: int | Expression | None = None) -> Expression:
         """Get a subset of each list or binary value.
 
@@ -2530,6 +2549,45 @@ class Expression:
         from daft.functions import file_size
 
         return file_size(self)
+
+
+class ExpressionKVNamespace:
+    def __init__(self, expr: Expression) -> None:
+        self._expr = expr
+
+    def get(
+        self,
+        store_name: str | Expression,
+        on_error: Literal["raise", "null"] | Expression = "raise",
+        columns: Iterable[str] | Expression | None = None,
+    ) -> Expression:
+        """Retrieves values from a KV store.
+
+        Args:
+            store_name: Name of the KV store (str or Expression)
+            on_error: Behavior when key not found ("raise" or "null")
+            columns: Optional list of columns to retrieve from the value (if it's a struct/json)
+
+        Returns:
+            Expression: The retrieved value
+        """
+        from daft.functions.kv import kv_get_with_name
+
+        # Convert inputs to expressions if they aren't already
+        if isinstance(store_name, str):
+            store_name = lit(store_name)
+
+        if isinstance(on_error, str):
+            on_error = lit(on_error)
+
+        columns_expr: Expression | list[str] | None = None
+        if columns is not None:
+            if isinstance(columns, Expression):
+                columns_expr = columns
+            else:
+                columns_expr = list(columns)
+
+        return kv_get_with_name(store_name, self._expr, columns=columns_expr, on_error=on_error)
 
 
 class WhenExpr(Expression):
