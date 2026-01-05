@@ -147,6 +147,37 @@ def test_lancedb_read_parallelism_fragment_merging(large_lance_dataset_path):
     assert len(result["big_int"]) == 10000
 
 
+def test_lancedb_read_filter_passthrough(tmp_path):
+    """Test passing raw SQL filter string to Lance via default_scan_options."""
+    from shapely.geometry import Point
+
+    # Create dataset with points
+    # Point 0: (0, 0)
+    # Point 1: (10, 10)
+    # Point 2: (20, 20)
+    points_list = [Point(i * 10, i * 10).wkb for i in range(3)]
+
+    schema = pa.schema([pa.field("point", pa.binary()), pa.field("id", pa.int32())])
+
+    table = pa.Table.from_pydict({"point": points_list, "id": list(range(3))}, schema=schema)
+
+    dataset_path = str(tmp_path / "test_geo_filter_passthrough.lance")
+    lance.write_dataset(table, dataset_path)
+
+    # Test: Pass a raw SQL filter string to Lance via default_scan_options
+    # We use a simple filter first to verify the mechanism works
+    filter_str = "id >= 1"
+
+    df = daft.read_lance(dataset_path, default_scan_options={"filter": filter_str})
+
+    res = df.to_pydict()
+
+    assert len(res["id"]) == 2
+    assert 0 not in res["id"]
+    assert 1 in res["id"]
+    assert 2 in res["id"]
+
+
 class TestLanceDBCountPushdown:
     tmp_data = {
         "a": ["a", "b", "c", "d", "e", None],
