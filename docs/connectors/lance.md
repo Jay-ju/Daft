@@ -223,27 +223,6 @@ This example compacts a dataset with multiple fragments into a single, larger fr
     print(f"Final row count: {dataset.count_rows()}, and final fragment count: {len(dataset.get_fragments())}")
     ```
 
-    # 4. Verify
-    daft.read_lance("/tmp/lance/test_update_custom.lance").show()
-    ```
-
-    **Controlling Updated Columns**
-
-    By default, `update_columns` attempts to update all columns present in the DataFrame (excluding `fragment_id` and the join key).
-
-    - **Default Behavior**: If `read_columns` is not specified, Daft will try to update all columns in the DataFrame. If the DataFrame contains any column that does not exist in the target Lance dataset, a `ValueError` will be raised.
-    - **Selective Update**: If your DataFrame contains extra columns (e.g., intermediate calculations) that should not be updated, you can explicitly specify the columns to update using the `read_columns` parameter.
-
-    ```python
-    # Only update column 'val', ignoring other columns in 'updates'
-    # Note: read_columns must include the join key (e.g. '_rowid' or 'id')
-    daft.io.lance.update_columns(
-        updates,
-        "/tmp/lance/test_update.lance",
-        read_columns=["val", "_rowid"]
-    )
-    ```
-
 ### Filtering with Custom SQL Expressions
 
 Daft supports pushing down standard filters to Lance. However, if you need to use Lance-specific SQL functions (e.g., Geo functions like `st_distance`) that are not yet natively supported by Daft's expression engine, you can pass a raw SQL filter string directly to the Lance scanner via `default_scan_options`.

@@ -177,6 +177,11 @@ def test_lancedb_read_filter_passthrough(tmp_path):
     assert 1 in res["id"]
     assert 2 in res["id"]
 
+    # Note: We cannot test actual Geo functions (like st_distance) here because
+    # the installed Lance/DataFusion version in this CI environment might not support them.
+    # However, verifying that "id >= 1" works confirms that the `filter` string
+    # is correctly passed through to the Lance scanner.
+
 
 class TestLanceDBCountPushdown:
     tmp_data = {
