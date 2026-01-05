@@ -206,8 +206,8 @@ def test_lancedb_read_filter_passthrough(tmp_path):
             geo_dataset_path = str(tmp_path / "test_geo_arrow_filter.lance")
             lance.write_dataset(table, geo_dataset_path)
 
-            # Test st_distance filter
-            filter_geo = "st_distance(point, st_point(0, 0)) < 5"
+            # Test st_distance filter with st_geomfromtext to avoid potential issues with st_point constructor
+            filter_geo = "st_distance(point, st_geomfromtext('POINT (0 0)')) < 5"
             df_geo = daft.read_lance(geo_dataset_path, default_scan_options={"filter": filter_geo})
             res_geo = df_geo.to_pydict()
 
