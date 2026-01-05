@@ -185,7 +185,7 @@ def test_lancedb_read_filter_passthrough(tmp_path):
 
     from packaging import version
 
-    if False and version.parse(lance.__version__) >= version.parse("1.0.0"):
+    if version.parse(lance.__version__) >= version.parse("1.0.0"):
         try:
             import geoarrow.pyarrow as ga  # noqa: F401
             import numpy as np
@@ -199,6 +199,8 @@ def test_lancedb_read_filter_passthrough(tmp_path):
             y_coords = np.array([0.0, 10.0, 20.0])
             points = point().from_geobuffers(None, x_coords, y_coords)
 
+            # Note: We must match the nullability of the GeoArrow type exactly to avoid Daft type mismatch errors
+            # The error showed Actual was nullable=False for x/y fields inside the struct
             schema = pa.schema([pa.field("point", points.type), pa.field("id", pa.int32())])
 
             table = pa.Table.from_arrays([points, [0, 1, 2]], schema=schema)
