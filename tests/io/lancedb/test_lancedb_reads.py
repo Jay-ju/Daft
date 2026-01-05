@@ -182,6 +182,13 @@ def test_lancedb_read_filter_passthrough(tmp_path):
     # However, verifying that "id >= 1" works confirms that the `filter` string
     # is correctly passed through to the Lance scanner.
 
+    # If st_distance were supported, the test would look like this:
+    # filter_geo = "st_distance(point, st_point(0, 0)) < 5"
+    # df_geo = daft.read_lance(dataset_path, default_scan_options={"filter": filter_geo})
+    # res_geo = df_geo.to_pydict()
+    # assert len(res_geo['id']) == 1
+    # assert res_geo['id'][0] == 0
+
 
 class TestLanceDBCountPushdown:
     tmp_data = {
