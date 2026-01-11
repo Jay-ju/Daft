@@ -14,6 +14,9 @@ use daft_micropartition::MicroPartitionRef;
 pub struct QueryMetadata {
     pub output_schema: SchemaRef,
     pub unoptimized_plan: QueryPlan,
+    pub runner: String,
+    pub ray_dashboard_url: Option<String>,
+    pub entrypoint: Option<String>,
 }
 
 #[derive(Debug, Clone)]

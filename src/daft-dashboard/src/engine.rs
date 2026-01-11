@@ -18,8 +18,11 @@ use crate::state::{
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct StartQueryArgs {
-    pub start_sec: u64,
+    pub start_sec: f64,
     pub unoptimized_plan: QueryPlan,
+    pub runner: Option<String>,
+    pub ray_dashboard_url: Option<String>,
+    pub entrypoint: Option<String>,
 }
 
 async fn query_start(
@@ -35,6 +38,11 @@ async fn query_start(
         id: query_id.clone().into(),
         start_sec: args.start_sec,
         unoptimized_plan: args.unoptimized_plan,
+        runner: args
+            .runner
+            .unwrap_or_else(|| "Native (Swordfish)".to_string()),
+        ray_dashboard_url: args.ray_dashboard_url,
+        entrypoint: args.entrypoint,
         state: QueryState::Pending,
     };
 
@@ -52,7 +60,7 @@ async fn query_start(
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PlanStartArgs {
-    pub plan_start_sec: u64,
+    pub plan_start_sec: f64,
 }
 
 async fn plan_start(
@@ -81,7 +89,7 @@ async fn plan_start(
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct PlanEndArgs {
-    pub plan_end_sec: u64,
+    pub plan_end_sec: f64,
     pub optimized_plan: QueryPlan,
 }
 
@@ -113,7 +121,7 @@ async fn plan_end(
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ExecStartArgs {
-    pub exec_start_sec: u64,
+    pub exec_start_sec: f64,
     pub physical_plan: QueryPlan,
 }
 
@@ -163,11 +171,22 @@ async fn exec_start(
     Path(query_id): Path<QueryID>,
     Json(args): Json<ExecStartArgs>,
 ) -> StatusCode {
+    tracing::info!("Received exec_start for query {}", query_id);
     let query_info = state.queries.get_mut(&query_id);
     let Some(mut query_info) = query_info else {
+        tracing::error!("Query {} not found in exec_start", query_id);
         return StatusCode::BAD_REQUEST;
     };
+
+    // Debug state
+    tracing::info!("Query {} state: {:?}", query_id, query_info.state);
+
     let QueryState::Setup { plan_info } = &query_info.state else {
+        tracing::error!(
+            "Query {} not in Setup state (actual: {:?})",
+            query_id,
+            query_info.state
+        );
         return StatusCode::BAD_REQUEST;
     };
 
@@ -257,7 +276,7 @@ async fn exec_emit_stats(
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ExecEndArgs {
-    pub exec_end_sec: u64,
+    pub exec_end_sec: f64,
 }
 
 async fn exec_end(
@@ -290,7 +309,7 @@ async fn exec_end(
 #[derive(Clone, Deserialize, Serialize)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct FinalizeArgs {
-    pub end_sec: u64,
+    pub end_sec: f64,
     pub end_state: QueryEndState,
     pub error_message: Option<String>,
     // IPC-serialized RecordBatch
@@ -307,14 +326,23 @@ async fn query_end(
         tracing::error!("Query `{}` not found", query_id);
         return StatusCode::BAD_REQUEST;
     };
-    let QueryState::Finalizing {
-        exec_info,
-        plan_info,
-        exec_end_sec,
-    } = &query_info.state
-    else {
-        tracing::error!("Query `{}` not in finalizing state", query_id);
-        return StatusCode::BAD_REQUEST;
+
+    let (plan_info, exec_info, exec_end_sec) = match &query_info.state {
+        QueryState::Finalizing {
+            exec_info,
+            plan_info,
+            exec_end_sec,
+        } => (
+            Some(plan_info.clone()),
+            Some(exec_info.clone()),
+            Some(*exec_end_sec),
+        ),
+        QueryState::Executing {
+            plan_info,
+            exec_info,
+        } => (Some(plan_info.clone()), Some(exec_info.clone()), None),
+        QueryState::Setup { plan_info } => (Some(plan_info.clone()), None, None),
+        _ => (None, None, None),
     };
 
     let results = if let Some(results) = &args.results {
@@ -334,22 +362,31 @@ async fn query_end(
     };
 
     query_info.state = match args.end_state {
-        QueryEndState::Finished => QueryState::Finished {
-            plan_info: plan_info.clone(),
-            exec_info: exec_info.clone(),
-            exec_end_sec: *exec_end_sec,
-            end_sec: args.end_sec,
-            results,
-        },
+        QueryEndState::Finished => {
+            if let (Some(plan_info), Some(exec_info), Some(exec_end_sec)) =
+                (plan_info, exec_info, exec_end_sec)
+            {
+                QueryState::Finished {
+                    plan_info,
+                    exec_info,
+                    exec_end_sec,
+                    end_sec: args.end_sec,
+                    results,
+                }
+            } else {
+                tracing::error!("Query `{}` cannot be finished (missing info)", query_id);
+                return StatusCode::BAD_REQUEST;
+            }
+        }
         QueryEndState::Canceled => QueryState::Canceled {
-            plan_info: plan_info.clone(),
-            exec_info: exec_info.clone(),
+            plan_info,
+            exec_info,
             end_sec: args.end_sec,
             message: args.error_message,
         },
         QueryEndState::Failed => QueryState::Failed {
-            plan_info: plan_info.clone(),
-            exec_info: exec_info.clone(),
+            plan_info,
+            exec_info,
             end_sec: args.end_sec,
             message: args.error_message,
         },

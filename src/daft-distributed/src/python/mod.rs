@@ -145,6 +145,17 @@ impl PyDistributedPhysicalPlan {
             None,
         ))
     }
+
+    fn repr_json(&self) -> PyResult<String> {
+        let dummy = serde_json::json!({
+            "id": 0,
+            "name": "DistributedPhysicalPlan",
+            "type": "Distributed",
+            "category": "Physical",
+            "children": []
+        });
+        Ok(dummy.to_string())
+    }
 }
 impl_bincode_py_state_serialization!(PyDistributedPhysicalPlan);
 

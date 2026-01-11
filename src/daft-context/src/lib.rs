@@ -184,6 +184,65 @@ impl DaftContext {
             Ok::<(), DaftError>(())
         })
     }
+
+    pub fn notify_exec_start(&self, query_id: QueryID, physical_plan: String) -> DaftResult<()> {
+        self.with_state(|state| {
+            for subscriber in state.subscribers.values() {
+                subscriber.on_exec_start(query_id.clone(), physical_plan.clone().into())?;
+            }
+            Ok::<(), DaftError>(())
+        })
+    }
+
+    pub fn notify_exec_end(&self, query_id: QueryID) -> DaftResult<()> {
+        self.with_state(|state| {
+            let rt = common_runtime::get_io_runtime(false);
+            for subscriber in state.subscribers.values() {
+                rt.block_on_current_thread(subscriber.on_exec_end(query_id.clone()))?;
+            }
+            Ok::<(), DaftError>(())
+        })
+    }
+
+    pub fn notify_exec_operator_start(&self, query_id: QueryID, node_id: usize) -> DaftResult<()> {
+        self.with_state(|state| {
+            let rt = common_runtime::get_io_runtime(false);
+            for subscriber in state.subscribers.values() {
+                rt.block_on_current_thread(
+                    subscriber.on_exec_operator_start(query_id.clone(), node_id),
+                )?;
+            }
+            Ok::<(), DaftError>(())
+        })
+    }
+
+    pub fn notify_exec_operator_end(&self, query_id: QueryID, node_id: usize) -> DaftResult<()> {
+        self.with_state(|state| {
+            let rt = common_runtime::get_io_runtime(false);
+            for subscriber in state.subscribers.values() {
+                rt.block_on_current_thread(
+                    subscriber.on_exec_operator_end(query_id.clone(), node_id),
+                )?;
+            }
+            Ok::<(), DaftError>(())
+        })
+    }
+
+    pub fn notify_exec_emit_stats(
+        &self,
+        query_id: QueryID,
+        stats: Vec<(usize, common_metrics::StatSnapshot)>,
+    ) -> DaftResult<()> {
+        self.with_state(|state| {
+            let rt = common_runtime::get_io_runtime(false);
+            for subscriber in state.subscribers.values() {
+                rt.block_on_current_thread(
+                    subscriber.on_exec_emit_stats(query_id.clone(), &stats),
+                )?;
+            }
+            Ok::<(), DaftError>(())
+        })
+    }
 }
 
 static DAFT_CONTEXT: OnceLock<DaftContext> = OnceLock::new();

@@ -6,19 +6,17 @@ use common_metrics::{NodeID, QueryID, QueryPlan, Stat, StatSnapshot};
 use common_runtime::{RuntimeRef, get_io_runtime};
 use daft_micropartition::{MicroPartition, MicroPartitionRef};
 use daft_recordbatch::RecordBatch;
-#[cfg(feature = "python")]
-use daft_runners::get_or_create_runner;
 use dashmap::DashMap;
 use reqwest::{Client, RequestBuilder};
 
 use crate::subscribers::{QueryMetadata, QueryResult, Subscriber};
 
 /// Get the number of seconds from the current timesince the UNIX epoch
-fn secs_from_epoch() -> u64 {
+fn secs_from_epoch() -> f64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .unwrap()
-        .as_secs()
+        .as_secs_f64()
 }
 
 pub struct DashboardSubscriber {
@@ -44,14 +42,6 @@ impl DashboardSubscriber {
         let Ok(url) = std::env::var("DAFT_DASHBOARD_URL") else {
             return Ok(None);
         };
-
-        // TODO(zhenchao) remove it when we support Ray Runner
-        #[cfg(feature = "python")]
-        if get_or_create_runner()?.is_ray() {
-            return Err(DaftError::not_implemented(
-                "Dashboard isn't currently supported in Ray Runner",
-            ));
-        }
 
         const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
@@ -118,6 +108,9 @@ impl Subscriber for DashboardSubscriber {
                     .json(&daft_dashboard::engine::StartQueryArgs {
                         start_sec: secs_from_epoch(),
                         unoptimized_plan: metadata.unoptimized_plan.clone(),
+                        runner: Some(metadata.runner.clone()),
+                        ray_dashboard_url: metadata.ray_dashboard_url.clone(),
+                        entrypoint: metadata.entrypoint.clone(),
                     }),
             )
             .await?;

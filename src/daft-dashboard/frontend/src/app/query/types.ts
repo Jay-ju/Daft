@@ -97,5 +97,8 @@ export type QueryInfo = {
   id: string;
   start_sec: number;
   unoptimized_plan: string;
+  runner: string;
+  ray_dashboard_url?: string;
+  entrypoint?: string;
   state: QueryState;
 };
