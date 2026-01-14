@@ -7,6 +7,14 @@ const getStatusIcon = (status: OperatorStatus) => {
       return <Naruto />;
     case "Executing":
       return <AnimatedFish />;
+    case "Failed":
+      return (
+        <div className="w-5 h-5 flex items-center justify-center">
+          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+            <span className="text-white text-[10px] font-bold">!</span>
+          </div>
+        </div>
+      );
     case "Pending":
     default:
       return (
@@ -20,6 +28,8 @@ const getStatusText = (status: OperatorStatus) => {
     return "Finished";
   } else if (status === "Executing") {
     return "Running";
+  } else if (status === "Failed") {
+    return "Failed";
   } else {
     return "Pending";
   }
@@ -31,6 +41,8 @@ const getStatusColor = (status: OperatorStatus) => {
       return "text-green-500";
     case "Executing":
       return "text-(--daft-accent)";
+    case "Failed":
+      return "text-red-500";
     case "Pending":
     default:
       return "text-zinc-400";
@@ -71,10 +83,13 @@ export default function ProgressTable({
 }) {
   return (
     <div className="overflow-auto h-full">
-      <div className="min-w-[710px]">
+      <div className="min-w-[770px]">
         {/* Table Headers */}
-        <div className="bg-zinc-800 grid grid-cols-[50px_100px_200px_120px_120px_1fr] gap-0 items-center min-h-[55px] border-b border-zinc-700">
+        <div className="bg-zinc-800 grid grid-cols-[50px_60px_100px_200px_120px_120px_1fr] gap-0 items-center min-h-[55px] border-b border-zinc-700">
           <div className="px-3 py-4 border-r border-zinc-700 h-full flex items-center"></div>
+          <div className="px-3 py-4 text-sm font-bold text-white font-mono border-r border-zinc-700 h-full flex items-center justify-center">
+            ID
+          </div>
           <div className="px-3 py-4 text-right text-sm font-bold text-white font-mono border-r border-zinc-700 h-full flex items-center justify-end">
             Status
           </div>
@@ -94,10 +109,10 @@ export default function ProgressTable({
 
         {/* Operator Rows */}
         <div className="divide-y divide-zinc-700">
-          {Object.entries(exec_state.exec_info.operators).map(
-            ([operatorId, operator]) => {
+          {Object.entries(exec_state.exec_info.operators)
+            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+            .map(([operatorId, operator]) => {
               const name = operator.node_info.name;
-
               // Extract important stats from operator.stats
               const rowsIn = operator.stats["rows in"]?.value || 0;
               const rowsOut = operator.stats["rows out"]?.value || 0;
@@ -115,10 +130,13 @@ export default function ProgressTable({
               return (
                 <div
                   key={operatorId}
-                  className="grid grid-cols-[50px_100px_200px_120px_120px_1fr] gap-0 items-center min-h-[55px] transition-colors hover:bg-zinc-800/50"
+                  className="grid grid-cols-[50px_60px_100px_200px_120px_120px_1fr] gap-0 items-center min-h-[55px] transition-colors hover:bg-zinc-800/50"
                 >
                   <div className="px-3 py-4 flex items-center justify-end border-r border-zinc-700 h-full">
                     {getStatusIcon(operator.status)}
+                  </div>
+                  <div className="px-3 py-4 text-center text-sm text-zinc-400 font-mono border-r border-zinc-700 h-full flex items-center justify-center">
+                    {operatorId}
                   </div>
                   <div className="pr-3 py-4 text-right text-sm border-r border-zinc-700 h-full flex items-center justify-end">
                     <span className={getStatusColor(operator.status)}>
@@ -139,8 +157,7 @@ export default function ProgressTable({
                   </div>
                 </div>
               );
-            }
-          )}
+            })}
         </div>
       </div>
     </div>

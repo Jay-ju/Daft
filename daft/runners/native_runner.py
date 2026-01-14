@@ -123,10 +123,6 @@ class NativeRunner(Runner[MicroPartition]):
             for result in results_gen:
                 ctx._notify_result_out(query_id, result.partition())
                 total_rows += len(result.partition())
-                # Try to emit stats for operator 0?
-                # If NativeExecutor doesn't start operator 0, this might fail or be ignored.
-                # Let's comment it out for now to see baseline behavior.
-                # ctx._notify_exec_emit_stats(query_id, 0, {"rows in": total_rows, "rows out": total_rows})
                 yield result
         except KeyboardInterrupt as e:
             query_result = PyQueryResult(QueryEndState.Canceled, "Query canceled by the user.")

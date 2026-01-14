@@ -33,14 +33,33 @@ pub trait Subscriber: Send + Sync + std::fmt::Debug + 'static {
     fn on_optimization_start(&self, query_id: QueryID) -> DaftResult<()>;
     fn on_optimization_end(&self, query_id: QueryID, optimized_plan: QueryPlan) -> DaftResult<()>;
     fn on_exec_start(&self, query_id: QueryID, physical_plan: QueryPlan) -> DaftResult<()>;
+    fn on_exec_start_with_id(
+        &self,
+        query_id: QueryID,
+        _execution_id: &str,
+        physical_plan: QueryPlan,
+    ) -> DaftResult<()> {
+        self.on_exec_start(query_id, physical_plan)
+    }
     async fn on_exec_operator_start(&self, query_id: QueryID, node_id: NodeID) -> DaftResult<()>;
     async fn on_exec_emit_stats(
         &self,
         query_id: QueryID,
         stats: &[(NodeID, StatSnapshot)],
     ) -> DaftResult<()>;
+    async fn on_exec_emit_stats_with_id(
+        &self,
+        query_id: QueryID,
+        _execution_id: &str,
+        stats: &[(NodeID, StatSnapshot)],
+    ) -> DaftResult<()> {
+        self.on_exec_emit_stats(query_id, stats).await
+    }
     async fn on_exec_operator_end(&self, query_id: QueryID, node_id: NodeID) -> DaftResult<()>;
     async fn on_exec_end(&self, query_id: QueryID) -> DaftResult<()>;
+    async fn on_exec_end_with_id(&self, query_id: QueryID, _execution_id: &str) -> DaftResult<()> {
+        self.on_exec_end(query_id).await
+    }
 }
 
 pub fn default_subscribers() -> HashMap<String, Arc<dyn Subscriber>> {

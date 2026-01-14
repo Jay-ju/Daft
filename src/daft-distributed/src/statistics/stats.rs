@@ -95,11 +95,19 @@ impl DefaultRuntimeStats {
         if let Some(Stat::Count(rows_in)) = stats.get(ROWS_IN_KEY) {
             self.completed_rows_in
                 .add(*rows_in, self.node_kv.as_slice());
+        } else if let Some(Stat::Count(rows_in)) = stats.get("rows_in") {
+            // Fallback for different key format
+            self.completed_rows_in
+                .add(*rows_in, self.node_kv.as_slice());
         }
 
         // Worker rows out
         // TODO: For sink operators, use a special runtime stats
         if let Some(Stat::Count(rows_out)) = stats.get(ROWS_OUT_KEY) {
+            self.completed_rows_out
+                .add(*rows_out, self.node_kv.as_slice());
+        } else if let Some(Stat::Count(rows_out)) = stats.get("rows_out") {
+            // Fallback for different key format
             self.completed_rows_out
                 .add(*rows_out, self.node_kv.as_slice());
         }

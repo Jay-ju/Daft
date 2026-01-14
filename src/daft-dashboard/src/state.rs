@@ -13,11 +13,12 @@ use serde::Serialize;
 use tokio::sync::{broadcast, watch};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub(crate) enum OperatorStatus {
     Pending,
     Executing,
     Finished,
+    Failed,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +34,8 @@ pub(crate) struct OperatorInfo {
     pub status: OperatorStatus,
     pub node_info: NodeInfo,
     pub stats: HashMap<String, Stat>,
+    #[serde(skip)]
+    pub source_stats: HashMap<String, HashMap<String, Stat>>,
 }
 
 pub(crate) type OperatorInfos = HashMap<NodeID, OperatorInfo>;
@@ -242,13 +245,29 @@ impl DashboardState {
     pub fn ping_clients_on_operator_update(&self, query_info: &QueryInfo) {
         let query_id = &query_info.id;
         if let Some(query_client) = self.query_clients.get(query_id) {
-            let QueryState::Executing { exec_info, .. } = &query_info.state else {
-                tracing::error!("Query `{}` is not executing", query_id);
-                panic!("Query `{}` is not executing", query_id);
-            };
-
-            let operator_infos = exec_info.operators.clone();
-            let _ = query_client.1.send(operator_infos);
+            match &query_info.state {
+                QueryState::Executing { exec_info, .. }
+                | QueryState::Finalizing { exec_info, .. }
+                | QueryState::Finished { exec_info, .. }
+                | QueryState::Failed {
+                    exec_info: Some(exec_info),
+                    ..
+                }
+                | QueryState::Canceled {
+                    exec_info: Some(exec_info),
+                    ..
+                } => {
+                    let operator_infos = exec_info.operators.clone();
+                    let _ = query_client.1.send(operator_infos);
+                }
+                _ => {
+                    tracing::warn!(
+                        "Query `{}` is not in an executing state (current: {:?}), skipping operator update",
+                        query_id,
+                        query_info.state
+                    );
+                }
+            }
         }
     }
 }

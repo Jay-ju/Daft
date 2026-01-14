@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -596,8 +597,8 @@ class RayRunner(Runner[ray.ObjectRef]):
             distributed_plan = DistributedPhysicalPlan.from_logical_plan_builder(
                 builder._builder, query_id, daft_execution_config
             )
-            ctx._notify_exec_start(query_id, distributed_plan.repr_json())
-            ctx._notify_exec_operator_start(query_id, 0)
+            physical_plan_json = distributed_plan.repr_json()
+            ctx._notify_exec_start(query_id, physical_plan_json)
 
             if self.flotilla_plan_runner is None:
                 self.flotilla_plan_runner = FlotillaRunner()
@@ -608,12 +609,23 @@ class RayRunner(Runner[ray.ObjectRef]):
             ):
                 if result.metadata() is not None:
                     total_rows += result.metadata().num_rows
-                    # TODO(srilman): We should emit stats from the Rust Executor (Flotilla) instead of here.
-                    # Currently Flotilla doesn't support Dashboard subscribers, so we keep this for now to ensure Dashboard shows row counts.
-                    ctx._notify_exec_emit_stats(query_id, 0, {"rows in": total_rows, "rows out": total_rows})
                 yield result
 
-            ctx._notify_exec_operator_end(query_id, 0)
+            # Mark all operators as finished to clean up the Dashboard UI before notify_exec_end
+            try:
+                plan_dict = json.loads(physical_plan_json)
+
+                def notify_end(node: dict[str, Any]) -> None:
+                    if "id" in node:
+                        ctx._notify_exec_operator_end(query_id, node["id"])
+                    if "children" in node:
+                        for child in node["children"]:
+                            notify_end(child)
+
+                notify_end(plan_dict)
+            except Exception:
+                pass
+
             ctx._notify_exec_end(query_id)
             ctx._notify_query_end(query_id, PyQueryResult(QueryEndState.Finished, ""))
 

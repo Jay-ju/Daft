@@ -182,12 +182,29 @@ impl RuntimeStatsManager {
                     }
 
                     finish_status = &mut finish_rx => {
-                        if let Ok(status) = finish_status && status == QueryEndState::Finished && !active_nodes.is_empty() {
+                        if finish_status == Ok(QueryEndState::Finished) && !active_nodes.is_empty() {
                             log::error!(
                                 "RuntimeStatsManager finished with active nodes {{{}}}",
                                 active_nodes.iter().map(|id: &usize| id.to_string()).join(", ")
                             );
                         }
+
+                        // Emit final stats to all subscribers before finishing
+                        snapshot_container.clear();
+                        for (node_id, runtime_stats) in &node_stats_map {
+                            let event = runtime_stats.flush();
+                            snapshot_container.push((*node_id, event));
+                        }
+                        if !snapshot_container.is_empty() {
+                            for res in future::join_all(subscribers.iter().map(|subscriber| {
+                                subscriber.handle_event(snapshot_container.as_slice())
+                            })).await {
+                                if let Err(e) = res {
+                                    log::error!("Failed to handle final event: {}", e);
+                                }
+                            }
+                        }
+
                         break;
                     }
 
@@ -198,7 +215,7 @@ impl RuntimeStatsManager {
 
                         for node_id in &active_nodes {
                             let runtime_stats = &node_stats_map[node_id];
-                            let event = runtime_stats.snapshot();
+                            let event = runtime_stats.flush();
                             snapshot_container.push((*node_id, event));
                         }
 
@@ -343,7 +360,8 @@ impl InitializingCountingReceiver {
             {
                 self.stats_manager.activate_node(self.node_id);
             }
-            self.rt.add_rows_in(v.len() as u64);
+            let len = v.len() as u64;
+            self.rt.add_rows_in(len);
         }
         v
     }

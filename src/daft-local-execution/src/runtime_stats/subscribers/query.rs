@@ -11,6 +11,7 @@ use crate::runtime_stats::RuntimeStatsSubscriber;
 pub(crate) struct SubscriberWrapper {
     inner: Arc<dyn Subscriber>,
     query_id: QueryID,
+    execution_id: String,
 }
 
 impl SubscriberWrapper {
@@ -19,8 +20,13 @@ impl SubscriberWrapper {
         query_id: QueryID,
         physical_plan: QueryPlan,
     ) -> DaftResult<Self> {
-        inner.on_exec_start(query_id.clone(), physical_plan)?;
-        Ok(Self { inner, query_id })
+        let execution_id = format!("{}-{}", query_id, rand::random::<u64>());
+        inner.on_exec_start_with_id(query_id.clone(), &execution_id, physical_plan)?;
+        Ok(Self {
+            inner,
+            query_id,
+            execution_id,
+        })
     }
 }
 
@@ -50,13 +56,19 @@ impl RuntimeStatsSubscriber for SubscriberWrapper {
             .collect::<Vec<_>>();
 
         self.inner
-            .on_exec_emit_stats(self.query_id.clone(), all_node_stats.as_slice())
+            .on_exec_emit_stats_with_id(
+                self.query_id.clone(),
+                &self.execution_id,
+                all_node_stats.as_slice(),
+            )
             .await?;
         Ok(())
     }
 
     async fn finish(self: Box<Self>) -> DaftResult<()> {
-        self.inner.on_exec_end(self.query_id.clone()).await?;
+        self.inner
+            .on_exec_end_with_id(self.query_id.clone(), &self.execution_id)
+            .await?;
         Ok(())
     }
 
