@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 NUM_BUCKETS = "num_buckets"
 KEY_COLUMN = "key_column"
 NUM_CPUS = "num_cpus"
+ENABLE_SCAN_TASK_SPLIT_AND_MERGE = "enable_scan_task_split_and_merge"
+MAX_SOURCES_PER_SCAN_TASK = "max_sources_per_scan_task"
+SCAN_TASKS_MAX_SIZE_BYTES = "scan_tasks_max_size_bytes"
+SCAN_TASKS_MIN_SIZE_BYTES = "scan_tasks_min_size_bytes"
 PLACEMENT_GROUP_READY_TIMEOUT_SECONDS = 10
 
 
@@ -106,13 +110,25 @@ def try_apply_filter_and_collect(
         placement_group: PlacementGroup | None = None
 
         if checkpoint_config is not None:
-            key_column, num_buckets, num_cpus = _validate_checkpoint_config(checkpoint_config)
+            (
+                key_column,
+                num_buckets,
+                num_cpus,
+                enable_scan_task_split_and_merge,
+                max_sources_per_scan_task,
+                scan_tasks_max_size_bytes,
+                scan_tasks_min_size_bytes,
+            ) = _validate_checkpoint_config(checkpoint_config)
             actor_handles, placement_group, checkpoint_filter = _prepare_checkpoint_filter(
                 root_dir=root_dir,
                 io_config=io_config,
                 key_column=key_column,
                 num_buckets=num_buckets,
                 num_cpus=num_cpus,
+                enable_scan_task_split_and_merge=enable_scan_task_split_and_merge,
+                max_sources_per_scan_task=max_sources_per_scan_task,
+                scan_tasks_max_size_bytes=scan_tasks_max_size_bytes,
+                scan_tasks_min_size_bytes=scan_tasks_min_size_bytes,
                 read_fn=read_fn,
             )
             if checkpoint_filter is not None:
@@ -131,7 +147,9 @@ def try_apply_filter_and_collect(
 # -----------------------------------------------------------------------------
 # Internal helper function: prepare checkpoint filtering for write methods
 # -----------------------------------------------------------------------------
-def _validate_checkpoint_config(config: dict[str, Any]) -> tuple[str, int, float]:
+def _validate_checkpoint_config(
+    config: dict[str, Any],
+) -> tuple[str, int, float, bool | None, int | None, int | None, int | None]:
     """Validates checkpoint configuration contains required fields with correct types.
 
     Args:
@@ -170,7 +188,69 @@ def _validate_checkpoint_config(config: dict[str, Any]) -> tuple[str, int, float
     if num_cpus <= 0:
         raise ValueError(f"'{NUM_CPUS}' must be > 0, got {num_cpus}")
 
-    return key_column, num_buckets, num_cpus
+    enable_scan_task_split_and_merge = config.get(ENABLE_SCAN_TASK_SPLIT_AND_MERGE, None)
+    if enable_scan_task_split_and_merge is not None and not isinstance(enable_scan_task_split_and_merge, bool):
+        raise ValueError(
+            f"'{ENABLE_SCAN_TASK_SPLIT_AND_MERGE}' must be a bool, got {type(enable_scan_task_split_and_merge).__name__}"
+        )
+
+    max_sources_per_scan_task_obj = config.get(MAX_SOURCES_PER_SCAN_TASK, None)
+    if max_sources_per_scan_task_obj is None:
+        max_sources_per_scan_task = None
+    else:
+        try:
+            ms_float = float(max_sources_per_scan_task_obj)
+        except Exception:
+            raise ValueError(
+                f"'{MAX_SOURCES_PER_SCAN_TASK}' must be numeric (int/float), got {max_sources_per_scan_task_obj}"
+            )
+        if not ms_float.is_integer() or ms_float <= 0:
+            raise ValueError(
+                f"'{MAX_SOURCES_PER_SCAN_TASK}' must be a positive integer, got {max_sources_per_scan_task_obj}"
+            )
+        max_sources_per_scan_task = int(ms_float)
+
+    scan_tasks_max_size_bytes_obj = config.get(SCAN_TASKS_MAX_SIZE_BYTES, None)
+    if scan_tasks_max_size_bytes_obj is None:
+        scan_tasks_max_size_bytes = None
+    else:
+        try:
+            max_bytes = float(scan_tasks_max_size_bytes_obj)
+        except Exception:
+            raise ValueError(
+                f"'{SCAN_TASKS_MAX_SIZE_BYTES}' must be numeric (int/float), got {scan_tasks_max_size_bytes_obj}"
+            )
+        if not max_bytes.is_integer() or max_bytes <= 0:
+            raise ValueError(
+                f"'{SCAN_TASKS_MAX_SIZE_BYTES}' must be a positive integer, got {scan_tasks_max_size_bytes_obj}"
+            )
+        scan_tasks_max_size_bytes = int(max_bytes)
+
+    scan_tasks_min_size_bytes_obj = config.get(SCAN_TASKS_MIN_SIZE_BYTES, None)
+    if scan_tasks_min_size_bytes_obj is None:
+        scan_tasks_min_size_bytes = None
+    else:
+        try:
+            min_bytes = float(scan_tasks_min_size_bytes_obj)
+        except Exception:
+            raise ValueError(
+                f"'{SCAN_TASKS_MIN_SIZE_BYTES}' must be numeric (int/float), got {scan_tasks_min_size_bytes_obj}"
+            )
+        if not min_bytes.is_integer() or min_bytes <= 0:
+            raise ValueError(
+                f"'{SCAN_TASKS_MIN_SIZE_BYTES}' must be a positive integer, got {scan_tasks_min_size_bytes_obj}"
+            )
+        scan_tasks_min_size_bytes = int(min_bytes)
+
+    return (
+        key_column,
+        num_buckets,
+        num_cpus,
+        enable_scan_task_split_and_merge,
+        max_sources_per_scan_task,
+        scan_tasks_max_size_bytes,
+        scan_tasks_min_size_bytes,
+    )
 
 
 def _split_partitions_evenly(total: int, buckets: int) -> tuple[int, int]:
@@ -186,6 +266,10 @@ def _prepare_checkpoint_filter(
     key_column: str,
     num_buckets: int,
     num_cpus: float,
+    enable_scan_task_split_and_merge: bool | None,
+    max_sources_per_scan_task: int | None,
+    scan_tasks_max_size_bytes: int | None,
+    scan_tasks_min_size_bytes: int | None,
     read_fn: Callable[..., DataFrame],
 ) -> tuple[list[ActorHandle], PlacementGroup | None, Expression | None]:
     """Build and return checkpoint resources.
@@ -206,10 +290,25 @@ def _prepare_checkpoint_filter(
     # Read existing keys dataframe and extract partitions
     df_keys = None
     try:
-        df_keys = read_fn(path=str(root_dir), io_config=io_config)
-        if key_column:
-            df_keys = df_keys.select(key_column)
-        partition_list = list(df_keys.iter_partitions())
+        from daft.context import execution_config_ctx
+
+        with execution_config_ctx(
+            enable_scan_task_split_and_merge=enable_scan_task_split_and_merge,
+            max_sources_per_scan_task=max_sources_per_scan_task,
+            scan_tasks_max_size_bytes=scan_tasks_max_size_bytes,
+            scan_tasks_min_size_bytes=scan_tasks_min_size_bytes,
+        ):
+            df_keys = read_fn(path=str(root_dir), io_config=io_config)
+            if key_column:
+                df_keys = df_keys.select(key_column)
+            num_partitions = df_keys.num_partitions()
+            if num_partitions is None:
+                raise RuntimeError(
+                    "Unable to determine number of partitions for checkpoint scan; "
+                    "cannot coalesce partitions before iter_partitions."
+                )
+            df_keys = df_keys.into_partitions(num_partitions)
+            partition_list = list(df_keys.iter_partitions())
     except FileNotFoundError as e:
         warnings.warn(
             f"{root_dir} not found, checkpointing will not be supported because it's unnecessary. message: {e}"
