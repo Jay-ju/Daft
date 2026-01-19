@@ -129,6 +129,32 @@ def test_checkpoint_resume_e2e_with_custom_num_cpus(tmp_path: Path, fmt):
     assert final_ids == set(range(100)), f"Final ids mismatch: {sorted(list(final_ids))}"
 
 
+@pytest.mark.skipif(get_tests_daft_runner_name() != "ray", reason="requires Ray Runner to be in use")
+def test_checkpoint_resume_e2e_with_scan_task_merge_config(tmp_path: Path):
+    """Goal: checkpoint_config can override scan task split/merge settings for checkpoint reads."""
+    fmt = FileFormat.Parquet
+    ck = {
+        "key_column": "id",
+        "num_buckets": 4,
+        "num_cpus": 1.0,
+        "enable_scan_task_split_and_merge": True,
+        "max_sources_per_scan_task": 100,
+        "scan_tasks_max_size_bytes": 256 * 1024 * 1024,
+        "scan_tasks_min_size_bytes": 1 * 1024 * 1024,
+    }
+
+    df_all = daft.range(1000, partitions=200)
+    df_first = df_all.where(col("id") < 500)
+
+    root_dir = tmp_path / "ckpt_scan_task_cfg"
+    helper_write_dataframe(df_first, fmt, root_dir, checkpoint_config=ck)
+    helper_write_dataframe(df_all, fmt, root_dir, checkpoint_config=ck)
+
+    df_final = helper_read_dataframe(fmt, root_dir)
+    final_ids = set(df_final.select("id").to_pydict()["id"])
+    assert final_ids == set(range(1000)), f"Final ids mismatch: {sorted(list(final_ids))}"
+
+
 @pytest.mark.parametrize("input_fmt", [FileFormat.Csv, FileFormat.Parquet, FileFormat.Json])
 @pytest.mark.parametrize("output_fmt", [FileFormat.Csv, FileFormat.Parquet, FileFormat.Json])
 @pytest.mark.skipif(get_tests_daft_runner_name() != "ray", reason="requires Ray Runner to be in use")
