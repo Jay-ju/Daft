@@ -6,7 +6,10 @@ from daft.datatype import DataType
 from daft.series import Series
 from daft.runners import get_or_create_runner
 from daft.expressions import col
+import logging
 import warnings
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from daft.expressions import Expression
@@ -31,12 +34,14 @@ PLACEMENT_GROUP_READY_TIMEOUT_SECONDS = 10
 
 class CheckpointActor:
     def __init__(self, partition_list: list[ray.ObjectRef], key_column_name: str):
+        logger.info("Start initializing CheckpointActor")
         import ray
 
         partitions = ray.get(partition_list)
         key_col = [partition.to_pydict()[key_column_name] for partition in partitions]
         self.key_set = set([item for sublist in key_col for item in sublist])
         del partitions, key_col, partition_list
+        logger.info("CheckpointActor initialized")
 
     def filter(self, input_keys: list[Any]) -> "np.ndarray":  # noqa: UP037
         import numpy as np
@@ -132,7 +137,10 @@ def try_apply_filter_and_collect(
                 read_fn=read_fn,
             )
             if checkpoint_filter is not None:
+                logger.info("Checkpoint filter enabled")
                 write_df = write_df._insert_filter_after_source(checkpoint_filter)
+            else:
+                logger.info("Checkpoint filter is a no-op (no existing checkpoint data)")
 
         write_df.collect()
     finally:
@@ -287,6 +295,14 @@ def _prepare_checkpoint_filter(
     if get_or_create_runner().name != "ray":
         raise RuntimeError("Checkpointing is only supported on Ray runner")
 
+    logger.info(
+        "Preparing checkpoint filter: root_dir=%s key_column=%s num_buckets=%s num_cpus=%s",
+        str(root_dir),
+        key_column,
+        num_buckets,
+        num_cpus,
+    )
+
     # Read existing keys dataframe and extract partitions
     df_keys = None
     try:
@@ -309,6 +325,7 @@ def _prepare_checkpoint_filter(
                 )
             df_keys = df_keys.into_partitions(num_partitions)
             partition_list = list(df_keys.iter_partitions())
+            logger.info("Checkpoint scan partitions=%s", len(partition_list))
     except FileNotFoundError as e:
         warnings.warn(
             f"{root_dir} not found, checkpointing will not be supported because it's unnecessary. message: {e}"
@@ -332,9 +349,11 @@ def _prepare_checkpoint_filter(
     from ray.util.placement_group import placement_group
 
     pg = placement_group([{"CPU": num_cpus} for _ in range(num_buckets)], strategy="SPREAD")
+    logger.info("Created checkpoint placement group: num_buckets=%s num_cpus=%s", num_buckets, num_cpus)
     try:
         # Wait for placement group to be ready with a timeout (seconds)
         ray.get(pg.ready(), timeout=PLACEMENT_GROUP_READY_TIMEOUT_SECONDS)
+        logger.info("Checkpoint placement group is ready")
     except GetTimeoutError as timeout_err:
         # Best effort cleanup to avoid leaking PG
         try:
@@ -351,24 +370,35 @@ def _prepare_checkpoint_filter(
 
     actor_handles: list[ActorHandle] = []
     start = 0
-    for i in range(num_buckets):
-        end = start + base_len + (1 if i < remainder else 0)
-        actor = (
-            ray.remote(CheckpointActor)
-            .options(
-                num_cpus=num_cpus,
-                scheduling_strategy=ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
-                    placement_group=pg,
-                    placement_group_bundle_index=i,
-                ),
+    try:
+        logger.info("Creating checkpoint actors: count=%s", num_buckets)
+        for i in range(num_buckets):
+            end = start + base_len + (1 if i < remainder else 0)
+            actor = (
+                ray.remote(CheckpointActor)
+                .options(
+                    num_cpus=num_cpus,
+                    scheduling_strategy=ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
+                        placement_group=pg,
+                        placement_group_bundle_index=i,
+                    ),
+                )
+                .remote(partition_list[start:end], key_column)
             )
-            .remote(partition_list[start:end], key_column)
-        )
-        actor_handles.append(actor)
-        start = end
+            actor_handles.append(actor)
+            start = end
 
-    ray.get([actor.__ray_ready__.remote() for actor in actor_handles])
-    del df_keys
+        ray.get(
+            [actor.__ray_ready__.remote() for actor in actor_handles],
+            timeout=PLACEMENT_GROUP_READY_TIMEOUT_SECONDS,
+        )
+        logger.info("All checkpoint actors are ready")
+    except Exception as e:
+        logger.exception("Failed to create all checkpoint actors")
+        _cleanup_checkpoint_resources(actor_handles, pg)
+        raise RuntimeError(f"Failed to create all checkpoint actors: {e}") from e
+    finally:
+        del df_keys
 
     checkpoint_filter = CheckpointFilter(num_buckets=num_buckets, actor_handles=actor_handles)
     checkpoint_filter_callable = checkpoint_filter(col(key_column))  # type: ignore
@@ -386,7 +416,13 @@ def _cleanup_checkpoint_resources(actor_handles: list[ActorHandle] | None, pg: P
 
     if actor_handles:
         for actor in actor_handles:
-            ray.kill(actor)
+            try:
+                ray.kill(actor)
+            except Exception as e:
+                warnings.warn(f"Unable to cleanup checkpoint resources: ray.kill failed: {e}")
 
     if pg:
-        ray.util.remove_placement_group(pg)
+        try:
+            ray.util.remove_placement_group(pg)
+        except Exception as e:
+            warnings.warn(f"Unable to cleanup checkpoint resources: remove_placement_group failed: {e}")
