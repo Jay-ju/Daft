@@ -468,3 +468,38 @@ def test_write_and_read_empty_parquet(tmp_path_factory):
     df.write_parquet(empty_parquet_files, write_mode="overwrite")
 
     assert daft.read_parquet(empty_parquet_files).to_pydict() == {"a": []}
+
+
+def test_parquet_row_group_splitting(tmpdir):
+    file_path = str(tmpdir / "multi_row_group.parquet")
+
+    # 10 row groups, 100 rows each.
+    num_row_groups = 10
+    rows_per_group = 100
+
+    schema = pa.schema([("id", pa.int64()), ("data", pa.string())])
+
+    batches = []
+    for i in range(num_row_groups):
+        start = i * rows_per_group
+        ids = pa.array(range(start, start + rows_per_group), type=pa.int64())
+        data = pa.array(["x" * 100] * rows_per_group, type=pa.string())
+        batch = pa.RecordBatch.from_arrays([ids, data], schema=schema)
+        batches.append(batch)
+
+    with papq.ParquetWriter(file_path, schema) as writer:
+        for batch in batches:
+            writer.write_batch(batch)
+
+    # Force splitting by setting a very small max size
+    with daft.execution_config_ctx(
+        scan_tasks_max_size_bytes=1,
+        scan_tasks_min_size_bytes=1,
+    ):
+        df = daft.read_parquet(file_path)
+        # We expect 10 partitions because we have 10 row groups and we forced splitting
+        assert df.num_partitions() == 10
+
+        # Verify data correctness
+        expected_rows = num_row_groups * rows_per_group
+        assert len(df) == expected_rows

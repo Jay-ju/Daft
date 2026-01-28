@@ -111,6 +111,8 @@ pub struct OptimizerBuilder {
     rule_batches: Vec<RuleBatch>,
     // Config for optimizer.
     config: OptimizerConfig,
+    // Config for execution.
+    execution_config: Option<Arc<DaftExecutionConfig>>,
 }
 
 impl OptimizerBuilder {
@@ -118,7 +120,13 @@ impl OptimizerBuilder {
         Self {
             rule_batches: vec![],
             config: Default::default(),
+            execution_config: None,
         }
+    }
+
+    pub fn with_execution_config(mut self, cfg: Arc<DaftExecutionConfig>) -> Self {
+        self.execution_config = Some(cfg);
+        self
     }
 
     pub fn with_default_optimizations(mut self) -> Self {
@@ -222,7 +230,9 @@ impl OptimizerBuilder {
             ),
             // --- Materialize scan nodes ---
             RuleBatch::new(
-                vec![Box::new(MaterializeScans::new())],
+                vec![Box::new(MaterializeScans::new(
+                    self.execution_config.clone(),
+                ))],
                 RuleExecutionStrategy::Once,
             ),
             // --- Shard scans ---
@@ -695,7 +705,7 @@ mod tests {
         Optimizer::with_rule_batches(
             vec![RuleBatch::new(
                 vec![
-                    Box::new(MaterializeScans::new()),
+                    Box::new(MaterializeScans::new(None)),
                     Box::new(EnrichWithStats::new(None)),
                 ],
                 RuleExecutionStrategy::Once,

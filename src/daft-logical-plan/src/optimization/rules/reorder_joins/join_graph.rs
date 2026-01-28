@@ -1066,7 +1066,7 @@ mod tests {
             .inner_join(join_plan_r, unresolved_col("a").eq(unresolved_col("d")))
             .unwrap();
         let original_plan = join_plan.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()
@@ -1133,7 +1133,7 @@ mod tests {
             .inner_join(join_plan_r, unresolved_col("b").eq(unresolved_col("d")))
             .unwrap();
         let original_plan = join_plan.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()
@@ -1203,7 +1203,7 @@ mod tests {
             .inner_join(scan_c, unresolved_col("a_beta").eq(unresolved_col("c")))
             .unwrap();
         let original_plan = join_plan_2.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()
@@ -1271,7 +1271,7 @@ mod tests {
             .inner_join(join_plan_r, unresolved_col("a").eq(unresolved_col("d")))
             .unwrap();
         let original_plan = join_plan.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()
@@ -1367,7 +1367,7 @@ mod tests {
             .inner_join(join_plan_r, unresolved_col("a").eq(unresolved_col("d")))
             .unwrap();
         let original_plan = join_plan.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()
@@ -1455,7 +1455,7 @@ mod tests {
             .inner_join(join_plan_r, unresolved_col("a").eq(unresolved_col("d")))
             .unwrap();
         let original_plan = join_plan.build();
-        let scan_materializer = MaterializeScans::new();
+        let scan_materializer = MaterializeScans::new(None);
         let original_plan = scan_materializer
             .try_optimize(original_plan)
             .data()

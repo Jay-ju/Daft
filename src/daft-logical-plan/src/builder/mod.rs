@@ -853,6 +853,7 @@ impl LogicalPlanBuilder {
 
         std::thread::spawn(move || {
             let optimizer = OptimizerBuilder::default()
+                .with_execution_config(execution_config.clone())
                 .when(
                     cfg.as_ref()
                         .map(|conf| conf.enable_strict_filter_pushdown)
@@ -922,6 +923,7 @@ impl LogicalPlanBuilder {
         let unoptimized_plan = self.build();
 
         let optimizer = OptimizerBuilder::default()
+            .with_execution_config(execution_config.clone())
             .when(
                 cfg.as_ref()
                     .map(|conf| conf.enable_strict_filter_pushdown)

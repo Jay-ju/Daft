@@ -3,12 +3,13 @@ use std::sync::Arc;
 mod split_jsonl;
 
 use common_daft_config::DaftExecutionConfig;
-use common_error::{DaftError, DaftResult};
+use common_error::DaftResult;
 use common_file_formats::{FileFormatConfig, ParquetSourceConfig};
-use common_scan_info::{SPLIT_AND_MERGE_PASS, ScanTaskLike, ScanTaskLikeRef};
+use common_scan_info::{SPLIT_AND_MERGE_PASS, ScanTaskLikeRef};
 use daft_io::IOStatsContext;
 use daft_parquet::read::read_parquet_metadata;
 use parquet2::metadata::RowGroupList;
+use split_jsonl::split_by_jsonl_ranges;
 
 use crate::{ChunkSpec, DataSource, Pushdowns, ScanTask, ScanTaskRef};
 
@@ -225,7 +226,8 @@ fn split_by_row_groups(
                         &t.sources[..],
                         t.sources.first().map(DataSource::get_chunk_spec),
                         t.pushdowns.limit,
-                    ) && source
+                    ) {
+                        if source
                         .get_size_bytes()
                         .is_none_or(|s| s > max_size_bytes as u64)
                       && source
@@ -311,6 +313,9 @@ fn split_by_row_groups(
 
                         Ok(Box::new(new_tasks.into_iter()))
                     } else {
+                            Ok(Box::new(std::iter::once(Ok(t))))
+                        }
+                    } else {
                         Ok(Box::new(std::iter::once(Ok(t))))
                     }
                 })
@@ -328,31 +333,24 @@ fn split_and_merge_pass(
     if scan_tasks
         .iter()
         .all(|st| st.as_any().downcast_ref::<ScanTask>().is_some())
-        && !scan_tasks
-            .iter()
-            .any(|st| matches!(st.file_format_config().as_ref(), FileFormatConfig::Warc(_)))
     {
-        // TODO(desmond): Here we downcast Arc<dyn ScanTaskLike> to Arc<ScanTask>. ScanTask and DummyScanTask (test only) are
-        // the only non-test implementer of ScanTaskLike. It might be possible to avoid the downcast by implementing merging
-        // at the trait level, but today that requires shifting around a non-trivial amount of code to avoid circular dependencies.
-        let iter: BoxScanTaskIter = Box::new(scan_tasks.as_ref().iter().map(|st| {
-            st.clone()
+        let scan_tasks = Box::new(scan_tasks.iter().map(|st| {
+            Ok(st
+                .clone()
                 .as_any_arc()
                 .downcast::<ScanTask>()
-                .map_err(|e| DaftError::TypeError(format!("Expected Arc<ScanTask>, found {:?}", e)))
+                .expect("Should be ScanTask"))
         }));
-        // Split JSONL by byte ranges aligned to line boundaries for JSONFileFormat, other formats will be leaked through.
-        // If there are other file formats in the future, a pipeline can be constructed to pass split_tasks.
-        let split_jsonl_tasks = split_jsonl::split_by_jsonl_ranges(iter, cfg);
-        let split_tasks = split_by_row_groups(
-            split_jsonl_tasks,
+        let scan_tasks = split_by_row_groups(
+            scan_tasks,
             cfg.parquet_split_row_groups_max_files,
             cfg.scan_tasks_min_size_bytes,
             cfg.scan_tasks_max_size_bytes,
         );
-        let merged_tasks = merge_by_sizes(split_tasks, pushdowns, cfg);
-        let scan_tasks: Vec<Arc<dyn ScanTaskLike>> = merged_tasks
-            .map(|st| st.map(|task| task as Arc<dyn ScanTaskLike>))
+        let scan_tasks = split_by_jsonl_ranges(scan_tasks, cfg);
+        let scan_tasks = merge_by_sizes(scan_tasks, pushdowns, cfg);
+        let scan_tasks = scan_tasks
+            .map(|t| t.map(|t| t as ScanTaskLikeRef))
             .collect::<DaftResult<Vec<_>>>()?;
         Ok(Arc::new(scan_tasks))
     } else {
