@@ -83,6 +83,8 @@ class CheckpointFilter:
             return Series.from_numpy(np.empty(0, dtype=bool))
 
         input_keys = input.to_pylist()
+        input_keys_np = np.asarray(input_keys, dtype=object)
+        # input_keys_np = input.to_arrow().to_numpy(zero_copy_only=False).astype(object, copy=False)
         hash_arr = input.hash().to_arrow()
         hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
         bucket_ids = (hash_np % np.uint64(self.num_buckets)).astype(np.int64, copy=False)
@@ -92,8 +94,11 @@ class CheckpointFilter:
             - np.unique(bucket_ids) 找出这批 input 实际出现了哪些 bucket（如果某些 bucket 没有数据，就不用发 RPC）。
             - np.nonzero(bucket_ids == bucket)[0] 得到属于该 bucket 的所有行下标（是 np.ndarray[int] ）。
             - 最终得到： bucket -> row_indices 的映射
+          indices_by_bucket: bucket_id -> row_indices
+          row_indices 是 input 里的行号（0-based），表示哪些 key 属于这个 bucket
         """
         indices_by_bucket: dict[int, np.ndarray] = {}
+        # TODO: 这里疑似是个问题，会扫描num_buckets次，对每个 bucket 做一次 bucket_ids == bucket ，再 nonzero 这等价于把 bucket_ids 完整扫描 num_buckets 次 （非常贵）
         for bucket in range(self.num_buckets):
             row_indices = np.nonzero(bucket_ids == bucket)[0]
             if len(row_indices) == 0:
@@ -101,13 +106,12 @@ class CheckpointFilter:
             indices_by_bucket[bucket] = row_indices
 
         futures = []
-        bucket_and_indices: list[tuple[int, np.ndarray]] = []
+        row_indices_list: list[np.ndarray] = []
         for bucket, row_indices in indices_by_bucket.items():
             actor = self.actors_by_bucket[bucket]
-            # TODO: 看看这里能否修改
-            keys_subset = [input_keys[i] for i in row_indices]
+            keys_subset = input_keys_np[row_indices].tolist()
             futures.append(actor.filter.remote(keys_subset))
-            bucket_and_indices.append((bucket, row_indices))
+            row_indices_list.append(row_indices)
 
         try:
             results = ray.get(futures, timeout=300)
@@ -115,7 +119,7 @@ class CheckpointFilter:
             raise RuntimeError(f"CheckpointActor filter failed: {e}") from e
 
         final_result = np.full(num_rows, True, dtype=bool)
-        for (_, row_indices), subset_mask in zip(bucket_and_indices, results):
+        for row_indices, subset_mask in zip(row_indices_list, results):
             final_result[row_indices] = subset_mask
 
         return Series.from_numpy(final_result)
