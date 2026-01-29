@@ -82,34 +82,23 @@ class CheckpointFilter:
         if num_rows == 0:
             return Series.from_numpy(np.empty(0, dtype=bool))
 
-        input_keys = input.to_pylist()
-        input_keys_np = np.asarray(input_keys, dtype=object)
-        # input_keys_np = input.to_arrow().to_numpy(zero_copy_only=False).astype(object, copy=False)
         hash_arr = input.hash().to_arrow()
         hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
         bucket_ids = (hash_np % np.uint64(self.num_buckets)).astype(np.int64, copy=False)
 
-        """
-          indices_by_bucket: dict[int, np.ndarray] = {} ... np.unique / np.nonzero
-            - np.unique(bucket_ids) 找出这批 input 实际出现了哪些 bucket（如果某些 bucket 没有数据，就不用发 RPC）。
-            - np.nonzero(bucket_ids == bucket)[0] 得到属于该 bucket 的所有行下标（是 np.ndarray[int] ）。
-            - 最终得到： bucket -> row_indices 的映射
-          indices_by_bucket: bucket_id -> row_indices
-          row_indices 是 input 里的行号（0-based），表示哪些 key 属于这个 bucket
-        """
-        indices_by_bucket: dict[int, np.ndarray] = {}
-        # TODO: 这里疑似是个问题，会扫描num_buckets次，对每个 bucket 做一次 bucket_ids == bucket ，再 nonzero 这等价于把 bucket_ids 完整扫描 num_buckets 次 （非常贵）
-        for bucket in range(self.num_buckets):
-            row_indices = np.nonzero(bucket_ids == bucket)[0]
-            if len(row_indices) == 0:
-                continue
-            indices_by_bucket[bucket] = row_indices
-
         futures = []
         row_indices_list: list[np.ndarray] = []
-        for bucket, row_indices in indices_by_bucket.items():
-            actor = self.actors_by_bucket[bucket]
-            keys_subset = input_keys_np[row_indices].tolist()
+        row_order = np.argsort(bucket_ids, kind="stable")
+        bucket_sorted = bucket_ids[row_order]
+        run_starts = np.flatnonzero(np.r_[True, bucket_sorted[1:] != bucket_sorted[:-1]])
+        run_ends = np.r_[run_starts[1:], len(bucket_sorted)]
+        buckets_present = bucket_sorted[run_starts]
+
+        # row_indices 是 input 里的行号（0-based），表示哪些 key 属于这个 bucket
+        for bucket, start, end in zip(buckets_present, run_starts, run_ends):
+            actor = self.actors_by_bucket[int(bucket)]
+            row_indices = row_order[int(start) : int(end)]
+            keys_subset = input.take(Series.from_numpy(row_indices, name="idx")).to_pylist()
             futures.append(actor.filter.remote(keys_subset))
             row_indices_list.append(row_indices)
 
@@ -370,10 +359,10 @@ def _prepare_checkpoint_filter(
     if not partition_list:
         return [], None, None
 
-    if len(partition_list) < num_buckets:
-        num_buckets = len(partition_list)
-        warnings.warn(
-            f"num_buckets is reduced to {num_buckets} because of insufficient partitions {len(partition_list)}."
+    if len(partition_list) != num_buckets:
+        raise RuntimeError(
+            f"Expected {num_buckets} partitions after repartition by '{key_column}', got {len(partition_list)}. "
+            "This would break hash routing (bucket_id = hash(key) % num_buckets)."
         )
 
     # Create placement group and actors
