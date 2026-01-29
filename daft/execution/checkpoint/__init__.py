@@ -47,6 +47,7 @@ class CheckpointActor:
     def filter(self, input_keys: list[Any]) -> "np.ndarray":  # noqa: UP037
         import numpy as np
 
+        # TODO： 看看能否优化修改，不用pylist
         return np.array([input_key not in self.key_set for input_key in input_keys], dtype=bool)
 
 
@@ -62,7 +63,7 @@ class CheckpointFilter:
             self._enabled = True
             for idx in range(num_buckets):
                 try:
-                    self.actors_by_bucket[idx] = actors_by_bucket[idx]
+                    self.actors_by_bucket[idx] = actors_by_bucket[idx] # idx 是 hash bucket id：Daft 的 hash repartition 输出分区按 bucket_id 顺序排列 (bucket_id = hash(key) % num_buckets) # 
                 except KeyError as e:
                     raise RuntimeError(
                         f"CheckpointActor_{idx} not found. "
@@ -82,12 +83,9 @@ class CheckpointFilter:
             return Series.from_numpy(np.empty(0, dtype=bool))
 
         input_keys = input.to_pylist()
-
-        import pyarrow.compute as pc
-
         hash_arr = input.hash().to_arrow()
-        bucket_arr = pc.mod(pc.fill_null(hash_arr, 0), self.num_buckets)
-        bucket_ids = bucket_arr.to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
+        hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
+        bucket_ids = (hash_np % np.uint64(self.num_buckets)).astype(np.int64, copy=False)
 
         """
           indices_by_bucket: dict[int, np.ndarray] = {} ... np.unique / np.nonzero
@@ -96,13 +94,17 @@ class CheckpointFilter:
             - 最终得到： bucket -> row_indices 的映射
         """
         indices_by_bucket: dict[int, np.ndarray] = {}
-        for bucket in np.unique(bucket_ids):
-            indices_by_bucket[int(bucket)] = np.nonzero(bucket_ids == bucket)[0] # 最终得到： bucket -> row_indices 的映射
+        for bucket in range(self.num_buckets):
+            row_indices = np.nonzero(bucket_ids == bucket)[0]
+            if len(row_indices) == 0:
+                continue
+            indices_by_bucket[bucket] = row_indices
 
         futures = []
         bucket_and_indices: list[tuple[int, np.ndarray]] = []
         for bucket, row_indices in indices_by_bucket.items():
             actor = self.actors_by_bucket[bucket]
+            # TODO: 看看这里能否修改
             keys_subset = [input_keys[i] for i in row_indices]
             futures.append(actor.filter.remote(keys_subset))
             bucket_and_indices.append((bucket, row_indices))
@@ -410,7 +412,7 @@ def _prepare_checkpoint_filter(
                 .remote(i, partition_list[i : i + 1], key_column)
             )
             actor_handles.append(actor)
-            actors_by_bucket[i] = actor
+            actors_by_bucket[i] = actor  # i 是 hash bucket id：Daft 的 hash repartition 输出分区按 bucket_id 顺序排列 (bucket_id = hash(key) % num_buckets) # 
 
         ray.get(
             [actor.__ray_ready__.remote() for actor in actor_handles],
