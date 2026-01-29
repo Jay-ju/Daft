@@ -33,7 +33,8 @@ PLACEMENT_GROUP_READY_TIMEOUT_SECONDS = 10
 
 
 class CheckpointActor:
-    def __init__(self, partition_list: list[ray.ObjectRef], key_column_name: str):
+    def __init__(self, bucket_id: int, partition_list: list[ray.ObjectRef], key_column_name: str):
+        self.bucket_id = bucket_id
         logger.info("Start initializing CheckpointActor")
         import ray
 
@@ -52,18 +53,17 @@ class CheckpointActor:
 # TODO: support native mode in future if needed
 @cls(max_concurrency=1)
 class CheckpointFilter:
-    def __init__(self, num_buckets: int, actor_handles: list[ray.ActorHandle] | None = None):
-        self.actors = []
-        if actor_handles is None:
+    def __init__(self, num_buckets: int, actors_by_bucket: dict[int, ray.ActorHandle] | None = None):
+        self.num_buckets = num_buckets
+        self.actors_by_bucket: dict[int, ray.ActorHandle] = {}
+        if actors_by_bucket is None:
             self._enabled = False
         else:
             self._enabled = True
-            self.actor_handles = actor_handles
             for idx in range(num_buckets):
                 try:
-                    actor = actor_handles[idx]
-                    self.actors.append(actor)
-                except ValueError as e:
+                    self.actors_by_bucket[idx] = actors_by_bucket[idx]
+                except KeyError as e:
                     raise RuntimeError(
                         f"CheckpointActor_{idx} not found. "
                         f"Please create actors before initializing CheckpointManager."
@@ -77,15 +77,44 @@ class CheckpointFilter:
         if not self._enabled:
             return Series.from_numpy(np.full(len(input), True, dtype=bool))
 
+        num_rows = len(input)
+        if num_rows == 0:
+            return Series.from_numpy(np.empty(0, dtype=bool))
+
         input_keys = input.to_pylist()
-        filter_futures = [actor.filter.remote(input_keys) for actor in self.actors]
+
+        import pyarrow.compute as pc
+
+        hash_arr = input.hash().to_arrow()
+        bucket_arr = pc.mod(pc.fill_null(hash_arr, 0), self.num_buckets)
+        bucket_ids = bucket_arr.to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
+
+        """
+          indices_by_bucket: dict[int, np.ndarray] = {} ... np.unique / np.nonzero
+            - np.unique(bucket_ids) 找出这批 input 实际出现了哪些 bucket（如果某些 bucket 没有数据，就不用发 RPC）。
+            - np.nonzero(bucket_ids == bucket)[0] 得到属于该 bucket 的所有行下标（是 np.ndarray[int] ）。
+            - 最终得到： bucket -> row_indices 的映射
+        """
+        indices_by_bucket: dict[int, np.ndarray] = {}
+        for bucket in np.unique(bucket_ids):
+            indices_by_bucket[int(bucket)] = np.nonzero(bucket_ids == bucket)[0] # 最终得到： bucket -> row_indices 的映射
+
+        futures = []
+        bucket_and_indices: list[tuple[int, np.ndarray]] = []
+        for bucket, row_indices in indices_by_bucket.items():
+            actor = self.actors_by_bucket[bucket]
+            keys_subset = [input_keys[i] for i in row_indices]
+            futures.append(actor.filter.remote(keys_subset))
+            bucket_and_indices.append((bucket, row_indices))
 
         try:
-            filter_results = ray.get(filter_futures, timeout=300)
+            results = ray.get(futures, timeout=300)
         except Exception as e:
             raise RuntimeError(f"CheckpointActor filter failed: {e}") from e
 
-        final_result = np.logical_and.reduce(filter_results)
+        final_result = np.full(num_rows, True, dtype=bool)
+        for (_, row_indices), subset_mask in zip(bucket_and_indices, results):
+            final_result[row_indices] = subset_mask
 
         return Series.from_numpy(final_result)
 
@@ -319,11 +348,9 @@ def _prepare_checkpoint_filter(
                 df_keys = df_keys.select(key_column)
             num_partitions = df_keys.num_partitions()
             if num_partitions is None:
-                raise RuntimeError(
-                    "Unable to determine number of partitions for checkpoint scan; "
-                    "cannot coalesce partitions before iter_partitions."
-                )
-            df_keys = df_keys.into_partitions(num_partitions)
+                raise RuntimeError("Unable to determine number of partitions for checkpoint scan.")
+            
+            df_keys = df_keys.repartition(num_buckets, key_column)
             partition_list = list(df_keys.iter_partitions())
             logger.info("Checkpoint scan partitions=%s", len(partition_list))
     except FileNotFoundError as e:
@@ -366,14 +393,11 @@ def _prepare_checkpoint_filter(
             f"Error message: {timeout_err}"
         ) from timeout_err
 
-    base_len, remainder = _split_partitions_evenly(len(partition_list), num_buckets)
-
     actor_handles: list[ActorHandle] = []
-    start = 0
+    actors_by_bucket: dict[int, ActorHandle] = {}
     try:
         logger.info("Creating checkpoint actors: count=%s", num_buckets)
         for i in range(num_buckets):
-            end = start + base_len + (1 if i < remainder else 0)
             actor = (
                 ray.remote(CheckpointActor)
                 .options(
@@ -383,10 +407,10 @@ def _prepare_checkpoint_filter(
                         placement_group_bundle_index=i,
                     ),
                 )
-                .remote(partition_list[start:end], key_column)
+                .remote(i, partition_list[i : i + 1], key_column)
             )
             actor_handles.append(actor)
-            start = end
+            actors_by_bucket[i] = actor
 
         ray.get(
             [actor.__ray_ready__.remote() for actor in actor_handles],
@@ -400,7 +424,7 @@ def _prepare_checkpoint_filter(
     finally:
         del df_keys
 
-    checkpoint_filter = CheckpointFilter(num_buckets=num_buckets, actor_handles=actor_handles)
+    checkpoint_filter = CheckpointFilter(num_buckets=num_buckets, actors_by_bucket=actors_by_bucket)
     checkpoint_filter_callable = checkpoint_filter(col(key_column))  # type: ignore
     return actor_handles, pg, checkpoint_filter_callable  # type: ignore
 
