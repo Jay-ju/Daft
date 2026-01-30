@@ -14,7 +14,7 @@ DAFT_RUNNER=ray pytest -s tests/dataframe/test_hash_repartition_bucket_mapping.p
 
 def test_hash_repartition_partition_index_is_bucket_id(make_df) -> None:
     num_buckets = 7
-    ids = list(range(200))
+    ids = list(range(200000))
 
     df = make_df({"id": ids}).select("id").repartition(num_buckets, "id")
     parts = list(df.iter_partitions())

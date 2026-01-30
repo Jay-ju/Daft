@@ -19,6 +19,7 @@ def _bucket_ids_for_series(s: daft.Series, num_buckets: int) -> np.ndarray:
         bucket_arr = pc.modulus(hash_arr, num_buckets)
         return bucket_arr.to_numpy(zero_copy_only=False).astype(np.int64, copy=False)
     except Exception:
+        print("Exception")
         hashes = s.hash().to_pylist()
         hashes_np = np.fromiter(hashes, dtype=np.uint64, count=len(hashes))
         return (hashes_np % np.uint64(num_buckets)).astype(np.int64, copy=False)
