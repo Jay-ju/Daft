@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from daft.udf import cls, method
+from daft.udf import cls, func, method
 from typing import TYPE_CHECKING, Any
 from daft.datatype import DataType
 from daft.series import Series
@@ -33,22 +33,16 @@ PLACEMENT_GROUP_READY_TIMEOUT_SECONDS = 10
 
 
 class CheckpointActor:
-    def __init__(self, bucket_id: int, partition_list: list[ray.ObjectRef], key_column_name: str):
+    def __init__(self, bucket_id: int):
         self.bucket_id = bucket_id
-        logger.info("Start initializing CheckpointActor")
-        import ray
+        self.key_set: set[Any] = set()
 
-        partitions = ray.get(partition_list)
-        key_col = [partition.to_pydict()[key_column_name] for partition in partitions]
-        self.key_set = set([item for sublist in key_col for item in sublist])
-        print(f"CheckpointActor {self.bucket_id} initialized with {len(self.key_set)} keys")
-        del partitions, key_col, partition_list
-        logger.info("CheckpointActor initialized")
+    def add_keys(self, input_keys: list[Any]) -> None:
+        self.key_set.update(input_keys)
 
     def filter(self, input_keys: list[Any]) -> "np.ndarray":  # noqa: UP037
         import numpy as np
-        print(f"CheckpointActor {self.bucket_id} filter {len(input_keys)} keys")
-        # TODO： 看看能否优化修改，不用pylist
+
         return np.array([input_key not in self.key_set for input_key in input_keys], dtype=bool)
 
 
@@ -64,7 +58,7 @@ class CheckpointFilter:
             self._enabled = True
             for idx in range(num_buckets):
                 try:
-                    self.actors_by_bucket[idx] = actors_by_bucket[idx] # idx 是 hash bucket id：Daft 的 hash repartition 输出分区按 bucket_id 顺序排列 (bucket_id = hash(key) % num_buckets) # 
+                    self.actors_by_bucket[idx] = actors_by_bucket[idx]
                 except KeyError as e:
                     raise RuntimeError(
                         f"CheckpointActor_{idx} not found. "
@@ -82,9 +76,6 @@ class CheckpointFilter:
         num_rows = len(input)
         if num_rows == 0:
             return Series.from_numpy(np.empty(0, dtype=bool))
-
-
-        time1 = time.time()
         hash_arr = input.hash().to_arrow()
         hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
         bucket_ids = (hash_np % np.uint64(self.num_buckets)).astype(np.int64, copy=False)
@@ -104,21 +95,14 @@ class CheckpointFilter:
             keys_subset = input.take(Series.from_numpy(row_indices, name="idx")).to_pylist()
             futures.append(actor.filter.remote(keys_subset))
             row_indices_list.append(row_indices)
-        time2 = time.time()
-
         try:
             results = ray.get(futures, timeout=300)
         except Exception as e:
             raise RuntimeError(f"CheckpointActor filter failed: {e}") from e
-        time3 = time.time()
 
         final_result = np.full(num_rows, True, dtype=bool)
         for row_indices, subset_mask in zip(row_indices_list, results):
             final_result[row_indices] = subset_mask
-
-        time4 = time.time()
-        print(f"CheckpointFilter hash:{time2 - time1}, filter:{time3 - time2}, total:{time4 - time1}")
-
         return Series.from_numpy(final_result)
 
 
@@ -368,12 +352,6 @@ def _prepare_checkpoint_filter(
     if not partition_list:
         return [], None, None
 
-    if len(partition_list) != num_buckets:
-        raise RuntimeError(
-            f"Expected {num_buckets} partitions after repartition by '{key_column}', got {len(partition_list)}. "
-            "This would break hash routing (bucket_id = hash(key) % num_buckets)."
-        )
-
     # Create placement group and actors
     import ray
     from ray.exceptions import GetTimeoutError
@@ -411,10 +389,51 @@ def _prepare_checkpoint_filter(
                         placement_group_bundle_index=i,
                     ),
                 )
-                .remote(i, partition_list[i : i + 1], key_column)
+                .remote(i)
             )
             actor_handles.append(actor)
-            actors_by_bucket[i] = actor  # i 是 hash bucket id：Daft 的 hash repartition 输出分区按 bucket_id 顺序排列 (bucket_id = hash(key) % num_buckets) # 
+            actors_by_bucket[i] = actor
+
+        @func.batch(return_dtype=DataType.null())
+        async def ingest_keys(
+            input: Series,
+            *,
+            actors_by_bucket: dict[int, ActorHandle] = actors_by_bucket,
+            num_buckets: int = num_buckets,
+        ) -> Series:
+            import asyncio
+            import numpy as np
+            import pyarrow as pa
+
+            num_rows = len(input)
+            if num_rows == 0:
+                return Series.from_arrow(pa.nulls(0))
+
+            keys = input.to_pylist()
+            keys_np = np.asarray(keys, dtype=object)
+
+            hash_arr = input.hash().to_arrow()
+            hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
+            bucket_ids = (hash_np % np.uint64(num_buckets)).astype(np.int64, copy=False)
+
+            row_order = np.argsort(bucket_ids, kind="stable")
+            bucket_sorted = bucket_ids[row_order]
+            run_starts = np.flatnonzero(np.r_[True, bucket_sorted[1:] != bucket_sorted[:-1]])
+            run_ends = np.r_[run_starts[1:], len(bucket_sorted)]
+            buckets_present = bucket_sorted[run_starts]
+
+            futures = []
+            for bucket, start, end in zip(buckets_present, run_starts, run_ends):
+                actor = actors_by_bucket[int(bucket)]
+                subset = keys_np[row_order[int(start) : int(end)]].tolist()
+                futures.append(actor.add_keys.remote(subset))
+
+            if futures:
+                await asyncio.wait_for(asyncio.gather(*futures), timeout=300)
+
+            return Series.from_arrow(pa.nulls(num_rows))
+
+        df_keys.select(ingest_keys(col(key_column))).collect()
 
         ray.get(
             [actor.__ray_ready__.remote() for actor in actor_handles],
