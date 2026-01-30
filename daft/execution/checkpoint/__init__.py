@@ -91,11 +91,11 @@ class CheckpointFilter:
         for bucket, start, end in zip(buckets_present, run_starts, run_ends):
             actor = self.actors_by_bucket[int(bucket)]
             row_indices = row_order[int(start) : int(end)]
-            keys_subset = input.take(Series.from_numpy(row_indices, name="idx")).to_pylist()
-            futures.append(actor.filter.remote(keys_subset))
+            keys_subset = input.take(Series.from_numpy(row_indices, name="idx")).to_pylist() #TODO:耗时多
+            futures.append(actor.filter.remote(keys_subset))         # TODO：耗时多
             row_indices_list.append(row_indices)
         try:
-            results = ray.get(futures, timeout=300)
+            results = ray.get(futures, timeout=300)         # TODO：耗时多
         except Exception as e:
             raise RuntimeError(f"CheckpointActor filter failed: {e}") from e
 
