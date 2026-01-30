@@ -31,7 +31,6 @@ SCAN_TASKS_MAX_SIZE_BYTES = "scan_tasks_max_size_bytes"
 SCAN_TASKS_MIN_SIZE_BYTES = "scan_tasks_min_size_bytes"
 PLACEMENT_GROUP_READY_TIMEOUT_SECONDS = 10
 
-
 class CheckpointActor:
     def __init__(self, bucket_id: int):
         self.bucket_id = bucket_id
@@ -381,7 +380,7 @@ def _prepare_checkpoint_filter(
         logger.info("Creating checkpoint actors: count=%s", num_buckets)
         for i in range(num_buckets):
             actor = (
-                ray.remote(CheckpointActor)
+                ray.remote(max_concurrency=10)(CheckpointActor)
                 .options(
                     num_cpus=num_cpus,
                     scheduling_strategy=ray.util.scheduling_strategies.PlacementGroupSchedulingStrategy(
