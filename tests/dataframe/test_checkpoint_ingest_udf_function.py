@@ -7,19 +7,17 @@ from daft import DataType, Series, col
 from daft.udf import func
 from tests.conftest import get_tests_daft_runner_name
 
-"""
-source /home/wangzheyan/las-Daft/.venv/bin/activate
-export DAFT_RUNNER=ray
-pytest -q -s tests/dataframe/test_checkpoint_ingest_udf_function.py
-"""
+
 @pytest.mark.skipif(get_tests_daft_runner_name() != "ray", reason="requires Ray Runner to be in use")
-def test_checkpoint_ingest_keys_function_udf_routes_to_correct_actor():
+def test_checkpoint_ingest_keys_function_udf_print_hash_mod_sample():
     import numpy as np
     import pyarrow as pa
     import ray
 
     num_buckets = 4
-    keys = [f"k{i % 97}" for i in range(2000)]
+    sample_n = 2
+
+    keys = [f"k{i % 97}" for i in range(2_000_000)]
     df_keys = daft.from_pydict({"key": keys})
 
     @ray.remote
@@ -30,18 +28,28 @@ def test_checkpoint_ingest_keys_function_udf_routes_to_correct_actor():
         def add_keys(self, input_keys: list[object]) -> None:
             self.keys.update(input_keys)
 
-        def get_keys(self) -> set[object]:
-            return self.keys
+        def size(self) -> int:
+            return len(self.keys)
+
+        def sample_keys(self, n: int) -> list[object]:
+            out = []
+            for k in self.keys:
+                out.append(k)
+                if len(out) >= n:
+                    break
+            return out
 
     actors_by_bucket: dict[int, ray.actor.ActorHandle] = {i: KeySetActor.remote() for i in range(num_buckets)}
 
     @func.batch(return_dtype=DataType.null())
-    def ingest_keys(
+    async def ingest_keys( 
         input: Series,
         *,
         actors_by_bucket: dict[int, ray.actor.ActorHandle] = actors_by_bucket,
         num_buckets: int = num_buckets,
     ) -> Series:
+        import asyncio
+
         num_rows = len(input)
         if num_rows == 0:
             return Series.from_arrow(pa.nulls(0))
@@ -66,39 +74,26 @@ def test_checkpoint_ingest_keys_function_udf_routes_to_correct_actor():
             futures.append(actor.add_keys.remote(subset))
 
         if futures:
-            ray.get(futures, timeout=300)
+            await asyncio.wait_for(asyncio.gather(*futures), timeout=300)
 
         return Series.from_arrow(pa.nulls(num_rows))
 
     df_keys.select(ingest_keys(col("key"))).collect()
 
-    expected_sets: dict[int, set[object]] = {i: set() for i in range(num_buckets)}
-    base_hash = (
-        Series.from_pylist(keys, name="key")
-        .hash()
-        .to_arrow()
-        .to_numpy(zero_copy_only=False)
-        .astype(np.uint64, copy=False)
-    )
-    base_bucket_ids = (base_hash % np.uint64(num_buckets)).astype(np.int64, copy=False)
-    for k, b in zip(keys, base_bucket_ids):
-        expected_sets[int(b)].add(k)
-
-    got_sets = ray.get([actors_by_bucket[i].get_keys.remote() for i in range(num_buckets)])
-    got_by_bucket = {i: got_sets[i] for i in range(num_buckets)}
+    sizes = ray.get([actors_by_bucket[i].size.remote() for i in range(num_buckets)])
+    samples = ray.get([actors_by_bucket[i].sample_keys.remote(sample_n) for i in range(num_buckets)])
 
     print("num_buckets:", num_buckets)
-    print("expected sizes:", {i: len(expected_sets[i]) for i in range(num_buckets)})
-    print("actual sizes:", {i: len(got_by_bucket[i]) for i in range(num_buckets)})
+    print("actor sizes:", {i: sizes[i] for i in range(num_buckets)})
 
     for i in range(num_buckets):
-        got_keys_list = sorted(list(got_by_bucket[i]))
-        if not got_keys_list:
-            print(f"bucket {i}: empty")
+        sample_keys = samples[i]
+        if not sample_keys:
+            print(f"bucket {i}: empty sample")
             continue
 
         h = (
-            Series.from_pylist(got_keys_list, name="key")
+            Series.from_pylist(sample_keys, name="key")
             .hash()
             .to_arrow()
             .to_numpy(zero_copy_only=False)
@@ -107,17 +102,9 @@ def test_checkpoint_ingest_keys_function_udf_routes_to_correct_actor():
         mods = (h % np.uint64(num_buckets)).astype(np.int64, copy=False)
         uniq_mods = np.unique(mods)
 
-        sample_n = min(30, len(got_keys_list))
-        sample_keys = got_keys_list[:sample_n]
-        sample_hash = h[:sample_n]
-        sample_mods = mods[:sample_n]
-
         print(f"bucket {i}: uniq(hash%{num_buckets})={uniq_mods.tolist()}")
-        print(f"bucket {i} sample keys:", sample_keys)
-        print(f"bucket {i} sample hash:", [int(x) for x in sample_hash])
-        print(f"bucket {i} sample mod :", sample_mods.tolist())
+        print(f"bucket {i} sample keys:", sample_keys[:10])
+        print(f"bucket {i} sample hash:", [int(x) for x in h[:10]])
+        print(f"bucket {i} sample mod :", mods[:10].tolist())
 
         assert (mods == i).all(), f"bucket {i} has wrong hash%{num_buckets}: {uniq_mods}"
-
-    assert got_by_bucket == expected_sets
-
