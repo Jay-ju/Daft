@@ -332,23 +332,14 @@ def _prepare_checkpoint_filter(
             df_keys = read_fn(path=str(root_dir), io_config=io_config)
             if key_column:
                 df_keys = df_keys.select(key_column)
-            num_partitions = df_keys.num_partitions()
-            if num_partitions is None:
-                raise RuntimeError("Unable to determine number of partitions for checkpoint scan.")
-            df_keys = df_keys.into_partitions(num_partitions)
-            
-            df_keys = df_keys.repartition(num_buckets, key_column)
-            partition_list = list(df_keys.iter_partitions())
-            logger.info("Checkpoint scan partitions=%s", len(partition_list))
     except FileNotFoundError as e:
         warnings.warn(
             f"{root_dir} not found, checkpointing will not be supported because it's unnecessary. message: {e}"
         )
-        partition_list = []
     except Exception as e:
         raise RuntimeError(f"Unable to read checkpoint at {root_dir}: {e}") from e
 
-    if not partition_list:
+    if df_keys is None:
         return [], None, None
 
     # Create placement group and actors
@@ -425,6 +416,7 @@ def _prepare_checkpoint_filter(
             for bucket, start, end in zip(buckets_present, run_starts, run_ends):
                 actor = actors_by_bucket[int(bucket)]
                 subset = keys_np[row_order[int(start) : int(end)]].tolist()
+                print(f"in ingest_keys: bucket={bucket} start={start} end={end} num_keys={len(subset)}")
                 futures.append(actor.add_keys.remote(subset))
 
             if futures:
@@ -433,12 +425,6 @@ def _prepare_checkpoint_filter(
             return Series.from_arrow(pa.nulls(num_rows))
 
         df_keys.select(ingest_keys(col(key_column))).collect()
-
-        ray.get(
-            [actor.__ray_ready__.remote() for actor in actor_handles],
-            timeout=PLACEMENT_GROUP_READY_TIMEOUT_SECONDS,
-        )
-        logger.info("All checkpoint actors are ready")
     except Exception as e:
         logger.exception("Failed to create all checkpoint actors")
         _cleanup_checkpoint_resources(actor_handles, pg)
