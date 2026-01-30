@@ -41,12 +41,13 @@ class CheckpointActor:
         partitions = ray.get(partition_list)
         key_col = [partition.to_pydict()[key_column_name] for partition in partitions]
         self.key_set = set([item for sublist in key_col for item in sublist])
+        print(f"CheckpointActor {self.bucket_id} initialized with {len(self.key_set)} keys")
         del partitions, key_col, partition_list
         logger.info("CheckpointActor initialized")
 
     def filter(self, input_keys: list[Any]) -> "np.ndarray":  # noqa: UP037
         import numpy as np
-
+        print(f"CheckpointActor {self.bucket_id} filter {len(input_keys)} keys")
         # TODO： 看看能否优化修改，不用pylist
         return np.array([input_key not in self.key_set for input_key in input_keys], dtype=bool)
 
@@ -82,6 +83,8 @@ class CheckpointFilter:
         if num_rows == 0:
             return Series.from_numpy(np.empty(0, dtype=bool))
 
+
+        time1 = time.time()
         hash_arr = input.hash().to_arrow()
         hash_np = hash_arr.to_numpy(zero_copy_only=False).astype(np.uint64, copy=False)
         bucket_ids = (hash_np % np.uint64(self.num_buckets)).astype(np.int64, copy=False)
@@ -101,15 +104,20 @@ class CheckpointFilter:
             keys_subset = input.take(Series.from_numpy(row_indices, name="idx")).to_pylist()
             futures.append(actor.filter.remote(keys_subset))
             row_indices_list.append(row_indices)
+        time2 = time.time()
 
         try:
             results = ray.get(futures, timeout=300)
         except Exception as e:
             raise RuntimeError(f"CheckpointActor filter failed: {e}") from e
+        time3 = time.time()
 
         final_result = np.full(num_rows, True, dtype=bool)
         for row_indices, subset_mask in zip(row_indices_list, results):
             final_result[row_indices] = subset_mask
+
+        time4 = time.time()
+        print(f"CheckpointFilter hash:{time2 - time1}, filter:{time3 - time2}, total:{time4 - time1}")
 
         return Series.from_numpy(final_result)
 
@@ -344,6 +352,7 @@ def _prepare_checkpoint_filter(
             num_partitions = df_keys.num_partitions()
             if num_partitions is None:
                 raise RuntimeError("Unable to determine number of partitions for checkpoint scan.")
+            df_keys = df_keys.into_partitions(num_partitions)
             
             df_keys = df_keys.repartition(num_buckets, key_column)
             partition_list = list(df_keys.iter_partitions())
